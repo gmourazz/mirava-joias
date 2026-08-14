@@ -1,0 +1,30 @@
+# Segredos — NUNCA versione. Ver docs/COMO-RODAR-EM-OUTRA-MAQUINA.md
+# para saber como levar os segredos pra outra máquina sem usar o git.
+.env
+.env.*
+!.env.exemplo
+!.env.example
+
+# Node / front
+node_modules/
+dist/
+build/
+.vite/
+
+# Go
+mirava-eccomerce/api/servidor
+mirava-eccomerce/api/bin/
+*.out
+
+# Supabase CLI
+mirava-eccomerce/supabase/.temp/
+mirava-eccomerce/supabase/.branches/
+
+# Sistema
+.DS_Store
+*.log
+/tmp/
+
+# Configuração local do Claude Code — às vezes acumula segredo em "permissions.allow"
+.claude/settings.local.json
+.claude/settings.json

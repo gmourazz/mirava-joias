@@ -1,0 +1,17 @@
+<svg width="600" height="420" viewBox="0 0 600 420" xmlns="http://www.w3.org/2000/svg">
+<title>Mirava Joias — logo principal (fundo escuro)</title>
+<desc>Logo vertical da marca Mirava em fundo vinho escuro, com tracos e texto em rosa claro.</desc>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&amp;family=Montserrat:wght@400&amp;display=swap');
+.nome { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; }
+.sub { font-family: 'Montserrat', Arial, sans-serif; }
+</style>
+<rect width="600" height="420" fill="#5C2A46"/>
+<path d="M190 250 C190 140, 252 140, 300 219 C348 140, 410 140, 410 250"
+      fill="none" stroke="#FDCAE1" stroke-width="4" stroke-linecap="round"/>
+<circle cx="410" cy="250" r="8" fill="#FDCAE1"/>
+<text x="300" y="345" class="nome" font-size="82" letter-spacing="16" text-anchor="middle" fill="#FFE5F0">MIRAVA</text>
+<line x1="228" y1="375" x2="272" y2="375" stroke="#C999AF" stroke-width="1.2"/>
+<text x="300" y="380" class="sub" font-size="14" letter-spacing="6" text-anchor="middle" fill="#FDCAE1">JOIAS</text>
+<line x1="328" y1="375" x2="372" y2="375" stroke="#C999AF" stroke-width="1.2"/>
+</svg>

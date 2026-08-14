@@ -1,0 +1,11 @@
+# Segredos — NUNCA versione
+.env
+.env.local
+.env.producao
+
+# Binário compilado
+/servidor
+/bin/
+
+# Cobertura de teste
+*.out

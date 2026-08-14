@@ -1,0 +1,8 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+<title>Mirava — icone de app</title>
+<desc>Icone de aplicativo da Mirava: fundo rosa com monograma M em branco.</desc>
+<rect width="512" height="512" rx="112" fill="#D46A9F"/>
+<path d="M150 330 C150 180, 212 180, 260 288 C308 180, 370 180, 370 330"
+      fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+<circle cx="370" cy="330" r="18" fill="#FFE5F0"/>
+</svg>

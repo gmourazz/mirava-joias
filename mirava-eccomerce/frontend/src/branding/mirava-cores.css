@@ -1,0 +1,18 @@
+:root {
+  /* Base */
+  --color-bg: #FFFFFF;         /* fundo principal */
+  --color-surface: #FFE5F0;    /* fundo suave / seções */
+  --color-surface-2: #FDCAE1;  /* cards */
+  --color-border: #E3B1C8;     /* bordas / detalhes */
+
+  /* Acentos */
+  --color-accent: #D46A9F;      /* CTA / botões / links */
+  --color-accent-soft: #C999AF; /* hover / destaque suave */
+
+  /* Texto */
+  --color-text: #8E3B6B;        /* texto principal */
+
+  /* Tema escuro (opcional) */
+  --color-bg-dark: #5C2A46;
+  --color-text-on-dark: #FFE5F0;
+}

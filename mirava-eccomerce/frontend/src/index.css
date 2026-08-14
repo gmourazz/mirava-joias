@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Marcellus", Georgia, serif;
+  --font-script: "Italiana", serif;
+  --font-sans: "Montserrat", system-ui, sans-serif;
+
+  --color-paper: #ffffff;
+  --color-cream: #fff7fb;
+  --color-blush: #ffe5f0;
+  --color-blush-2: #fdcae1;
+  --color-rose: #e3b1c8;
+  --color-wine: #d46a9f;
+  --color-wine-dark: #8e3b6b;
+  --color-plum: #5c2a46;
+  --color-mauve: #b49aa6;
+  --color-ink: #8e3b6b;
+  --color-ink-soft: #6e5a64;
+
+  --animate-rise: rise 900ms cubic-bezier(0.22, 0.7, 0.25, 1) both;
+  --animate-fade-in: fadeIn 320ms ease both;
+  --animate-slide-in: slideIn 460ms cubic-bezier(0.22, 0.7, 0.25, 1) both;
+  --animate-ann-in: annIn 12s infinite both;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(22px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes annIn {
+    0% {
+      opacity: 0;
+    }
+    6%,
+    30% {
+      opacity: 1;
+    }
+    36%,
+    100% {
+      opacity: 0;
+    }
+  }
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+  }
+  a {
+    color: var(--color-wine);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--color-wine-dark);
+  }
+  ::selection {
+    background: var(--color-rose);
+  }
+  button:focus-visible,
+  a:focus-visible {
+    outline: 1.5px solid var(--color-wine);
+    outline-offset: 3px;
+  }
+  img {
+    transition: transform 900ms cubic-bezier(0.22, 0.7, 0.25, 1);
+  }
+}
+
+@layer utilities {
+  .zoom-on-hover:hover img {
+    transform: scale(1.05);
+  }
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition:
+      opacity 900ms cubic-bezier(0.22, 0.7, 0.25, 1),
+      transform 900ms cubic-bezier(0.22, 0.7, 0.25, 1);
+  }
+  .reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

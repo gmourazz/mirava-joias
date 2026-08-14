@@ -1,0 +1,8 @@
+<svg width="300" height="220" viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg">
+<title>Mirava — monograma isolado</title>
+<desc>Monograma M da Mirava em traco fino continuo com bolinha na ponta.</desc>
+<rect width="300" height="220" fill="#FFFFFF"/>
+<path d="M60 160 C60 60, 113 60, 155 132 C197 60, 250 60, 250 160"
+      fill="none" stroke="#D46A9F" stroke-width="5" stroke-linecap="round"/>
+<circle cx="250" cy="160" r="9" fill="#D46A9F"/>
+</svg>

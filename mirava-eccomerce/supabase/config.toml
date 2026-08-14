@@ -1,0 +1,66 @@
+# Configuração da CLI do Supabase.
+#
+# Rode os comandos a partir de `mirava-eccomerce/` (o diretório PAI desta
+# pasta) — a CLI procura por `supabase/config.toml` a partir de onde você está.
+#
+#   cd ~/Documents/mirava/mirava-eccomerce
+#   supabase link --project-ref SEU_PROJECT_REF
+#   supabase db push
+
+project_id = "mirava"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+# Teto de linhas por requisição. Protege contra alguém pedir a tabela inteira
+# de uma vez — a vitrine nunca precisa de mais que isso.
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+# Captura os e-mails no desenvolvimento local, para você ver o link de
+# confirmação sem configurar servidor de e-mail.
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"   # foto de joia comprimida em .webp fica bem abaixo
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/**"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# Desligado só no desenvolvimento: com confirmação ligada, cada cadastro de
+# teste exige abrir e-mail e clicar em link.
+# LIGUE ANTES DE LANÇAR — senão qualquer pessoa cria conta com e-mail alheio.
+enable_confirmations = false
+double_confirm_changes = true
+
+[auth.external.google]
+enabled = false            # ligue depois de criar as credenciais no Google Cloud
+client_id = ""
+secret = ""
+
+[analytics]
+enabled = false

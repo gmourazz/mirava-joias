@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mirava · Simulador de preços</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --branco: #FFFFFF;
+    --veu: #FFE5F0;
+    --bebe: #FDCAE1;
+    --borda: #E3B1C8;
+    --acinzentado: #C999AF;
+    --cta: #D46A9F;
+    --vinho: #8E3B6B;
+    --plum: #5C2A46;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 64px;
+    font-family: Montserrat, system-ui, sans-serif;
+    background: var(--branco);
+    color: var(--vinho);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 {
+    font-family: Marcellus, Georgia, serif;
+    font-size: 30px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    margin: 0 0 4px;
+  }
+  .sub { color: var(--acinzentado); font-size: 13.5px; margin: 0 0 32px; }
+  h2 {
+    font-family: Marcellus, Georgia, serif;
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    margin: 40px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--veu);
+  }
+  label { display: block; font-size: 12.5px; color: var(--acinzentado); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+  input[type="number"], select {
+    width: 100%; padding: 10px 12px; font-family: inherit; font-size: 15px;
+    color: var(--vinho); background: var(--branco);
+    border: 1px solid var(--borda); border-radius: 8px; outline: none;
+  }
+  input[type="number"]:focus, select:focus { border-color: var(--cta); }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+    background: var(--bebe); border-radius: 2px; outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--cta); cursor: pointer; border: 3px solid var(--branco);
+    box-shadow: 0 0 0 1px var(--borda);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px; height: 20px; border-radius: 50%; background: var(--cta);
+    cursor: pointer; border: 3px solid var(--branco);
+  }
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
+  .slider-row { display: flex; align-items: center; gap: 16px; margin-top: 20px; }
+  .slider-row label { margin: 0; min-width: 84px; }
+  .slider-val { font-size: 17px; font-weight: 500; min-width: 58px; text-align: right; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-top: 28px; }
+  .card { background: var(--veu); border-radius: 12px; padding: 18px; }
+  .card p.lab { margin: 0 0 6px; font-size: 12px; color: var(--acinzentado); text-transform: uppercase; letter-spacing: 0.06em; }
+  .card p.val { margin: 0; font-family: Marcellus, Georgia, serif; font-size: 28px; }
+  .alerta { margin-top: 20px; padding: 14px 16px; border-radius: 10px; font-size: 13.5px; display: none; }
+  .alerta.warn { background: #FFF4E0; color: #8A5A00; }
+  .alerta.bad { background: #FDE7E7; color: #A32D2D; }
+  .cen { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .cen div { border: 1px solid var(--veu); border-radius: 12px; padding: 14px; }
+  .cen div.on { border: 2px solid var(--cta); }
+  .cen .m { font-size: 12px; color: var(--acinzentado); margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .cen .p { font-family: Marcellus, Georgia, serif; font-size: 20px; margin: 0 0 3px; }
+  .cen .l { font-size: 12.5px; margin: 0; color: var(--acinzentado); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--acinzentado); padding: 8px 10px; border-bottom: 1px solid var(--veu); }
+  td { padding: 10px; border-bottom: 1px solid #FBF6F8; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .nota { font-size: 13px; color: var(--acinzentado); margin-top: 12px; }
+  .neg { color: #A32D2D; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Simulador de preços</h1>
+  <p class="sub">Mirava Joias · markup sobre o atacado da Lilly Store, com taxa do Mercado Pago descontada</p>
+
+  <div class="grid3">
+    <div>
+      <label for="custo">Custo atacado (R$)</label>
+      <input type="number" id="custo" value="23" min="0.5" step="0.10" />
+    </div>
+    <div>
+      <label for="emb">Embalagem + cartão (R$)</label>
+      <input type="number" id="emb" value="5" min="0" step="0.50" />
+    </div>
+    <div>
+      <label for="metodo">Meio de pagamento</label>
+      <select id="metodo">
+        <option value="0.99">Pix — 0,99%</option>
+        <option value="4.98" selected>Crédito à vista — 4,98%</option>
+        <option value="4.49">Crédito 2x — 4,49%</option>
+        <option value="12.49">Crédito 12x — 12,49%</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="slider-row">
+    <label for="markup">Markup</label>
+    <input type="range" id="markup" min="0" max="250" value="150" step="5" />
+    <span class="slider-val" id="markup-out">150%</span>
+  </div>
+
+  <div class="slider-row">
+    <label for="desc">Desconto</label>
+    <input type="range" id="desc" min="0" max="50" value="0" step="1" />
+    <span class="slider-val" id="desc-out">0%</span>
+  </div>
+
+  <div class="cards">
+    <div class="card"><p class="lab">Preço de venda</p><p class="val" id="preco"></p></div>
+    <div class="card"><p class="lab">Lucro líquido</p><p class="val" id="lucro"></p></div>
+    <div class="card"><p class="lab">Margem real</p><p class="val" id="margem"></p></div>
+  </div>
+
+  <div class="alerta" id="alerta"></div>
+
+  <h2>Cenários de markup</h2>
+  <div class="cen" id="cenarios"></div>
+  <p class="nota">Com o desconto e o meio de pagamento selecionados acima.</p>
+
+  <h2>Onde o dinheiro vai</h2>
+  <table>
+    <thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead>
+    <tbody id="quebra"></tbody>
+  </table>
+
+  <h2>Lote de compra</h2>
+  <table>
+    <thead><tr><th>Lote fecha em</th><th style="text-align:right">Peças</th><th style="text-align:right">Frete</th><th style="text-align:right">Custo extra/peça</th><th style="text-align:right">Lucro/peça</th></tr></thead>
+    <tbody id="lotes"></tbody>
+  </table>
+  <p class="nota">Frete grátis no atacado a partir de R$300 (Sudeste). Fechar o lote antes custa pouco por peça — atrasar a cliente custa muito mais.</p>
+
+</div>
+
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var FRETE = 30;
+
+function brl(v) {
+  return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function calc(custo, emb, markup, desc, taxa) {
+  var base = custo * (1 + markup / 100);
+  var preco = base * (1 - desc / 100);
+  var fee = preco * (taxa / 100);
+  var lucro = preco - custo - emb - fee;
+  return { base: base, preco: preco, fee: fee, lucro: lucro, margem: preco > 0 ? (lucro / preco) * 100 : 0 };
+}
+
+function render() {
+  var custo = parseFloat($('custo').value) || 0;
+  var emb = parseFloat($('emb').value) || 0;
+  var markup = parseFloat($('markup').value);
+  var desc = parseFloat($('desc').value);
+  var taxa = parseFloat($('metodo').value);
+
+  $('markup-out').textContent = markup + '%';
+  $('desc-out').textContent = desc + '%';
+
+  var r = calc(custo, emb, markup, desc, taxa);
+  $('preco').textContent = brl(r.preco);
+  $('lucro').textContent = brl(r.lucro);
+  $('lucro').className = 'val' + (r.lucro < 0 ? ' neg' : '');
+  $('margem').textContent = Math.round(r.margem) + '%';
+
+  var al = $('alerta');
+  if (r.lucro < 0) {
+    al.style.display = 'block';
+    al.className = 'alerta bad';
+    al.textContent = 'Nesse cenário você paga para vender. Falta ' + brl(Math.abs(r.lucro)) + ' por peça só para empatar.';
+  } else if (r.margem < 20) {
+    al.style.display = 'block';
+    al.className = 'alerta warn';
+    al.textContent = 'Margem apertada. Uma devolução, um extravio ou uma peça com defeito apaga o lucro de várias vendas.';
+  } else {
+    al.style.display = 'none';
+  }
+
+  var html = '';
+  [50, 100, 150, 200].forEach(function (m) {
+    var c = calc(custo, emb, m, desc, taxa);
+    html += '<div class="' + (m === markup ? 'on' : '') + '">' +
+      '<p class="m">' + m + '% markup</p>' +
+      '<p class="p">' + brl(c.preco) + '</p>' +
+      '<p class="l' + (c.lucro < 0 ? ' neg' : '') + '">lucro ' + brl(c.lucro) + '</p></div>';
+  });
+  $('cenarios').innerHTML = html;
+
+  $('quebra').innerHTML =
+    '<tr><td>Cliente paga</td><td class="num">' + brl(r.preco) + '</td></tr>' +
+    '<tr><td>Custo da peça na Lilly</td><td class="num">− ' + brl(custo) + '</td></tr>' +
+    '<tr><td>Embalagem Mirava</td><td class="num">− ' + brl(emb) + '</td></tr>' +
+    '<tr><td>Taxa Mercado Pago (' + taxa.toString().replace('.', ',') + '%)</td><td class="num">− ' + brl(r.fee) + '</td></tr>' +
+    '<tr><td style="font-weight:500">Fica com você</td><td class="num" style="font-weight:500">' + brl(r.lucro) + '</td></tr>';
+
+  var linhas = '';
+  [300, 200, 150, 70].forEach(function (alvo) {
+    var pecas = custo > 0 ? Math.ceil(alvo / custo) : 0;
+    var frete = alvo >= 300 ? 0 : FRETE;
+    var extra = pecas > 0 ? frete / pecas : 0;
+    var lp = r.lucro - extra;
+    linhas += '<tr><td>' + brl(alvo) + '</td><td class="num">' + pecas + '</td><td class="num">' +
+      (frete === 0 ? 'grátis' : brl(frete)) + '</td><td class="num">' + brl(extra) +
+      '</td><td class="num' + (lp < 0 ? ' neg' : '') + '">' + brl(lp) + '</td></tr>';
+  });
+  $('lotes').innerHTML = linhas;
+}
+
+['custo', 'emb', 'markup', 'desc', 'metodo'].forEach(function (id) {
+  $(id).addEventListener('input', render);
+  $(id).addEventListener('change', render);
+});
+render();
+</script>
+</body>
+</html>

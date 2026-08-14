@@ -1,0 +1,15 @@
+<svg width="580" height="160" viewBox="0 0 580 160" xmlns="http://www.w3.org/2000/svg">
+<title>Mirava Joias — logo horizontal</title>
+<desc>Assinatura horizontal da Mirava: monograma M a esquerda, nome MIRAVA e subtitulo a direita.</desc>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&amp;family=Montserrat:wght@400&amp;display=swap');
+.nome { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; }
+.sub { font-family: 'Montserrat', Arial, sans-serif; }
+</style>
+<rect width="580" height="160" fill="#FFFFFF"/>
+<path d="M45 108 C45 48, 81 48, 110 91 C139 48, 175 48, 175 108"
+      fill="none" stroke="#D46A9F" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="175" cy="108" r="6.5" fill="#D46A9F"/>
+<text x="215" y="92" class="nome" font-size="58" letter-spacing="10" fill="#8E3B6B">MIRAVA</text>
+<text x="217" y="120" class="sub" font-size="12" letter-spacing="7" fill="#C999AF">JOIAS SOB ENCOMENDA</text>
+</svg>

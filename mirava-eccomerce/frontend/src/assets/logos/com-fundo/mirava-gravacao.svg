@@ -1,0 +1,12 @@
+<svg width="360" height="360" viewBox="0 0 360 360" xmlns="http://www.w3.org/2000/svg">
+<title>Mirava — versao para gravacao / selo</title>
+<desc>Versao monocromatica em linha unica da Mirava, dentro de um circulo, para gravacao a laser em metal ou selo de embalagem.</desc>
+<rect width="360" height="360" fill="#FFFFFF"/>
+<circle cx="180" cy="180" r="150" fill="none" stroke="#8E3B6B" stroke-width="2"/>
+<circle cx="180" cy="180" r="132" fill="none" stroke="#8E3B6B" stroke-width="0.8"/>
+<path d="M115 185 C115 115, 157 115, 190 168 C223 115, 265 115, 265 185"
+      fill="none" stroke="#8E3B6B" stroke-width="4" stroke-linecap="round"/>
+<circle cx="265" cy="185" r="6" fill="#8E3B6B"/>
+<text x="180" y="240" font-family="'Cormorant Garamond', Georgia, serif" font-weight="500" font-size="34" letter-spacing="8" text-anchor="middle" fill="#8E3B6B">MIRAVA</text>
+<text x="180" y="265" font-family="'Montserrat', Arial, sans-serif" font-size="9" letter-spacing="5" text-anchor="middle" fill="#8E3B6B">JOIAS</text>
+</svg>
