@@ -9,3 +9,6 @@
 
 # Cobertura de teste
 *.out
+
+# Fotos baixadas da Lilly — geradas pela sincronização, não versionadas
+/uploads/

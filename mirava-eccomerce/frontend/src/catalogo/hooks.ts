@@ -6,78 +6,116 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  listarProdutos, produtoPorSlug, relacionados,
-  type FiltroProdutos,
+  listProducts, productBySlug, relatedProducts,
+  type ProductFilter,
 } from "./consultas";
-import type { Produto } from "./tipos";
+import type { Metal, Product } from "./tipos";
 
-interface Estado<T> {
-  dado: T;
-  carregando: boolean;
-  erro: string | null;
+interface State<T> {
+  data: T;
+  loading: boolean;
+  error: string | null;
 }
 
-export function useProdutos(filtro: FiltroProdutos = {}) {
-  const [estado, setEstado] = useState<Estado<Produto[]>>({
-    dado: [], carregando: true, erro: null,
+export function useProducts(filter: ProductFilter = {}) {
+  const [state, setState] = useState<State<Product[]>>({
+    data: [], loading: true, error: null,
   });
 
   // Serializa o filtro para comparar por valor. Sem isto, um objeto novo a
   // cada render dispararia busca infinita.
-  const chave = JSON.stringify(filtro);
-  const [tentativa, setTentativa] = useState(0);
+  const key = JSON.stringify(filter);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let ativo = true;
-    setEstado((e) => ({ ...e, carregando: true, erro: null }));
+    let active = true;
+    setState((s) => ({ ...s, loading: true, error: null }));
 
-    listarProdutos(JSON.parse(chave) as FiltroProdutos)
-      .then((dado) => ativo && setEstado({ dado, carregando: false, erro: null }))
+    listProducts(JSON.parse(key) as ProductFilter)
+      .then((data) => active && setState({ data, loading: false, error: null }))
       .catch((e: Error) =>
-        ativo && setEstado({ dado: [], carregando: false, erro: e.message }),
+        active && setState({ data: [], loading: false, error: e.message }),
       );
 
     // Evita gravar resposta de uma busca antiga por cima da nova quando a
     // cliente troca de categoria rápido.
-    return () => { ativo = false; };
-  }, [chave, tentativa]);
+    return () => { active = false; };
+  }, [key, attempt]);
 
-  const tentarDeNovo = useCallback(() => setTentativa((n) => n + 1), []);
-  return { ...estado, tentarDeNovo };
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  return { ...state, retry };
 }
 
-export function useProduto(slug: string | undefined) {
-  const [estado, setEstado] = useState<Estado<Produto | null>>({
-    dado: null, carregando: true, erro: null,
+// Cache simples em módulo: o menu abre e fecha várias vezes na mesma
+// sessão, e a lista de peças por metal não muda a ponto de justificar
+// buscar de novo toda hora — só na primeira vez que cada aba é aberta.
+const menuPreviewCache = new Map<string, Product[]>();
+
+/**
+ * Peças reais pra enriquecer o dropdown do menu (prata/ouro) com foto de
+ * categoria de verdade, em vez de arte estática — mais rico e sempre
+ * atualizado com o catálogo. Só busca quando o menu está aberto.
+ */
+export function useMenuPreview(metal: Metal | "all" | null) {
+  const cacheKey = metal ?? "";
+  const [products, setProducts] = useState<Product[]>(() =>
+    metal ? (menuPreviewCache.get(cacheKey) ?? []) : [],
+  );
+
+  useEffect(() => {
+    if (!metal) return;
+    const cached = menuPreviewCache.get(cacheKey);
+    if (cached) {
+      setProducts(cached);
+      return;
+    }
+    let active = true;
+    listProducts({ metal: metal === "all" ? undefined : metal, limit: 60 })
+      .then((data) => {
+        menuPreviewCache.set(cacheKey, data);
+        if (active) setProducts(data);
+      })
+      .catch(() => {
+        // dropdown cai pro visual estático — não é motivo pra quebrar o menu
+      });
+    return () => { active = false; };
+  }, [metal, cacheKey]);
+
+  return products;
+}
+
+export function useProduct(slug: string | undefined) {
+  const [state, setState] = useState<State<Product | null>>({
+    data: null, loading: true, error: null,
   });
-  const [similares, setSimilares] = useState<Produto[]>([]);
-  const ultimoSlug = useRef<string>();
+  const [related, setRelated] = useState<Product[]>([]);
+  const lastSlug = useRef<string>(undefined);
 
   useEffect(() => {
     if (!slug) {
-      setEstado({ dado: null, carregando: false, erro: null });
+      setState({ data: null, loading: false, error: null });
       return;
     }
-    let ativo = true;
-    ultimoSlug.current = slug;
-    setEstado({ dado: null, carregando: true, erro: null });
-    setSimilares([]);
+    let active = true;
+    lastSlug.current = slug;
+    setState({ data: null, loading: true, error: null });
+    setRelated([]);
 
-    produtoPorSlug(slug)
-      .then(async (dado) => {
-        if (!ativo) return;
-        setEstado({ dado, carregando: false, erro: null });
-        if (dado) {
-          const s = await relacionados(dado);
-          if (ativo && ultimoSlug.current === slug) setSimilares(s);
+    productBySlug(slug)
+      .then(async (data) => {
+        if (!active) return;
+        setState({ data, loading: false, error: null });
+        if (data) {
+          const r = await relatedProducts(data);
+          if (active && lastSlug.current === slug) setRelated(r);
         }
       })
       .catch((e: Error) =>
-        ativo && setEstado({ dado: null, carregando: false, erro: e.message }),
+        active && setState({ data: null, loading: false, error: e.message }),
       );
 
-    return () => { ativo = false; };
+    return () => { active = false; };
   }, [slug]);
 
-  return { ...estado, similares };
+  return { ...state, related };
 }

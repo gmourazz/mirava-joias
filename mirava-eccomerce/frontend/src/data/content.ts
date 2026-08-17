@@ -1,7 +1,7 @@
 export const ANNOUNCEMENTS = [
   { text: "Frete grátis acima de R$ 350", delay: "0s" },
-  { text: "Até 6x sem juros · 5% off no PIX", delay: "4s" },
-  { text: "Peças feitas sob encomenda em 7 a 15 dias", delay: "8s" },
+  { text: "Até 3x sem juros · 5% off no PIX", delay: "4s" },
+  { text: "Pagamento 100% seguro", delay: "8s" },
 ];
 
 export const HERO_SLIDES = [
@@ -35,16 +35,16 @@ export const HERO_SLIDES = [
 ];
 
 export const ORDER_FACTS = [
-  { icon: "clock", text: "Produção em 7 a 15 dias úteis após a confirmação" },
-  { icon: "ruler", text: "Tamanho, metal e gravação definidos com você" },
-  { icon: "sparkles", text: "Vagas limitadas de produção por mês" },
+  { icon: "gem", text: "Materiais de qualidade" },
+  { icon: "shield", text: "Garantia em todas as peças" },
+  { icon: "truck", text: "Entrega acompanhada de perto" },
 ];
 
 export const STEPS = [
-  { n: "01", icon: "gem", title: "Escolha seu estilo", desc: "Navegue pelas coleções ou traga uma referência sua — foto, desenho, ideia solta.", meta: "sem compromisso" },
-  { n: "02", icon: "pen", title: "Consulta e personalização", desc: "Escolha metal, tamanho e gravação na página da peça — dúvidas, é só chamar no WhatsApp.", meta: "resposta no mesmo dia" },
-  { n: "03", icon: "hammer", title: "Produção da sua peça", desc: "Depois do pedido confirmado no site, sua joia é feita à mão, uma só.", meta: "7 a 15 dias úteis" },
-  { n: "04", icon: "package", title: "Entrega", desc: "Embalagem Mirava, certificado da peça e rastreio até a sua porta.", meta: "frete grátis acima de R$ 350" },
+  { n: "01", icon: "gem", title: "Escolha sua peça", desc: "Navegue pelas coleções e veja fotos reais de cada peça, com tamanho e acabamento disponíveis.", meta: "catálogo atualizado" },
+  { n: "02", icon: "card", title: "Compra segura no site", desc: "Pague por Pix ou cartão, do jeito que for melhor pra você, em poucos cliques.", meta: "até 3x sem juros" },
+  { n: "03", icon: "truck", title: "Envio com rastreio", desc: "Com o pagamento aprovado, sua peça é preparada com cuidado e enviada para o seu endereço.", meta: "10 a 20 dias úteis" },
+  { n: "04", icon: "package", title: "Acompanhamento", desc: "Você recebe o código de rastreio por e-mail e acompanha o status do pedido até a entrega.", meta: "frete grátis acima de R$ 350" },
 ];
 
 export const LINES = [
@@ -64,23 +64,53 @@ export const ENGRAVE_STYLES = [
 
 export const TRUST = [
   { icon: "truck", title: "Frete para todo o Brasil", desc: "Grátis acima de R$ 350" },
-  { icon: "card", title: "Até 6x sem juros", desc: "5% de desconto no PIX" },
+  { icon: "card", title: "Até 3x sem juros", desc: "5% de desconto no PIX" },
   { icon: "shield", title: "Entrega segura", desc: "Compra e pagamento no site" },
-  { icon: "message", title: "Suporte no WhatsApp", desc: "Dúvidas antes e depois da compra" },
+  { icon: "message", title: "Atendimento por e-mail", desc: "Dúvidas antes e depois da compra" },
 ];
 
 export const FOOTER_COLS = [
-  { title: "A marca", links: ["Sobre a Mirava", "Como funciona a encomenda", "Prazos de produção"] },
+  { title: "A marca", links: ["Sobre a Mirava", "Como comprar", "Prazos de entrega"] },
   { title: "Ajuda", links: ["Fale conosco", "Guia de tamanhos", "Cuidados com a peça"] },
-  { title: "Contato", links: ["contato@miravajoias.com.br", "WhatsApp (11) 98888-0000", "@miravajoias"] },
+  { title: "Contato", links: ["miravajoias@gmail.com", "@miravajoias"] },
 ];
 
+// Perguntas que a cliente realmente faz antes de comprar. Nada de resposta
+// que a loja não possa cumprir: prazo, troca e garantia aqui precisam bater
+// com o que está no domínio (api/internal/dominio) e na política real.
+//
+// As regras de troca e devolução seguem a política da fornecedora (prazo de
+// 7 dias, peça intacta na embalagem original, vale-troca de 30 dias, estorno
+// na forma de pagamento original). Mudou lá, muda aqui.
 export const FAQ = [
-  { q: "Quanto tempo leva para a peça ficar pronta?", a: "De 7 a 15 dias úteis depois da compra confirmada. Peças com gravação ou pedra específica podem levar alguns dias a mais — avisamos antes de começar." },
-  { q: "Posso escolher o tamanho do anel?", a: "Sim, todos os anéis são feitos no seu tamanho. Se você não souber, mandamos um medidor junto de um pedido anterior ou orientamos pelo WhatsApp." },
-  { q: "A gravação tem custo extra?", a: "Não. Até 14 caracteres estão inclusos no preço, em qualquer um dos três estilos de traço." },
-  { q: "Como funciona a troca?", a: "Peças personalizadas não têm troca por desistência, mas ajustamos tamanho sem custo em até 30 dias e cobrimos qualquer defeito de fabricação." },
-  { q: "O banho de ouro descasca?", a: "O banho é aplicado em camada grossa sobre prata 925 e tem 12 meses de garantia. Evite perfume e água do mar direto na peça." },
+  {
+    q: "Em quantos dias eu recebo?",
+    a: "De 10 a 20 dias úteis depois do pagamento confirmado. Assim que a peça é enviada, você recebe o código de rastreio por e-mail e acompanha a entrega direto na sua conta.",
+  },
+  {
+    q: "Quanto custa o frete?",
+    a: "Depende da sua região e aparece antes de você pagar, sem surpresa no final. Acima de R$ 350 o frete sai grátis, e existe também uma opção expressa para quem deseja receber mais rápido.",
+  },
+  {
+    q: "Quais as formas de pagamento?",
+    a: "Pix, com desconto à vista, ou cartão de crédito com parcelamento sem juros. Você escolhe na hora de finalizar a compra.",
+  },
+  {
+    q: "Como descubro meu tamanho de anel?",
+    a: "Na página de cada anel você escolhe entre os tamanhos disponíveis. Se ficar na dúvida, entre em contato com a nossa equipe que ajudamos você a medir antes de fechar o pedido.",
+  },
+  {
+    q: "Posso trocar ou devolver?",
+    a: "Pode. Você tem até 7 dias corridos a partir do recebimento para solicitar a troca ou a devolução, conforme o Código de Defesa do Consumidor. É só entrar em contato com a nossa equipe informando o número do pedido e a peça, que enviamos todas as orientações. Na devolução por arrependimento o frete fica por nossa conta e o reembolso é feito na mesma forma de pagamento da compra. Na troca, você recebe um vale no valor da peça para usar em um novo pedido, válido por 30 dias.",
+  },
+  {
+    q: "A peça precisa voltar de algum jeito específico?",
+    a: "Sim. Ela deve estar sem sinais de uso, sem manchas ou odores, na embalagem original e com tudo que veio junto, como tags e cartão de garantia. Envie sempre dentro de uma caixa, nunca em envelope, para a peça não se danificar no caminho. Peças em promoção e danos por mau uso não entram na política de troca.",
+  },
+  {
+    q: "Como cuido das minhas peças?",
+    a: "Guarde separadas e sequinhas, e tire para dormir, tomar banho ou entrar no mar. Perfume, hidratante e produto de limpeza são os grandes vilões: aplique tudo antes de colocar a joia.",
+  },
 ];
 
 export const INSTAGRAM_SEEDS = ["jw2", "jw6", "jw3", "jw5", "jw7", "jw4"];

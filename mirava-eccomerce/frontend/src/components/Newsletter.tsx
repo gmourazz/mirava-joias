@@ -5,7 +5,7 @@ export default function Newsletter() {
         <span className="font-script text-[28px] tracking-[0.06em] text-wine">Bem-vinda</span>
         <h2 className="m-0 font-serif text-[30px] font-normal">10% na sua primeira encomenda</h2>
         <p className="m-0 max-w-[420px] text-sm leading-relaxed text-ink-soft">
-          Receba o cupom e avisos de abertura de agenda — trabalhamos com vagas limitadas de produção por mês.
+          Receba o cupom de primeira compra e seja a primeira a saber das novidades.
         </p>
       </div>
       <form className="flex flex-wrap gap-2.5" onSubmit={(e) => e.preventDefault()}>

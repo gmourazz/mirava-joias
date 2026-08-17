@@ -1,40 +1,56 @@
-// Tipos do catálogo, espelhando as tabelas `produtos` e `produto_variantes`.
+// Tipos do catálogo, espelhando a tabela `products` do banco.
 //
 // Convenções que vêm do banco e não devem ser "melhoradas" aqui:
 //   • preço é SEMPRE integer em centavos, nunca float
-//   • categoria e metal são minúsculos, iguais aos CHECK constraints do SQL
-//   • imagens são caminhos no Supabase Storage, não URLs da fornecedora
+//   • category e metal são os valores do CHECK constraint em português —
+//     são slugs de conteúdo/URL/asset (rota, chave de imagem em
+//     lib/images.ts), não identificadores de código. Trocar para inglês
+//     quebraria as imagens do catálogo sem trazer benefício real.
 
-export type Categoria =
+export type Category =
   | "aneis" | "colares" | "pulseiras" | "berloques"
   | "brincos" | "conjuntos" | "outros";
 
 export type Metal = "prata" | "ouro";
 
-export interface Variante {
+export interface Variant {
   id: string;
-  tamanho: string;
-  ajustePrecoCentavos: number;
-  disponivel: boolean;
+  size: string;
+  priceAdjustCents: number;
+  available: boolean;
 }
 
-export interface Produto {
+/** Avaliação copiada da própria página da Lilly — nome, data e comentário
+ *  (quando a cliente escreveu; muita gente só dá a nota, sem comentar). */
+export interface Review {
+  author: string;
+  date: string;
+  text: string;
+}
+
+export interface Product {
   id: string;
   slug: string;
-  nome: string;
-  descricao: string | null;
-  precoCentavos: number;
-  categoria: Categoria;
+  name: string;
+  description: string | null;
+  priceCents: number;
+  category: Category;
   metal: Metal;
-  imagens: string[];
-  destaque: boolean;
+  images: string[];
+  featured: boolean;
   /** Disponibilidade na fornecedora. A Lilly não publica quantidade,
    *  só se dá ou não para comprar — por isso booleano, não número. */
-  disponivel: boolean;
-  variantes: Variante[];
+  available: boolean;
+  variants: Variant[];
+  /** Como chamar o grupo de opção desta peça: "Tamanho", "Letras". Null
+   *  quando a peça não tem escolha nenhuma. */
+  variantLabel: string | null;
+  rating: number | null;
+  ratingCount: number;
+  reviews: Review[];
 }
 
-export const ROTULO_CATEGORIA: Record<Categoria, string> = {
+export const CATEGORY_LABEL: Record<Category, string> = {
   aneis: "Anéis",
   colares: "Colares",
   pulseiras: "Pulseiras",
@@ -44,12 +60,12 @@ export const ROTULO_CATEGORIA: Record<Categoria, string> = {
   outros: "Outros",
 };
 
-export const ROTULO_METAL: Record<Metal, string> = {
+export const METAL_LABEL: Record<Metal, string> = {
   prata: "Prata",
   ouro: "Banhado a ouro",
 };
 
 /** As categorias que aparecem na navegação, na ordem desejada. */
-export const CATEGORIAS_MENU: Categoria[] = [
+export const MENU_CATEGORIES: Category[] = [
   "aneis", "colares", "pulseiras", "berloques", "brincos",
 ];

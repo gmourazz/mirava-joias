@@ -154,7 +154,7 @@ export const LOJA = {
   lote: {
     metaFreteGratisCentavos: 30000,    // R$300 — Sudeste
     tetoDiasUteis: 5,
-    diaDeDespacho: 1,                  // segunda-feira
+    diaDeDespacho: 6,                  // sábado (agência abre de manhã)
   },
   prazo: { minDiasUteis: 10, maxDiasUteis: 20 },
 } as const;
@@ -699,14 +699,18 @@ Esta última linha é o retorno concreto de ter feito as camadas: trocar Mercado
 | 8 | Sync escreve só no espelho | Site da Lilly não pode mexer no seu catálogo | — |
 | 9 | Admin por tabela, não metadata | `user_metadata` é editável pelo usuário | — |
 | 15 | **Sai do Supabase — banco, auth e storage próprios** | Escolha da dona (13/08/2026): Postgres local agora, depois VPS da Hostinger | Isso reverte as decisões 2 e 12 acima |
+| 16 | **Identificadores de código em inglês** | Escolha da dona (13/08/2026): tabela, coluna, função e tipo em inglês; comentários e conteúdo (category/metal) continuam em português | Ver seção "Idioma e convenção de nomes" no CLAUDE.md |
+| 17 | **Mais vendidos com dois sinais e sucessão automática** | Escolha da dona (16/08/2026): a vitrine precisa funcionar no dia 1, quando não existe venda própria, sem ficar refém da Lilly para sempre. `products.supplier_rank` guarda a posição na vitrine da fornecedora (emprestada, reescrita a cada sync) e `products.units_sold` guarda a venda da Mirava em pedidos pagos (dado nosso, permanente). A ordenação usa `units_sold` primeiro e só cai no `supplier_rank` no desempate: conforme a loja vende, a lista vira dela sozinha, sem trocar código | Quando houver venda própria em volume, avaliar cortar o `supplier_rank` da ordenação |
 
-### Detalhe da decisão 15 — o que muda de verdade
+### Detalhe da decisão 15 — o que mudou de verdade
 
-Sair do Supabase não é só trocar a string de conexão do banco. Três peças hoje entregues por ele precisam de substituto:
+Sair do Supabase não foi só trocar a string de conexão do banco. Três peças que ele entregava precisaram de substituto — **status: banco e auth já feitos, storage ainda não**:
 
-1. **Banco** — Postgres puro, local agora (Docker ou instalação nativa), depois na VPS da Hostinger. As migrations em `supabase/migrations/` continuam servindo de base, mas precisam perder a dependência de `auth.users` (schema que só existe dentro do Supabase) e de `auth.uid()` nas policies de RLS.
-2. **Auth** — hoje é Supabase Auth (hash de senha, sessão, JWKS, OAuth do Google). Sem ele, a API Go passa a emitir e validar sua própria sessão: tabela `usuarios` com senha em hash (bcrypt), endpoints `POST /auth/entrar`, `POST /auth/cadastrar`, e um token de sessão (JWT assinado por nós, ou cookie httpOnly — decidir na hora de implementar). Google OAuth fica pra depois, se for feito de novo.
-3. **Storage** — hoje é o Storage do Supabase. Sem ele, as imagens de produto vão para disco na própria VPS (servidas por Nginx ou pela API Go) ou um bucket S3-compatível.
+1. **Banco** ✅ — Postgres próprio, hoje local via Docker (`mirava-eccomerce/db/`, ver `schema.sql` e `docker-compose.yml`), depois na VPS da Hostinger. Sem `auth.users` nem `auth.uid()`: a tabela `users` é nossa, e a API Go filtra por `user_id` explicitamente em vez de depender de RLS.
+2. **Auth** ✅ — implementado em `internal/auth/`: bcrypt para senha, JWT (HS256) emitido e validado por nós. Rotas `POST /auth/entrar`, `POST /auth/cadastrar`, `GET /auth/eu`. Google OAuth fica pra depois, se for feito de novo.
+3. **Storage** ⏳ — ainda é o caminho salvo no banco sem servidor por trás (ver TODO em `frontend/src/catalogo/consultas.ts`, função `imageUrl`). Quando o catálogo for sincronizado de novo, as imagens de produto precisam ir para disco na própria VPS (servidas por Nginx ou pela API Go) ou um bucket S3-compatível — ainda não decidido.
+
+Nota sobre nomes: esta seção e as próximas (RLS do Supabase, `auth.users`, `preco_centavos` etc.) descrevem o desenho **original**, anterior à decisão 15. O código de verdade hoje usa Postgres próprio sem RLS e identificadores em inglês (`users`, `orders`, `price_cents`...) — ver decisão 16. Os trechos de SQL/TS abaixo são história de como se chegou aqui, não o schema atual; a fonte da verdade do schema é sempre `mirava-eccomerce/db/schema.sql`.
 
 **Consequência importante para o front:** hoje o `frontend/src/lib/supabase.ts` fala direto com o Postgres via `supabase-js`, protegido por RLS. Sem Supabase, não existe mais essa porta — não dá para um navegador falar direto com um Postgres puro com segurança. **Todo acesso a dado, incluindo leitura da vitrine, passa a ir pela API Go.** Isso na prática *simplifica* a arquitetura: a API Go vira o único ponto de acesso a dado, e RLS deixa de ser a fronteira de segurança (vira defesa em profundidade opcional) — quem protege é o filtro por `user_id` no Go, que já era a regra para tudo que mexe em dinheiro.
 

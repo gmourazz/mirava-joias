@@ -2,12 +2,12 @@ import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 import {
-  CatalogoCarregando, CatalogoErro, CatalogoVazio,
+  CatalogLoading, CatalogError, CatalogEmpty,
 } from "../components/EstadosCatalogo";
-import { useProdutos } from "../catalogo/hooks";
+import { useProducts } from "../catalogo/hooks";
 import {
-  CATEGORIAS_MENU, ROTULO_CATEGORIA,
-  type Categoria, type Metal,
+  MENU_CATEGORIES, CATEGORY_LABEL,
+  type Category, type Metal,
 } from "../catalogo/tipos";
 import { MENUS, type MenuKey } from "../data/navegacao";
 import { img } from "../lib/images";
@@ -16,11 +16,11 @@ import { textoPrazo } from "../lib/dinheiro";
 const MENU_KEYS: MenuKey[] = ["prata", "ouro", "colecoes"];
 
 /** "colecoes" mostra tudo — não é um metal, é uma vitrine. */
-function metalDoMenu(menu: MenuKey): Metal | undefined {
+function metalFromMenu(menu: MenuKey): Metal | undefined {
   return menu === "colecoes" ? undefined : menu;
 }
 
-export default function Category() {
+export default function CategoryPage() {
   const { menuKey = "prata", filter = "todos" } = useParams();
   const navigate = useNavigate();
 
@@ -28,14 +28,14 @@ export default function Category() {
     ? (menuKey as MenuKey)
     : "prata";
 
-  const categoria: Categoria | undefined =
-    CATEGORIAS_MENU.includes(filter as Categoria)
-      ? (filter as Categoria)
+  const category: Category | undefined =
+    MENU_CATEGORIES.includes(filter as Category)
+      ? (filter as Category)
       : undefined;
 
-  const { dado: produtos, carregando, erro, tentarDeNovo } = useProdutos({
-    metal: metalDoMenu(menu),
-    categoria,
+  const { data: products, loading, error, retry } = useProducts({
+    metal: metalFromMenu(menu),
+    category,
   });
 
   useEffect(() => {
@@ -43,9 +43,9 @@ export default function Category() {
   }, [menuKey, filter]);
 
   const info = MENUS[menu];
-  const filtros: Array<{ key: string; label: string }> = [
+  const filters: Array<{ key: string; label: string }> = [
     { key: "todos", label: "Todas" },
-    ...CATEGORIAS_MENU.map((c) => ({ key: c, label: ROTULO_CATEGORIA[c] })),
+    ...MENU_CATEGORIES.map((c) => ({ key: c, label: CATEGORY_LABEL[c] })),
   ];
 
   return (
@@ -66,8 +66,8 @@ export default function Category() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5 px-6 pt-[34px] sm:px-16 lg:px-24">
-        {filtros.map((f) => {
-          const ativo = (categoria ?? "todos") === f.key;
+        {filters.map((f) => {
+          const active = (category ?? "todos") === f.key;
           return (
             <button
               key={f.key}
@@ -75,8 +75,8 @@ export default function Category() {
               onClick={() => navigate(`/categoria/${menu}/${f.key}`)}
               className="cursor-pointer rounded-full border border-rose px-[18px] py-[9px] font-serif text-sm font-semibold tracking-[0.2em] uppercase"
               style={{
-                background: ativo ? "#8E3B6B" : "transparent",
-                color: ativo ? "#ffffff" : "#8E3B6B",
+                background: active ? "#8E3B6B" : "transparent",
+                color: active ? "#ffffff" : "#8E3B6B",
               }}
             >
               {f.label}
@@ -86,27 +86,27 @@ export default function Category() {
       </div>
 
       <div className="px-6 pt-7 pb-5 text-[13px] text-ink-soft sm:px-16 lg:px-24">
-        {carregando
+        {loading
           ? "carregando peças…"
-          : erro
-            ? " "
-            : `${produtos.length} ${produtos.length === 1 ? "peça" : "peças"} · todas feitas sob encomenda`}
+          : error
+            ? " "
+            : `${products.length} ${products.length === 1 ? "peça" : "peças"} · todas feitas sob encomenda`}
       </div>
 
       <section className="grid grid-cols-2 gap-[22px] px-6 pb-20 sm:px-16 md:grid-cols-3 lg:grid-cols-4 lg:px-24">
-        {carregando && <CatalogoCarregando />}
-        {!carregando && erro && <CatalogoErro mensagem={erro} aoTentarDeNovo={tentarDeNovo} />}
-        {!carregando && !erro && produtos.length === 0 && (
-          <CatalogoVazio
-            mensagem={
-              categoria
-                ? `Nenhuma peça em ${ROTULO_CATEGORIA[categoria].toLowerCase()} ainda`
+        {loading && <CatalogLoading />}
+        {!loading && error && <CatalogError message={error} onRetry={retry} />}
+        {!loading && !error && products.length === 0 && (
+          <CatalogEmpty
+            message={
+              category
+                ? `Nenhuma peça em ${CATEGORY_LABEL[category].toLowerCase()} ainda`
                 : undefined
             }
           />
         )}
-        {!carregando && !erro &&
-          produtos.map((p) => <ProductCard key={p.id} produto={p} />)}
+        {!loading && !error &&
+          products.map((p) => <ProductCard key={p.id} product={p} />)}
       </section>
     </div>
   );

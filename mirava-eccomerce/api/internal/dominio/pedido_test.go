@@ -5,74 +5,74 @@ import (
 	"time"
 )
 
-func TestTransicoesLegais(t *testing.T) {
-	casos := []struct {
-		de, para Status
+func TestLegalTransitions(t *testing.T) {
+	cases := []struct {
+		from, to Status
 		ok       bool
 	}{
-		{AguardandoPagamento, Pago, true},
-		{AguardandoPagamento, Cancelado, true},
-		{Pago, NoLote, true},
-		{NoLote, CompradoFornecedor, true},
-		{CompradoFornecedor, RecebidoPorMim, true},
-		{RecebidoPorMim, Enviado, true},
-		{Enviado, Entregue, true},
-		{FalhaEstoque, Estornado, true},
+		{AwaitingPayment, Paid, true},
+		{AwaitingPayment, Cancelled, true},
+		{Paid, InBatch, true},
+		{InBatch, PurchasedFromSupplier, true},
+		{PurchasedFromSupplier, ReceivedByOwner, true},
+		{ReceivedByOwner, Shipped, true},
+		{Shipped, Delivered, true},
+		{OutOfStock, Refunded, true},
 
 		// Os caminhos que precisam ser impossíveis:
-		{AguardandoPagamento, Enviado, false},  // despachar sem receber
-		{AguardandoPagamento, Entregue, false},
-		{Entregue, Enviado, false},             // voltar no tempo
-		{Cancelado, Pago, false},
-		{Estornado, Enviado, false},            // despachar depois de devolver
-		{Pago, Entregue, false},                // pular a operação inteira
+		{AwaitingPayment, Shipped, false},   // despachar sem receber
+		{AwaitingPayment, Delivered, false},
+		{Delivered, Shipped, false},         // voltar no tempo
+		{Cancelled, Paid, false},
+		{Refunded, Shipped, false},          // despachar depois de devolver
+		{Paid, Delivered, false},            // pular a operação inteira
 	}
 
-	for _, c := range casos {
-		if got := PodeIr(c.de, c.para); got != c.ok {
-			t.Errorf("PodeIr(%s, %s) = %v, esperado %v", c.de, c.para, got, c.ok)
+	for _, c := range cases {
+		if got := CanGo(c.from, c.to); got != c.ok {
+			t.Errorf("CanGo(%s, %s) = %v, esperado %v", c.from, c.to, got, c.ok)
 		}
 	}
 }
 
 // Este teste existe para lembrar que a mesma tabela vive em SQL, na função
-// public.transicao_valida (migration 06). Se alguém adicionar um status aqui
+// public.valid_transition (db/schema.sql). Se alguém adicionar um status aqui
 // sem adicionar lá, o banco vai recusar a transição em produção.
-func TestTodoStatusTemEntradaNaTabela(t *testing.T) {
-	todos := []Status{
-		AguardandoPagamento, Pago, NoLote, CompradoFornecedor, RecebidoPorMim,
-		Enviado, Entregue, Cancelado, Estornado, FalhaEstoque,
+func TestEveryStatusHasTableEntry(t *testing.T) {
+	all := []Status{
+		AwaitingPayment, Paid, InBatch, PurchasedFromSupplier, ReceivedByOwner,
+		Shipped, Delivered, Cancelled, Refunded, OutOfStock,
 	}
-	for _, s := range todos {
-		if _, ok := transicoes[s]; !ok {
-			t.Errorf("status %s sem entrada em transicoes — o banco vai recusar", s)
+	for _, s := range all {
+		if _, ok := transitions[s]; !ok {
+			t.Errorf("status %s sem entrada em transitions — o banco vai recusar", s)
 		}
-		if s.Rotulo() == string(s) {
+		if s.Label() == string(s) {
 			t.Errorf("status %s sem rótulo amigável para a cliente", s)
 		}
 	}
 }
 
-func TestContaParaFaturamento(t *testing.T) {
-	naoConta := []Status{AguardandoPagamento, Cancelado, Estornado, FalhaEstoque}
-	for _, s := range naoConta {
-		if s.ContaParaFaturamento() {
+func TestCountsForRevenue(t *testing.T) {
+	doesNotCount := []Status{AwaitingPayment, Cancelled, Refunded, OutOfStock}
+	for _, s := range doesNotCount {
+		if s.CountsForRevenue() {
 			t.Errorf("%s não deveria entrar no faturamento", s)
 		}
 	}
-	if !Pago.ContaParaFaturamento() {
-		t.Error("pago deveria contar no faturamento")
+	if !Paid.CountsForRevenue() {
+		t.Error("paid deveria contar no faturamento")
 	}
 }
 
-func TestDiasUteis(t *testing.T) {
+func TestBusinessDays(t *testing.T) {
 	// 2026-08-03 é uma segunda-feira.
-	seg := time.Date(2026, 8, 3, 10, 0, 0, 0, time.UTC)
+	monday := time.Date(2026, 8, 3, 10, 0, 0, 0, time.UTC)
 
-	casos := []struct {
-		dias  int
-		quero int
-		nota  string
+	cases := []struct {
+		days    int
+		want    int
+		note    string
 	}{
 		{0, 0, "mesmo dia"},
 		{1, 1, "terça"},
@@ -80,39 +80,80 @@ func TestDiasUteis(t *testing.T) {
 		{5, 4, "sábado: de segunda até aqui passaram ter, qua, qui, sex"},
 		{7, 5, "segunda seguinte: fim de semana não conta"},
 	}
-	for _, c := range casos {
-		got := DiasUteisEntre(seg, seg.AddDate(0, 0, c.dias))
-		if got != c.quero {
-			t.Errorf("%s: %d dias corridos = %d úteis, esperado %d", c.nota, c.dias, got, c.quero)
+	for _, c := range cases {
+		got := BusinessDaysBetween(monday, monday.AddDate(0, 0, c.days))
+		if got != c.want {
+			t.Errorf("%s: %d dias corridos = %d úteis, esperado %d", c.note, c.days, got, c.want)
 		}
 	}
 }
 
-func TestAvaliarLote(t *testing.T) {
-	agora := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC) // terça
-	seisDiasUteisAtras := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
+func TestEvaluateBatch(t *testing.T) {
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC) // terça
+	sixBusinessDaysAgo := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
 
 	// Bateu R$300: fecha com frete grátis.
-	av := AvaliarLote(30000, agora, agora)
-	if !av.Deve || av.Motivo != MotivoMeta || av.FreteEstimado != 0 {
-		t.Errorf("meta atingida deveria fechar sem frete: %+v", av)
+	ev := EvaluateBatch(30000, now, now)
+	if !ev.ShouldClose || ev.Reason != ReasonGoal || ev.EstimatedShipping != 0 {
+		t.Errorf("meta atingida deveria fechar sem frete: %+v", ev)
 	}
 
 	// Só R$150, mas o pedido mais antigo já esperou demais: fecha e paga.
-	av = AvaliarLote(15000, seisDiasUteisAtras, agora)
-	if !av.Deve || av.Motivo != MotivoTeto {
-		t.Errorf("teto de dias deveria fechar o lote: %+v", av)
+	ev = EvaluateBatch(15000, sixBusinessDaysAgo, now)
+	if !ev.ShouldClose || ev.Reason != ReasonCap {
+		t.Errorf("teto de dias deveria fechar o lote: %+v", ev)
 	}
-	if av.FreteEstimado == 0 {
+	if ev.EstimatedShipping == 0 {
 		t.Error("fechando abaixo da meta, o frete precisa ser previsto")
 	}
 
 	// Pouco dinheiro e pouco tempo: continua acumulando.
-	av = AvaliarLote(5000, agora, agora)
-	if av.Deve {
-		t.Errorf("não deveria fechar ainda: %+v", av)
+	ev = EvaluateBatch(5000, now, now)
+	if ev.ShouldClose {
+		t.Errorf("não deveria fechar ainda: %+v", ev)
 	}
-	if av.FaltaParaMeta != 25000 {
-		t.Errorf("FaltaParaMeta = %v, esperado R$ 250,00", av.FaltaParaMeta)
+	if ev.MissingForGoal != 25000 {
+		t.Errorf("MissingForGoal = %v, esperado R$ 250,00", ev.MissingForGoal)
+	}
+}
+
+// A cliente não precisa saber o que é lote nem quando a peça foi comprada na
+// fornecedora: do pagamento até a postagem é tudo a mesma espera.
+func TestTudoAntesDaPostagemEhPreparacao(t *testing.T) {
+	for _, s := range []Status{Paid, InBatch, PurchasedFromSupplier, ReceivedByOwner} {
+		if got := PublicStage(s); got != StagePreparing {
+			t.Errorf("%s virou %q, esperava %q", s, got, StagePreparing)
+		}
+	}
+}
+
+func TestPostagemMudaOQueAClienteVe(t *testing.T) {
+	if PublicStage(Shipped) != StageShipped {
+		t.Error("postado deveria virar enviado")
+	}
+	if PublicStage(Delivered) != StageDelivered {
+		t.Error("entregue deveria virar entregue")
+	}
+}
+
+func TestCanceladoEstornadoESemEstoqueEncerram(t *testing.T) {
+	for _, s := range []Status{Cancelled, Refunded, OutOfStock} {
+		if got := PublicStage(s); got != StageClosed {
+			t.Errorf("%s virou %q, esperava %q", s, got, StageClosed)
+		}
+	}
+}
+
+// Todo estado interno precisa de tradução — um estado novo sem entrada aqui
+// cairia silenciosamente em "encerrado" e assustaria a cliente.
+func TestTodoStatusTemRotulo(t *testing.T) {
+	for s := range transitions {
+		stage := PublicStage(s)
+		if StageLabel(stage) == "" {
+			t.Errorf("status %s virou stage %q sem rótulo", s, stage)
+		}
+		if s != Cancelled && s != Refunded && s != OutOfStock && stage == StageClosed {
+			t.Errorf("status %s caiu em 'encerrado' sem ser um estado final", s)
+		}
 	}
 }

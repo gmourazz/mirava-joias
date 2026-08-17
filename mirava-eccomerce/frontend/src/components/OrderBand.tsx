@@ -5,12 +5,12 @@ export default function OrderBand() {
   return (
     <section className="grid grid-cols-1 items-center gap-10 bg-plum px-6 py-11 text-blush sm:px-16 md:grid-cols-[1.2fr_1fr] lg:px-24">
       <div className="flex flex-col gap-3">
-        <span className="text-[10px] tracking-[0.24em] text-rose uppercase">Importante saber</span>
+        <span className="text-[10px] tracking-[0.24em] text-rose uppercase">Sobre a Mirava</span>
         <h2 className="m-0 font-serif text-[clamp(24px,2.6vw,34px)] leading-tight font-normal">
-          Todas as peças são feitas <em className="text-rose italic">sob encomenda</em>
+          Qualidade em cada <em className="text-rose italic">detalhe</em>
         </h2>
         <p className="m-0 max-w-[520px] text-[14.5px] leading-relaxed text-blush/82">
-          Nada aqui é estoque pronto: sua peça começa a ser produzida depois que a gente conversa sobre metal, tamanho e gravação. A produção leva de 7 a 15 dias úteis, e você acompanha cada etapa.
+          Peças com acabamento cuidadoso e garantia, pensadas para acompanhar você no dia a dia.
         </p>
       </div>
       <div className="flex flex-col gap-3.5">

@@ -10,7 +10,7 @@ Lilly e decide quando fechar o lote de compra.
 cmd/servidor/          entrada, wiring, encerramento gradual
 internal/
   dominio/             regras puras — não importa banco, HTTP nem nada
-    dinheiro.go        Centavos (inteiro), nunca float
+    dinheiro.go        Cents (inteiro), nunca float
     precificacao.go    markup, desconto, margem, disjuntor
     pedido.go          máquina de estados
     lote.go            regra do R$300 e do teto de dias

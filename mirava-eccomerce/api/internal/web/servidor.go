@@ -13,41 +13,77 @@ import (
 	"github.com/mirava/api/internal/dominio"
 	"github.com/mirava/api/internal/lilly"
 	"github.com/mirava/api/internal/mercadopago"
+	"github.com/mirava/api/internal/notificacao"
+	"github.com/mirava/api/internal/storage"
 )
 
 type Config struct {
-	SiteURL          string
-	WebhookURL       string
-	ModoTeste        bool
-	ParcelasSemJuros int
-	EmbalagemCentavos dominio.Centavos
-	CronSecret       string
-	// PagamentoPronto é false quando as credenciais do Mercado Pago não foram
+	SiteURL                string
+	WebhookURL             string
+	TestMode               bool
+	InstallmentsNoInterest int
+	PackagingCents         dominio.Cents
+	CronSecret             string
+	// WhatsApp da loja, só dígitos com DDI (ex.: 5519998604004). Usado para
+	// montar o link wa.me que vai nos avisos e na página do pedido.
+	WhatsApp string
+	// PaymentReady é false quando as credenciais do Mercado Pago não foram
 	// configuradas. O serviço sobe assim mesmo — catálogo e sincronização não
 	// dependem dele — mas checkout e webhook recusam com mensagem clara.
-	PagamentoPronto bool
+	PaymentReady bool
 }
 
 type Servidor struct {
-	db   *db.DB
-	mp   *mercadopago.Cliente
-	auth *auth.Validador
-	li   *lilly.Cliente
-	cfg  Config
-	log  *slog.Logger
+	db      *db.DB
+	mp      *mercadopago.Client
+	auth    *auth.Validator
+	li      *lilly.Client
+	storage *storage.Store
+	notif   *notificacao.Notificador
+	cfg     Config
+	log     *slog.Logger
 }
 
-func Novo(banco *db.DB, mp *mercadopago.Cliente, val *auth.Validador, cfg Config, log *slog.Logger) *Servidor {
-	return &Servidor{db: banco, mp: mp, auth: val, li: lilly.NovoCliente(), cfg: cfg, log: log}
+func Novo(banco *db.DB, mp *mercadopago.Client, val *auth.Validator, store *storage.Store,
+	notif *notificacao.Notificador, cfg Config, log *slog.Logger) *Servidor {
+	return &Servidor{db: banco, mp: mp, auth: val, li: lilly.NewClient(),
+		storage: store, notif: notif, cfg: cfg, log: log}
 }
 
 func (s *Servidor) Rotas() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /saude", s.saude)
-	mux.HandleFunc("POST /checkout", s.criarPagamento)
+
+	// Fotos de produto, servidas direto do disco (ver internal/storage).
+	mux.Handle("GET /images/", http.StripPrefix("/images/", s.storage.Handler()))
+	mux.HandleFunc("POST /auth/cadastrar", s.signup)
+	mux.HandleFunc("POST /auth/entrar", s.login)
+	mux.HandleFunc("GET /auth/eu", s.me)
+	mux.HandleFunc("PUT /auth/perfil", s.updateProfile)
+
+	mux.HandleFunc("GET /produtos", s.listProducts)
+	mux.HandleFunc("GET /produtos/{slug}", s.productBySlug)
+	mux.HandleFunc("GET /produtos/{slug}/relacionados", s.relatedProducts)
+	mux.HandleFunc("GET /categorias/contagem", s.categoryCounts)
+
+	mux.HandleFunc("GET /enderecos", s.listAddresses)
+	mux.HandleFunc("POST /enderecos", s.createAddress)
+	mux.HandleFunc("DELETE /enderecos/{id}", s.deleteAddress)
+
+	mux.HandleFunc("GET /frete", s.shippingQuote)
+
+	mux.HandleFunc("GET /pedidos", s.listOrders)
+	mux.HandleFunc("GET /pedidos/{id}", s.orderByID)
+
+	mux.HandleFunc("POST /checkout", s.createPayment)
 	mux.HandleFunc("POST /webhook/mercadopago", s.webhookMP)
-	mux.HandleFunc("POST /tarefas/sincronizar", s.protegidoPorCron(s.sincronizar))
-	mux.HandleFunc("POST /tarefas/avaliar-lote", s.protegidoPorCron(s.avaliarLote))
+	mux.HandleFunc("POST /tarefas/sincronizar", s.protegidoPorCron(s.syncCatalog))
+	mux.HandleFunc("POST /tarefas/avaliar-lote", s.protegidoPorCron(s.evaluateBatch))
+
+	// Gestão da loja (ver gestao.go). Protegida pelo mesmo segredo das
+	// tarefas até o painel com login de admin existir.
+	mux.HandleFunc("GET /gestao/pedidos", s.protegidoPorCron(s.listOrdersToShip))
+	mux.HandleFunc("POST /gestao/pedidos/{id}/despachar", s.protegidoPorCron(s.shipOrder))
 	return s.comCORS(s.comLog(mux))
 }
 
@@ -87,7 +123,7 @@ func (s *Servidor) protegidoPorCron(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		enviado := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if s.cfg.CronSecret == "" || enviado != s.cfg.CronSecret {
-			responder(w, http.StatusUnauthorized, mapa{"erro": "não autorizado"})
+			responder(w, http.StatusUnauthorized, mapa{"error": "não autorizado"})
 			return
 		}
 		h(w, r)
@@ -104,7 +140,7 @@ func responder(w http.ResponseWriter, status int, corpo any) {
 
 func (s *Servidor) saude(w http.ResponseWriter, r *http.Request) {
 	if err := s.db.Ping(r.Context()); err != nil {
-		responder(w, http.StatusServiceUnavailable, mapa{"ok": false, "erro": "banco indisponível"})
+		responder(w, http.StatusServiceUnavailable, mapa{"ok": false, "error": "banco indisponível"})
 		return
 	}
 	responder(w, http.StatusOK, mapa{"ok": true})

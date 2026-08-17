@@ -1,0 +1,22 @@
+# Postgres próprio da Mirava — local agora, mesma imagem serve de referência
+# pro que vai rodar na VPS da Hostinger depois.
+#
+# Subir:   cd mirava-eccomerce/db && docker compose up -d
+# Parar:   docker compose down            (mantém os dados)
+# Zerar:   docker compose down -v         (apaga os dados — cuidado)
+services:
+  postgres:
+    image: postgres:16
+    container_name: mirava-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mirava
+      POSTGRES_PASSWORD: mirava_dev_local
+      POSTGRES_DB: mirava
+    ports:
+      - "5433:5432"
+    volumes:
+      - mirava_pg_dados:/var/lib/postgresql/data
+
+volumes:
+  mirava_pg_dados:

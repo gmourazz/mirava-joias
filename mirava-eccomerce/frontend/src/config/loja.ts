@@ -30,8 +30,13 @@ export const LOJA = {
   /** Prazo prometido, contado a partir da confirmação do pagamento. */
   prazo: { minDiasUteis: 10, maxDiasUteis: 20 },
 
+  // Frete NÃO mora aqui. Preço de entrega é dinheiro, e dinheiro é decidido no
+  // servidor: a tabela está em api/internal/dominio/frete.go e o front pergunta
+  // por GET /frete. Ver lib/frete.ts.
+
   /** URL da API Go. Em produção, aponta para o Cloud Run. */
   apiUrl: import.meta.env.VITE_API_URL ?? "http://localhost:8080",
 
-  whatsapp: "5519998604004",
+  /** Canal de atendimento. É o único contato publicado no site. */
+  email: "miravajoias@gmail.com",
 } as const;

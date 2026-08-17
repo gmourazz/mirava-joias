@@ -4,12 +4,12 @@ import "testing"
 
 // Os números deste teste vêm de uma peça real da Lilly: Pulseira Maya (PL46),
 // atacado R$23,00, varejo dela R$32,90. Embalagem Mirava estimada em R$5,00.
-func TestPrecificarPecaReal(t *testing.T) {
-	casos := []struct {
-		markup     float64
-		preco      Centavos
-		lucro      Centavos
-		margemAprox float64
+func TestPriceRealItem(t *testing.T) {
+	cases := []struct {
+		markup      float64
+		price       Cents
+		profit      Cents
+		approxMargin float64
 	}{
 		{50, 3450, 478, 13.9},
 		{100, 4600, 1571, 34.2},
@@ -17,67 +17,67 @@ func TestPrecificarPecaReal(t *testing.T) {
 		{200, 6900, 3756, 54.4}, // markup escolhido pela dona
 	}
 
-	for _, c := range casos {
-		got := Precificar(EntradaPreco{
-			CustoAtacado:   2300,
-			Embalagem:      500,
-			MarkupPct:      c.markup,
-			TaxaGatewayPct: TaxaCreditoAVista,
+	for _, c := range cases {
+		got := Price(PricingInput{
+			WholesaleCost: 2300,
+			Packaging:     500,
+			MarkupPct:     c.markup,
+			GatewayFeePct: FeeCreditUpfront,
 		})
 
-		if got.PrecoFinal != c.preco {
-			t.Errorf("markup %.0f%%: preço = %v, esperado %v", c.markup, got.PrecoFinal, c.preco)
+		if got.FinalPrice != c.price {
+			t.Errorf("markup %.0f%%: preço = %v, esperado %v", c.markup, got.FinalPrice, c.price)
 		}
-		if got.Lucro != c.lucro {
-			t.Errorf("markup %.0f%%: lucro = %v, esperado %v", c.markup, got.Lucro, c.lucro)
+		if got.Profit != c.profit {
+			t.Errorf("markup %.0f%%: lucro = %v, esperado %v", c.markup, got.Profit, c.profit)
 		}
-		if diff := got.MargemPct - c.margemAprox; diff > 0.15 || diff < -0.15 {
-			t.Errorf("markup %.0f%%: margem = %.2f%%, esperado ~%.1f%%", c.markup, got.MargemPct, c.margemAprox)
+		if diff := got.MarginPct - c.approxMargin; diff > 0.15 || diff < -0.15 {
+			t.Errorf("markup %.0f%%: margem = %.2f%%, esperado ~%.1f%%", c.markup, got.MarginPct, c.approxMargin)
 		}
 	}
 }
 
 // Markup de 50% deixa menos de R$5 por peça — precisa disparar o alerta.
-func TestMargemPerigosa(t *testing.T) {
-	fraca := Precificar(EntradaPreco{
-		CustoAtacado: 2300, Embalagem: 500, MarkupPct: 50, TaxaGatewayPct: TaxaCreditoAVista,
+func TestMarginDangerous(t *testing.T) {
+	weak := Price(PricingInput{
+		WholesaleCost: 2300, Packaging: 500, MarkupPct: 50, GatewayFeePct: FeeCreditUpfront,
 	})
-	if !fraca.MargemPerigosa() {
-		t.Errorf("markup de 50%% deveria ser sinalizado como perigoso (margem %.1f%%)", fraca.MargemPct)
+	if !weak.MarginDangerous() {
+		t.Errorf("markup de 50%% deveria ser sinalizado como perigoso (margem %.1f%%)", weak.MarginPct)
 	}
 
-	boa := Precificar(EntradaPreco{
-		CustoAtacado: 2300, Embalagem: 500, MarkupPct: 200, TaxaGatewayPct: TaxaCreditoAVista,
+	good := Price(PricingInput{
+		WholesaleCost: 2300, Packaging: 500, MarkupPct: 200, GatewayFeePct: FeeCreditUpfront,
 	})
-	if boa.MargemPerigosa() {
-		t.Errorf("markup de 200%% não deveria ser perigoso (margem %.1f%%)", boa.MargemPct)
+	if good.MarginDangerous() {
+		t.Errorf("markup de 200%% não deveria ser perigoso (margem %.1f%%)", good.MarginPct)
 	}
 }
 
 // Pix é a venda mais lucrativa mesmo dando 5% de desconto — e o dinheiro cai
 // na hora, que é quando ela precisa para fechar o lote.
-func TestPixCompensaMesmoComDesconto(t *testing.T) {
-	pix := Precificar(EntradaPreco{
-		CustoAtacado: 2300, Embalagem: 500, MarkupPct: 200,
-		DescontoPct: 5, TaxaGatewayPct: TaxaPix,
+func TestPixWorthsEvenWithDiscount(t *testing.T) {
+	pix := Price(PricingInput{
+		WholesaleCost: 2300, Packaging: 500, MarkupPct: 200,
+		DiscountPct: 5, GatewayFeePct: FeePix,
 	})
-	credito := Precificar(EntradaPreco{
-		CustoAtacado: 2300, Embalagem: 500, MarkupPct: 200,
-		TaxaGatewayPct: TaxaCreditoAVista,
+	credit := Price(PricingInput{
+		WholesaleCost: 2300, Packaging: 500, MarkupPct: 200,
+		GatewayFeePct: FeeCreditUpfront,
 	})
 
-	diff := credito.Lucro - pix.Lucro
+	diff := credit.Profit - pix.Profit
 	if diff > 100 { // menos de R$1,00 de diferença
 		t.Errorf("Pix com 5%% off perdendo demais: crédito %v vs pix %v (diferença %v)",
-			credito.Lucro, pix.Lucro, diff)
+			credit.Profit, pix.Profit, diff)
 	}
 }
 
-func TestDisjuntorDePreco(t *testing.T) {
-	casos := []struct {
-		nome        string
-		atual, novo Centavos
-		aceita      bool
+func TestPriceCircuitBreaker(t *testing.T) {
+	cases := []struct {
+		name           string
+		current, updated Cents
+		accepted       bool
 	}{
 		{"reajuste pequeno da Lilly", 6900, 7200, true},
 		{"reajuste de 10%", 6900, 7590, true},
@@ -87,18 +87,18 @@ func TestDisjuntorDePreco(t *testing.T) {
 		{"produto sem preço anterior", 0, 6900, false},
 	}
 
-	for _, c := range casos {
-		if got := VariacaoAceitavel(c.atual, c.novo); got != c.aceita {
-			t.Errorf("%s: VariacaoAceitavel(%v, %v) = %v, esperado %v",
-				c.nome, c.atual, c.novo, got, c.aceita)
+	for _, c := range cases {
+		if got := VariationAcceptable(c.current, c.updated); got != c.accepted {
+			t.Errorf("%s: VariationAcceptable(%v, %v) = %v, esperado %v",
+				c.name, c.current, c.updated, got, c.accepted)
 		}
 	}
 }
 
 func TestParseBRL(t *testing.T) {
-	casos := []struct {
-		entrada string
-		querido Centavos
+	cases := []struct {
+		input string
+		want  Cents
 	}{
 		{"48,00", 4800},
 		{"R$ 48,00", 4800},
@@ -106,23 +106,23 @@ func TestParseBRL(t *testing.T) {
 		{"1.234,56", 123456},
 		{"23,00", 2300},
 	}
-	for _, c := range casos {
-		got, err := ParseBRL(c.entrada)
+	for _, c := range cases {
+		got, err := ParseBRL(c.input)
 		if err != nil {
-			t.Errorf("ParseBRL(%q) devolveu erro: %v", c.entrada, err)
+			t.Errorf("ParseBRL(%q) devolveu erro: %v", c.input, err)
 			continue
 		}
-		if got != c.querido {
-			t.Errorf("ParseBRL(%q) = %v, esperado %v", c.entrada, got, c.querido)
+		if got != c.want {
+			t.Errorf("ParseBRL(%q) = %v, esperado %v", c.input, got, c.want)
 		}
 	}
 }
 
-func TestFormatacao(t *testing.T) {
-	if got := Centavos(6900).String(); got != "R$ 69,00" {
+func TestFormatting(t *testing.T) {
+	if got := Cents(6900).String(); got != "R$ 69,00" {
 		t.Errorf("String() = %q", got)
 	}
-	if got := Centavos(478).String(); got != "R$ 4,78" {
+	if got := Cents(478).String(); got != "R$ 4,78" {
 		t.Errorf("String() = %q", got)
 	}
 }

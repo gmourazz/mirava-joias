@@ -1,151 +1,145 @@
-// Consultas de catálogo no Supabase.
+// Consultas de catálogo — falam com a API Go, não mais com o Supabase.
 //
 // Só LEITURA. Nada aqui escreve — pedido e pagamento passam pela API Go, que
-// é quem decide preço. O RLS já restringe a `publicado = true`, mas o filtro
-// vai explícito na query também: contar só com a policy é frágil, e ver o
-// filtro no código deixa a intenção clara para quem ler depois.
+// é quem decide preço. O filtro `published = true` vive no servidor.
 
-import { supabase } from "../lib/supabase";
-import type { Categoria, Metal, Produto, Variante } from "./tipos";
+import { api, BASE_URL } from "../lib/api";
+import type { Category, Metal, Product, Review, Variant } from "./tipos";
 
-/** Colunas pedidas em toda consulta de produto. Uma constante evita que as
- *  telas divirjam sobre o que buscam. */
-const CAMPOS = `
-  id, slug, nome, descricao, preco_centavos, categoria, metal,
-  imagens, destaque,
-  fornecedor_produtos ( disponivel ),
-  produto_variantes ( id, tamanho, ajuste_preco_centavos, disponivel )
-`;
-
-interface LinhaProduto {
+interface ProductRow {
   id: string;
   slug: string;
-  nome: string;
-  descricao: string | null;
-  preco_centavos: number;
-  categoria: Categoria;
+  name: string;
+  description: string | null;
+  price_cents: number;
+  category: Category;
   metal: Metal;
-  imagens: string[] | null;
-  destaque: boolean;
-  fornecedor_produtos: { disponivel: boolean } | null;
-  produto_variantes: Array<{
+  images: string[] | null;
+  featured: boolean;
+  available: boolean;
+  variant_label: string | null;
+  rating: number | null;
+  rating_count: number;
+  reviews: Array<{ author: string; date: string; text: string }> | null;
+  variants: Array<{
     id: string;
-    tamanho: string;
-    ajuste_preco_centavos: number;
-    disponivel: boolean;
+    size: string;
+    price_adjust_cents: number;
+    available: boolean;
   }> | null;
 }
 
-function paraProduto(linha: LinhaProduto): Produto {
-  const variantes: Variante[] = (linha.produto_variantes ?? [])
+function toProduct(row: ProductRow): Product {
+  const variants: Variant[] = (row.variants ?? [])
     .map((v) => ({
       id: v.id,
-      tamanho: v.tamanho,
-      ajustePrecoCentavos: v.ajuste_preco_centavos,
-      disponivel: v.disponivel,
+      size: v.size,
+      priceAdjustCents: v.price_adjust_cents,
+      available: v.available,
     }))
     // ordem natural de tamanho: "14" antes de "16", "40cm" antes de "45cm"
     .sort((a, b) =>
-      a.tamanho.localeCompare(b.tamanho, "pt-BR", { numeric: true }),
+      a.size.localeCompare(b.size, "pt-BR", { numeric: true }),
     );
 
+  const reviews: Review[] = (row.reviews ?? []).map((r) => ({
+    author: r.author,
+    date: r.date,
+    text: r.text,
+  }));
+
   return {
-    id: linha.id,
-    slug: linha.slug,
-    nome: linha.nome,
-    descricao: linha.descricao,
-    precoCentavos: linha.preco_centavos,
-    categoria: linha.categoria,
-    metal: linha.metal,
-    imagens: linha.imagens ?? [],
-    destaque: linha.destaque,
-    // Sem vínculo com a fornecedora, assume disponível: é produto que a dona
-    // cadastrou à mão, então a disponibilidade é decisão dela.
-    disponivel: linha.fornecedor_produtos?.disponivel ?? true,
-    variantes,
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    priceCents: row.price_cents,
+    category: row.category,
+    metal: row.metal,
+    images: row.images ?? [],
+    featured: row.featured,
+    available: row.available,
+    variantLabel: row.variant_label,
+    rating: row.rating,
+    ratingCount: row.rating_count ?? 0,
+    reviews,
+    variants,
   };
 }
 
-export interface FiltroProdutos {
-  categoria?: Categoria;
+export interface ProductFilter {
+  category?: Category;
   metal?: Metal;
-  destaque?: boolean;
-  busca?: string;
-  limite?: number;
+  featured?: boolean;
+  /** Mais vendidos: a API ordena pela venda da Mirava e, no desempate, pela
+   *  posição na vitrine da fornecedora. Ver a coluna units_sold no schema. */
+  bestSellers?: boolean;
+  search?: string;
+  limit?: number;
 }
 
-export async function listarProdutos(filtro: FiltroProdutos = {}): Promise<Produto[]> {
-  let q = supabase
-    .from("produtos")
-    .select(CAMPOS)
-    .eq("publicado", true);
-
-  if (filtro.categoria) q = q.eq("categoria", filtro.categoria);
-  if (filtro.metal) q = q.eq("metal", filtro.metal);
-  if (filtro.destaque) q = q.eq("destaque", true);
-  if (filtro.busca?.trim()) q = q.ilike("nome", `%${filtro.busca.trim()}%`);
-
+function toQuery(filter: ProductFilter): string {
+  const params = new URLSearchParams();
+  if (filter.category) params.set("category", filter.category);
+  if (filter.metal) params.set("metal", filter.metal);
+  if (filter.featured) params.set("featured", "true");
+  if (filter.bestSellers) params.set("best_sellers", "true");
+  if (filter.search?.trim()) params.set("search", filter.search.trim());
   // Teto sempre presente: sem limite, uma categoria grande arrastaria o
   // catálogo inteiro para o navegador da cliente.
-  q = q.order("criado_em", { ascending: false }).limit(filtro.limite ?? 48);
-
-  const { data, error } = await q;
-  if (error) throw new Error(`Não consegui carregar as peças: ${error.message}`);
-
-  return (data as unknown as LinhaProduto[]).map(paraProduto);
+  params.set("limit", String(filter.limit ?? 48));
+  return params.toString();
 }
 
-export async function produtoPorSlug(slug: string): Promise<Produto | null> {
-  const { data, error } = await supabase
-    .from("produtos")
-    .select(CAMPOS)
-    .eq("slug", slug)
-    .eq("publicado", true)
-    .maybeSingle();
+export async function listProducts(filter: ProductFilter = {}): Promise<Product[]> {
+  const rows = await api<ProductRow[]>(`/produtos?${toQuery(filter)}`);
+  return rows.map(toProduct);
+}
 
-  if (error) throw new Error(`Não consegui carregar a peça: ${error.message}`);
-  if (!data) return null;
-
-  return paraProduto(data as unknown as LinhaProduto);
+export async function productBySlug(slug: string): Promise<Product | null> {
+  try {
+    const row = await api<ProductRow>(`/produtos/${encodeURIComponent(slug)}`);
+    return toProduct(row);
+  } catch (e) {
+    if (e instanceof Error && "status" in e && (e as { status: number }).status === 404) {
+      return null;
+    }
+    throw new Error(`Não consegui carregar a peça: ${(e as Error).message}`);
+  }
 }
 
 /** Peças relacionadas para o fim da página de produto. */
-export async function relacionados(p: Produto, quantidade = 4): Promise<Produto[]> {
-  const { data, error } = await supabase
-    .from("produtos")
-    .select(CAMPOS)
-    .eq("publicado", true)
-    .eq("categoria", p.categoria)
-    .neq("id", p.id)
-    .limit(quantidade);
-
-  if (error) return []; // seção secundária: falhar calado é melhor que quebrar a página
-  return (data as unknown as LinhaProduto[]).map(paraProduto);
+export async function relatedProducts(p: Product, quantity = 4): Promise<Product[]> {
+  try {
+    const rows = await api<ProductRow[]>(
+      `/produtos/${encodeURIComponent(p.slug)}/relacionados?quantity=${quantity}`,
+    );
+    return rows.map(toProduct);
+  } catch {
+    return []; // seção secundária: falhar calado é melhor que quebrar a página
+  }
 }
 
 /** Quantas peças publicadas existem por categoria — alimenta os contadores. */
-export async function contarPorCategoria(): Promise<Record<string, number>> {
-  const { data, error } = await supabase
-    .from("produtos")
-    .select("categoria")
-    .eq("publicado", true);
-
-  if (error || !data) return {};
-
-  return data.reduce<Record<string, number>>((acc, { categoria }) => {
-    acc[categoria as string] = (acc[categoria as string] ?? 0) + 1;
-    return acc;
-  }, {});
+export async function countByCategory(): Promise<Record<string, number>> {
+  try {
+    return await api<Record<string, number>>("/categorias/contagem");
+  } catch {
+    return {};
+  }
 }
 
 /**
- * URL pública de uma imagem no Storage.
+ * URL pública de uma imagem de produto.
  *
- * O banco guarda o caminho (`produtos/PL46/1.webp`), não a URL completa —
- * assim, trocar de bucket ou de CDN não exige reescrever o catálogo inteiro.
+ * A sincronização baixa a foto da Lilly e guarda um caminho relativo tipo
+ * "/images/PL289/1.jpg" — a própria API Go serve esse arquivo (ver
+ * internal/storage). Se algum dia o banco guardar uma URL completa (http…),
+ * usa direto; caminho relativo ganha o prefixo da API.
  */
-export function urlImagem(caminho: string | undefined): string | null {
-  if (!caminho) return null;
-  if (caminho.startsWith("http")) return caminho; // já é URL completa
-  return supabase.storage.from("produtos").getPublicUrl(caminho).data.publicUrl;
+export function imageUrl(path: string | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  if (path.startsWith("/")) return `${BASE_URL}${path}`;
+  return null;
 }

@@ -61,6 +61,64 @@
       opacity: 0;
     }
   }
+
+  /* Esteira infinita: a lista é renderizada DUAS vezes e o trilho anda
+     exatamente -50%. Quando a primeira cópia sai, a segunda está no lugar
+     dela, e o salto de volta ao início passa despercebido. */
+  @keyframes esteira {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes esteiraReversa {
+    from {
+      transform: translateX(-50%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  /* Brilho lento no fundo em degradê, para a faixa não parecer chapada. */
+  @keyframes brilhoLento {
+    0%,
+    100% {
+      transform: translate3d(-8%, 0, 0) scale(1);
+      opacity: 0.55;
+    }
+    50% {
+      transform: translate3d(8%, -6%, 0) scale(1.12);
+      opacity: 0.85;
+    }
+  }
+}
+
+@layer utilities {
+  .esteira-trilho {
+    animation: esteira 46s linear infinite;
+  }
+  .esteira-trilho-reversa {
+    animation: esteiraReversa 52s linear infinite;
+  }
+  /* Parar ao passar o mouse: a pessoa viu uma peça e quer olhar. */
+  .esteira:hover .esteira-trilho,
+  .esteira:hover .esteira-trilho-reversa {
+    animation-play-state: paused;
+  }
+  .brilho-lento {
+    animation: brilhoLento 18s ease-in-out infinite;
+  }
+  /* Quem pediu menos movimento no sistema não recebe esteira andando. */
+  @media (prefers-reduced-motion: reduce) {
+    .esteira-trilho,
+    .esteira-trilho-reversa,
+    .brilho-lento {
+      animation: none;
+    }
+  }
 }
 
 @layer base {
