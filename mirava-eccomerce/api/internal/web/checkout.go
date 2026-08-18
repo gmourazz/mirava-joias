@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/mirava/api/internal/db"
 	"github.com/mirava/api/internal/dominio"
@@ -36,6 +37,9 @@ type checkoutRequest struct {
 	// o preço é olhado na tabela do domínio, a partir do estado do endereço
 	// salvo. Mandar "economico" num pedido de R$10 não torna o frete grátis.
 	Shipping string `json:"shipping"`
+	// Código do cupom de boas-vindas, opcional. O DESCONTO nunca vem daqui —
+	// só o código; o valor é recalculado do zero a partir do banco, ver abaixo.
+	CouponCode string `json:"coupon_code"`
 }
 
 func (s *Servidor) createPayment(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +188,29 @@ func (s *Servidor) createPayment(w http.ResponseWriter, r *http.Request) {
 		shipping = 0
 	}
 
+	// Cupom de boas-vindas: o código é o que a cliente digitou, mas o
+	// DESCONTO é sempre recalculado aqui — igual ao preço da peça, nunca
+	// aceito pronto do front.
 	var discount dominio.Cents
+	couponCode := strings.ToUpper(strings.TrimSpace(req.CouponCode))
+	if couponCode != "" {
+		if couponCode != dominio.WelcomeCouponCode {
+			responder(w, http.StatusBadRequest, mapa{"error": "Cupom inválido"})
+			return
+		}
+		eligible, err := s.db.WelcomeCouponEligible(ctx, user.ID)
+		if err != nil {
+			s.log.Error("falha ao checar cupom", "erro", err)
+			responder(w, http.StatusInternalServerError, mapa{"error": "Erro ao aplicar o cupom"})
+			return
+		}
+		if !eligible {
+			responder(w, http.StatusBadRequest, mapa{"error": "Esse cupom já foi usado nesta conta"})
+			return
+		}
+		discount = dominio.WelcomeCouponDiscount(subtotal)
+	}
+
 	total := subtotal + shipping - discount
 	if total <= 0 {
 		responder(w, http.StatusBadRequest, mapa{"error": "Total inválido"})
@@ -243,6 +269,7 @@ func (s *Servidor) createPayment(w http.ResponseWriter, r *http.Request) {
 		"number":         number,
 		"subtotal_cents": int64(subtotal),
 		"shipping_cents": int64(shipping),
+		"discount_cents": int64(discount),
 		"total_cents":    int64(total),
 		"payment_url":    url,
 	})

@@ -34,20 +34,26 @@ type Config struct {
 }
 
 type Servidor struct {
-	db      *db.DB
-	mp      *mercadopago.Client
-	auth    *auth.Validator
-	li      *lilly.Client
-	storage *storage.Store
-	notif   *notificacao.Notificador
-	cfg     Config
-	log     *slog.Logger
+	db         *db.DB
+	mp         *mercadopago.Client
+	auth       *auth.Validator
+	li         *lilly.Client
+	storage    *storage.Store
+	notif      *notificacao.Notificador
+	emailCupom *notificacao.Email
+	cfg        Config
+	log        *slog.Logger
 }
 
+// emailCupom vem separado do Notificador porque o e-mail de boas-vindas não
+// tem pedido por trás — Notificador.Avisar exige um Pedido, e forçar um
+// pedido falso só para mandar esse e-mail seria pior que um segundo campo.
+// Nulo é o normal em desenvolvimento (sem RESEND_API_KEY): o cadastro na
+// newsletter continua funcionando, só não dispara e-mail de verdade.
 func Novo(banco *db.DB, mp *mercadopago.Client, val *auth.Validator, store *storage.Store,
-	notif *notificacao.Notificador, cfg Config, log *slog.Logger) *Servidor {
+	notif *notificacao.Notificador, emailCupom *notificacao.Email, cfg Config, log *slog.Logger) *Servidor {
 	return &Servidor{db: banco, mp: mp, auth: val, li: lilly.NewClient(),
-		storage: store, notif: notif, cfg: cfg, log: log}
+		storage: store, notif: notif, emailCupom: emailCupom, cfg: cfg, log: log}
 }
 
 func (s *Servidor) Rotas() http.Handler {
@@ -76,9 +82,12 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("GET /pedidos/{id}", s.orderByID)
 
 	mux.HandleFunc("POST /checkout", s.createPayment)
+	mux.HandleFunc("POST /cupom/validar", s.validateCoupon)
+	mux.HandleFunc("POST /newsletter/inscrever", s.subscribeNewsletter)
 	mux.HandleFunc("POST /webhook/mercadopago", s.webhookMP)
 	mux.HandleFunc("POST /tarefas/sincronizar", s.protegidoPorCron(s.syncCatalog))
 	mux.HandleFunc("POST /tarefas/avaliar-lote", s.protegidoPorCron(s.evaluateBatch))
+	mux.HandleFunc("POST /tarefas/atualizar-mais-vendidos", s.protegidoPorCron(s.refreshBestSellers))
 
 	// Gestão da loja (ver gestao.go). Protegida pelo mesmo segredo das
 	// tarefas até o painel com login de admin existir.

@@ -8,10 +8,11 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Loader2, Lock, MapPin, Plus, Trash2, Truck, User } from "lucide-react";
+import { Check, ChevronLeft, Loader2, Lock, MapPin, Plus, Tag, Trash2, Truck, User, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { api, ApiError } from "../lib/api";
+import { validateCoupon } from "../lib/cupom";
 import {
   createAddress,
   deleteAddress,
@@ -48,6 +49,7 @@ interface CheckoutResponse {
   number: number;
   subtotal_cents: number;
   shipping_cents: number;
+  discount_cents: number;
   total_cents: number;
   payment_url: string;
 }
@@ -72,6 +74,12 @@ export default function Checkout() {
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const [couponInput, setCouponInput] = useState("");
+  const [couponApplied, setCouponApplied] = useState<string | null>(null);
+  const [discountCents, setDiscountCents] = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -135,7 +143,39 @@ export default function Checkout() {
 
   const chosen = shippingOptions.find((o) => o.service === shipping);
   const shippingCents = somenteTeste ? 0 : (chosen?.cents ?? 0);
-  const totalCents = subtotalCents + shippingCents;
+  const totalCents = subtotalCents + shippingCents - discountCents;
+
+  async function applyCoupon(e: FormEvent) {
+    e.preventDefault();
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      const res = await validateCoupon(code, subtotalCents);
+      if (res.valid) {
+        setCouponApplied(code.toUpperCase());
+        setDiscountCents(res.discount_cents ?? 0);
+      } else {
+        setDiscountCents(0);
+        setCouponApplied(null);
+        setCouponError(res.error ?? "Cupom inválido");
+      }
+    } catch (e) {
+      setDiscountCents(0);
+      setCouponApplied(null);
+      setCouponError(e instanceof ApiError ? e.message : "Não consegui checar o cupom");
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function removeCoupon() {
+    setCouponApplied(null);
+    setDiscountCents(0);
+    setCouponInput("");
+    setCouponError(null);
+  }
 
   // Busca o CEP assim que o 8º dígito é digitado — não espera a cliente sair
   // do campo. `buscadoRef` evita repetir a busca pro mesmo CEP (o efeito
@@ -212,6 +252,7 @@ export default function Checkout() {
           address_id: selected,
           shipping,
           phone: onlyDigits(phone),
+          coupon_code: couponApplied ?? "",
         },
       });
       // O carrinho NÃO é limpo aqui. Se a cliente desistir dentro do Mercado
@@ -501,11 +542,60 @@ export default function Checkout() {
               ))}
             </div>
 
-            <div className="mt-5 flex flex-col gap-1.5 border-t border-blush pt-4 text-[13px]">
+            {/* Cupom */}
+            <div className="mt-5 border-t border-blush pt-4">
+              {couponApplied ? (
+                <div className="flex items-center justify-between gap-2 rounded-[12px] border border-rose/60 bg-cream/50 px-3.5 py-2.5">
+                  <span className="flex items-center gap-2 text-[12.5px] text-ink">
+                    <Check className="h-3.5 w-3.5 text-wine" strokeWidth={2} />
+                    Cupom <span className="font-semibold">{couponApplied}</span> aplicado
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    aria-label="Remover cupom"
+                    className="cursor-pointer border-none bg-none p-0.5 text-mauve hover:text-wine"
+                  >
+                    <X className="h-3.5 w-3.5" strokeWidth={1.8} />
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={applyCoupon} className="flex items-center gap-2">
+                  <label className="relative flex-1">
+                    <Tag className="pointer-events-none absolute top-1/2 left-3.5 h-3.5 w-3.5 -translate-y-1/2 text-mauve" strokeWidth={1.6} />
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      placeholder="Cupom de desconto"
+                      className="w-full rounded-full border border-mauve/50 bg-paper py-2.5 pr-3 pl-9 font-sans text-[12.5px] tracking-[0.04em] text-ink uppercase outline-none focus:border-wine"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={couponLoading || !couponInput.trim()}
+                    className="shrink-0 cursor-pointer rounded-full border border-wine px-4 py-2.5 font-serif text-[11.5px] font-semibold tracking-[0.12em] text-wine uppercase transition-colors hover:bg-wine hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {couponLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : "Aplicar"}
+                  </button>
+                </form>
+              )}
+              {couponError && (
+                <p className="m-0 mt-2 text-[12px] leading-relaxed text-wine-dark">{couponError}</p>
+              )}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-1.5 text-[13px]">
               <div className="flex justify-between text-ink-soft">
                 <span>Subtotal</span>
                 <span>{formatarBRL(subtotalCents)}</span>
               </div>
+              {discountCents > 0 && (
+                <div className="flex justify-between text-wine">
+                  <span>Desconto</span>
+                  <span>−{formatarBRL(discountCents)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-ink-soft">
                 <span>Frete{!somenteTeste && chosen ? ` · ${chosen.label}` : ""}</span>
                 <span>

@@ -14,7 +14,7 @@ services:
       POSTGRES_PASSWORD: mirava_dev_local
       POSTGRES_DB: mirava
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - mirava_pg_dados:/var/lib/postgresql/data
 

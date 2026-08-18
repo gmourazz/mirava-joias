@@ -597,23 +597,68 @@ func (d *DB) CreateOrder(ctx context.Context, o NewOrder) (id string, number int
 }
 
 type OrderSummary struct {
-	ID     string
-	Number int
-	Status dominio.Status
-	Total  dominio.Cents
-	Email  string
+	ID       string
+	Number   int
+	Status   dominio.Status
+	Total    dominio.Cents
+	Email    string
+	UserID   string
+	Discount dominio.Cents
 }
 
 func (d *DB) OrderByID(ctx context.Context, id string) (*OrderSummary, error) {
 	var o OrderSummary
+	var userID *string
 	err := d.pool.QueryRow(ctx, `
-		select id::text, number, status, total_cents, customer_email
+		select id::text, number, status, total_cents, customer_email,
+		       user_id::text, discount_cents
 		from orders where id = $1`, id).
-		Scan(&o.ID, &o.Number, &o.Status, &o.Total, &o.Email)
+		Scan(&o.ID, &o.Number, &o.Status, &o.Total, &o.Email, &userID, &o.Discount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
+	if userID != nil {
+		o.UserID = *userID
+	}
 	return &o, err
+}
+
+// ---------------------------------------------------------------------------
+// Cupom de boas-vindas
+// ---------------------------------------------------------------------------
+
+// WelcomeCouponEligible diz se esta conta ainda não usou o cupom de
+// boas-vindas — é o que garante que a promoção vale só para conta nova,
+// uma vez cada.
+func (d *DB) WelcomeCouponEligible(ctx context.Context, userID string) (bool, error) {
+	var redeemed bool
+	err := d.pool.QueryRow(ctx,
+		`select welcome_coupon_redeemed_at is not null from users where id = $1`, userID,
+	).Scan(&redeemed)
+	if err != nil {
+		return false, err
+	}
+	return !redeemed, nil
+}
+
+// RedeemWelcomeCoupon marca o cupom como usado. Só grava se ainda estiver
+// livre: se o webhook do Mercado Pago chegar mais de uma vez para o mesmo
+// pedido (comportamento normal dele), a segunda chamada é um no-op em vez de
+// reescrever a data original.
+func (d *DB) RedeemWelcomeCoupon(ctx context.Context, userID string) error {
+	_, err := d.pool.Exec(ctx,
+		`update users set welcome_coupon_redeemed_at = now()
+		 where id = $1 and welcome_coupon_redeemed_at is null`, userID)
+	return err
+}
+
+// AddNewsletterSubscriber grava o e-mail capturado pelo banner "Bem-vinda".
+// E-mail repetido não é erro — a pessoa só clicou de novo.
+func (d *DB) AddNewsletterSubscriber(ctx context.Context, email string) error {
+	_, err := d.pool.Exec(ctx,
+		`insert into newsletter_subscribers (email) values ($1)
+		 on conflict (email) do nothing`, email)
+	return err
 }
 
 type PaymentRecord struct {
@@ -919,6 +964,11 @@ func (d *DB) SetSupplierRanks(ctx context.Context, slugsEmOrdem []string) (int, 
 	// O casamento é pela URL da peça no espelho: o slug da Lilly é o fim da
 	// URL que a sincronização já guardou em supplier_products.url. O slug da
 	// Mirava é outro (pode ter sido renomeado pela dona), então não serve.
+	//
+	// category <> 'outros' exclui embalagem e brinde (caixinha, saquinho...)
+	// que aparecem na vitrine "mais vendidos" da Lilly misturados com joia de
+	// verdade — a categoria "outros" é o catch-all de GuessCategory para tudo
+	// que não bateu em nenhuma palavra-chave de joia.
 	tag, err := tx.Exec(ctx, `
 		update products p
 		   set supplier_rank = r.pos
@@ -927,7 +977,8 @@ func (d *DB) SetSupplierRanks(ctx context.Context, slugsEmOrdem []string) (int, 
 		  join supplier_products sp
 		    on sp.url like '%/' || r.slug || '/'
 		    or sp.url like '%/' || r.slug
-		 where p.supplier_product_id = sp.id`, slugsEmOrdem)
+		 where p.supplier_product_id = sp.id
+		   and p.category <> 'outros'`, slugsEmOrdem)
 	if err != nil {
 		return 0, err
 	}

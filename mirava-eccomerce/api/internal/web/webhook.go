@@ -155,6 +155,15 @@ func (s *Servidor) webhookMP(w http.ResponseWriter, r *http.Request) {
 			// reenvia webhook do mesmo pagamento; sem esse "changed" a cliente
 			// receberia o mesmo e-mail de confirmação várias vezes.
 			s.avisar(ctx, order.ID, notificacao.PedidoPago)
+
+			// Cupom de boas-vindas: só é consumido quando a compra vira
+			// dinheiro de verdade, nunca numa tentativa de checkout que não
+			// foi paga. Se este pedido usou desconto, é o cupom.
+			if order.UserID != "" && order.Discount > 0 {
+				if err := s.db.RedeemWelcomeCoupon(ctx, order.UserID); err != nil {
+					s.log.Error("falha ao marcar cupom como usado", "erro", err, "usuario", order.UserID)
+				}
+			}
 		}
 
 	case payment.Status == "refunded" || payment.Status == "charged_back":

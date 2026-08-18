@@ -84,6 +84,33 @@ export function useMenuPreview(metal: Metal | "all" | null) {
   return products;
 }
 
+// Cache em módulo — as páginas institucionais (Sobre, Cuidados...) usam foto
+// real de peça como pano de fundo editorial; não precisa buscar de novo toda
+// vez que a pessoa navega entre elas na mesma sessão.
+let showcaseCache: Product[] | null = null;
+
+/** Peças reais para compor páginas editoriais com foto de verdade em vez de
+ *  arte estática — mesma ideia do useMenuPreview, para fora do menu. */
+export function useShowcaseProducts(count = 8) {
+  const [products, setProducts] = useState<Product[]>(showcaseCache ?? []);
+
+  useEffect(() => {
+    if (showcaseCache) return;
+    let active = true;
+    listProducts({ limit: count })
+      .then((data) => {
+        showcaseCache = data;
+        if (active) setProducts(data);
+      })
+      .catch(() => {
+        // página cai no visual estático — não é motivo pra quebrar nada
+      });
+    return () => { active = false; };
+  }, [count]);
+
+  return products;
+}
+
 export function useProduct(slug: string | undefined) {
   const [state, setState] = useState<State<Product | null>>({
     data: null, loading: true, error: null,

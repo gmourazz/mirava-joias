@@ -247,6 +247,14 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 		"falhas", res.Failed, "travados", res.LockedPrices, "sumidos", res.Vanished)
 }
 
+// refreshBestSellers recalcula só a vitrine de mais vendidos, sem varrer o
+// catálogo inteiro de novo — útil pra corrigir a lista (ex.: filtro de
+// categoria mudou) sem esperar a sincronização completa, que leva horas.
+func (s *Servidor) refreshBestSellers(w http.ResponseWriter, r *http.Request) {
+	s.atualizarMaisVendidos(r.Context())
+	responder(w, http.StatusOK, mapa{"ok": true})
+}
+
 // atualizarMaisVendidos guarda os dois sinais da vitrine de mais vendidos.
 //
 // A posição da fornecedora é empréstimo: vale enquanto a Mirava não tem venda

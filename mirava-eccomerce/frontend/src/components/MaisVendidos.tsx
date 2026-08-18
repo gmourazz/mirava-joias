@@ -62,10 +62,10 @@ export default function MaisVendidos() {
           </p>
         </div>
         <Link
-          to="/categoria/colecoes/todos"
+          to="/mais-vendidas"
           className="group flex items-center gap-2 text-[12px] tracking-[0.14em] text-wine uppercase hover:text-wine-dark"
         >
-          Ver o catálogo
+          Ver todas
           <ArrowRight
             className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
             strokeWidth={1.8}

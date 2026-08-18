@@ -89,6 +89,11 @@ create table public.users (
   name          text not null default '',
   email         text not null unique,
   password_hash text not null,
+  -- Cupom de boas-vindas (10% na primeira encomenda, código BEMVINDA10):
+  -- null = ainda não usado. Marcado só quando o PAGAMENTO é confirmado (ver
+  -- webhookMP), nunca na tentativa de checkout — senão um pedido abandonado
+  -- queimaria o cupom à toa. Ver internal/dominio/cupom.go.
+  welcome_coupon_redeemed_at timestamptz,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
@@ -99,6 +104,15 @@ create trigger t_users_updated
 
 comment on table public.users is
   'Conta própria da Mirava (bcrypt + JWT emitido pela API Go). Ver internal/auth.';
+
+-- E-mails capturados pelo banner "Bem-vinda" da home. Existe só para não
+-- jogar fora um contato que a visitante deu de propósito — a promoção em si
+-- (código BEMVINDA10) não depende desta tabela, só de ter conta.
+create table public.newsletter_subscribers (
+  id         uuid primary key default gen_random_uuid(),
+  email      text not null unique,
+  created_at timestamptz not null default now()
+);
 
 create table public.profiles (
   id           uuid primary key references public.users(id) on delete cascade,

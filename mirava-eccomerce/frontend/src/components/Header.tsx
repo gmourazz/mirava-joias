@@ -89,6 +89,14 @@ export default function Header() {
               )}
             </div>
           ))}
+
+          <button
+            type="button"
+            onClick={() => navigate("/mais-vendidas")}
+            className="whitespace-nowrap border-none bg-none py-2.5 font-serif text-[19px] font-normal text-white cursor-pointer hover:text-blush-2"
+          >
+            Mais Vendidas
+          </button>
         </nav>
 
         <button type="button" onClick={() => navigate("/")} className="flex items-center gap-3.5 border-none bg-none p-0 cursor-pointer">

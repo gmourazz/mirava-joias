@@ -597,7 +597,7 @@ var categoryKeywords = []struct {
 	{"colares", []string{"colar", "gargantilha", "choker"}},
 	{"pulseiras", []string{"pulseira", "bracelete"}},
 	{"berloques", []string{"berloque", "pingente avulso", "charm"}},
-	{"brincos", []string{"brinco"}},
+	{"brincos", []string{"brinco", "argola", "argolinha", "ear cuff", "ear line", "piercing"}},
 }
 
 // GuessCategory infere a categoria a partir do nome da peça.
