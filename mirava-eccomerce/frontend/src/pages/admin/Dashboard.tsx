@@ -11,6 +11,27 @@ import {
   STATUS_LABEL, SYNC_STATUS_LABEL,
   type DashboardStats, type ShoppingItem,
 } from "../../lib/admin";
+import RevenueChart from "../../components/admin/RevenueChart";
+import BarList, { type BarListItem } from "../../components/admin/BarList";
+
+function topProductItems(products: DashboardStats["top_products"]): BarListItem[] {
+  return products.map((p) => ({
+    label: p.name,
+    value: p.revenue_cents,
+    formattedValue: formatarBRL(p.revenue_cents),
+  }));
+}
+
+function statusItems(counts: DashboardStats["status_counts"]): BarListItem[] {
+  return Object.entries(counts)
+    .filter(([, n]) => n > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([status, n]) => ({
+      label: STATUS_LABEL[status] ?? status,
+      value: n,
+      formattedValue: String(n),
+    }));
+}
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -33,7 +54,7 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
+    <div className="mx-auto max-w-6xl px-6 py-10 sm:px-10">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <span className="font-script text-[20px] text-wine">Bem-vinda de volta</span>
@@ -74,28 +95,28 @@ export default function AdminDashboard() {
             Não inclui o frete pago aos Correios (esse custo só existe somado por lote, não por pedido).
           </p>
 
-          <section className="mt-9 grid gap-5 sm:grid-cols-2">
-            <LoteCard batch={stats.open_batch} />
-            <SincronizacaoCard sync={stats.last_sync} onSincronizado={carregar} />
+          <section className="mt-9 rounded-[18px] border border-blush bg-white p-6 shadow-[0_8px_26px_-14px_rgba(92,42,70,0.22)]">
+            <div className="mb-1 flex items-baseline justify-between">
+              <h2 className="m-0 font-serif text-[17px] font-normal text-ink">Receita — últimos 14 dias</h2>
+              <span className="text-[11px] text-mauve">passe o mouse pra ver o dia</span>
+            </div>
+            <RevenueChart data={stats.daily_revenue} />
           </section>
 
-          <section className="mt-9">
-            <h2 className="m-0 mb-3 font-serif text-[18px] font-normal">Pedidos por status</h2>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(stats.status_counts)
-                .filter(([, n]) => n > 0)
-                .map(([status, n]) => (
-                  <span
-                    key={status}
-                    className="rounded-full border border-blush bg-cream/60 px-3.5 py-1.5 text-[12px] text-ink-soft"
-                  >
-                    {STATUS_LABEL[status] ?? status} <strong className="text-ink">{n}</strong>
-                  </span>
-                ))}
-              {Object.values(stats.status_counts).every((n) => n === 0) && (
-                <span className="text-[12.5px] text-mauve">Nenhum pedido ainda.</span>
-              )}
+          <section className="mt-6 grid gap-5 sm:grid-cols-2">
+            <div className="rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
+              <h2 className="m-0 mb-4 font-serif text-[15px]">Mais vendidos do mês</h2>
+              <BarList items={topProductItems(stats.top_products)} />
             </div>
+            <div className="rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
+              <h2 className="m-0 mb-4 font-serif text-[15px]">Pedidos por status</h2>
+              <BarList items={statusItems(stats.status_counts)} />
+            </div>
+          </section>
+
+          <section className="mt-6 grid gap-5 sm:grid-cols-2">
+            <LoteCard batch={stats.open_batch} />
+            <SincronizacaoCard sync={stats.last_sync} onSincronizado={carregar} />
           </section>
         </>
       ) : null}

@@ -30,6 +30,18 @@ export interface SyncSummary {
   finished_at: string | null;
 }
 
+export interface DailyRevenue {
+  date: string;
+  revenue_cents: number;
+  orders: number;
+}
+
+export interface TopProduct {
+  name: string;
+  units_sold: number;
+  revenue_cents: number;
+}
+
 export interface DashboardStats {
   revenue_today_cents: number;
   revenue_month_cents: number;
@@ -42,6 +54,8 @@ export interface DashboardStats {
   status_counts: Record<string, number>;
   open_batch: BatchStatus | null;
   last_sync: SyncSummary | null;
+  daily_revenue: DailyRevenue[];
+  top_products: TopProduct[];
 }
 
 export function getDashboard(): Promise<DashboardStats> {

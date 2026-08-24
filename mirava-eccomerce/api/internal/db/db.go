@@ -1547,6 +1547,20 @@ type DashboardStats struct {
 	StatusCounts     map[string]int `json:"status_counts"`
 	OpenBatch        *BatchStatus   `json:"open_batch"`
 	LastSync         *SyncSummary   `json:"last_sync"`
+	DailyRevenue     []DailyRevenue `json:"daily_revenue"`
+	TopProducts      []TopProduct   `json:"top_products"`
+}
+
+type DailyRevenue struct {
+	Date         string        `json:"date"`
+	RevenueCents dominio.Cents `json:"revenue_cents"`
+	Orders       int           `json:"orders"`
+}
+
+type TopProduct struct {
+	Name         string        `json:"name"`
+	UnitsSold    int           `json:"units_sold"`
+	RevenueCents dominio.Cents `json:"revenue_cents"`
 }
 
 // paidStatuses é o filtro repetido em todo lugar que soma dinheiro de
@@ -1646,6 +1660,57 @@ func (d *DB) DashboardStats(ctx context.Context, packagingPerOrder dominio.Cents
 	}
 	if len(last) > 0 {
 		s.LastSync = &last[0]
+	}
+
+	// Série de 14 dias, com generate_series pra não sumir dia sem venda —
+	// um gráfico com buraco no meio parece bug, não "dia parado".
+	dailyRows, err := d.pool.Query(ctx, `
+		select gs.day::date::text, coalesce(sum(o.total_cents), 0), count(o.id)
+		from generate_series(current_date - interval '13 days', current_date, interval '1 day') as gs(day)
+		left join orders o on o.paid_at::date = gs.day
+			and o.status not in ('awaiting_payment','cancelled','refunded','out_of_stock')
+		group by gs.day
+		order by gs.day`)
+	if err != nil {
+		return nil, err
+	}
+	s.DailyRevenue = []DailyRevenue{}
+	for dailyRows.Next() {
+		var r DailyRevenue
+		if err := dailyRows.Scan(&r.Date, &r.RevenueCents, &r.Orders); err != nil {
+			dailyRows.Close()
+			return nil, err
+		}
+		s.DailyRevenue = append(s.DailyRevenue, r)
+	}
+	dailyRows.Close()
+	if err := dailyRows.Err(); err != nil {
+		return nil, err
+	}
+
+	topRows, err := d.pool.Query(ctx, `
+		select oi.name_snapshot, sum(oi.quantity)::int, sum(oi.unit_price_cents * oi.quantity)
+		from order_items oi
+		join orders o on o.id = oi.order_id
+		where o.`+paidStatusesSQL+` and o.paid_at >= date_trunc('month', now())
+		group by oi.name_snapshot
+		order by sum(oi.unit_price_cents * oi.quantity) desc
+		limit 5`)
+	if err != nil {
+		return nil, err
+	}
+	s.TopProducts = []TopProduct{}
+	for topRows.Next() {
+		var p TopProduct
+		if err := topRows.Scan(&p.Name, &p.UnitsSold, &p.RevenueCents); err != nil {
+			topRows.Close()
+			return nil, err
+		}
+		s.TopProducts = append(s.TopProducts, p)
+	}
+	topRows.Close()
+	if err := topRows.Err(); err != nil {
+		return nil, err
 	}
 
 	return &s, nil
