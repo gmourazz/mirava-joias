@@ -87,3 +87,16 @@ func (s *Servidor) categoryCounts(w http.ResponseWriter, r *http.Request) {
 	}
 	responder(w, http.StatusOK, count)
 }
+
+// showcaseReviews alimenta a seção "Quem já comprou conta" da home — sempre
+// avaliação real, nunca depoimento inventado (ver comentário em
+// db.ShowcaseReviews).
+func (s *Servidor) showcaseReviews(w http.ResponseWriter, r *http.Request) {
+	reviews, err := s.db.ShowcaseReviews(r.Context(), 15)
+	if err != nil {
+		s.log.Error("falha ao listar avaliações", "erro", err)
+		responder(w, http.StatusOK, []db.ShowcaseReview{}) // seção secundária: falha calada
+		return
+	}
+	responder(w, http.StatusOK, reviews)
+}

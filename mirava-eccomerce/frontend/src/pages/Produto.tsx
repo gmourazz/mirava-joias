@@ -1,19 +1,22 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { Clock, Package, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Clock, Heart, Package, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { useProduct } from "../catalogo/hooks";
 import { imageUrl } from "../catalogo/consultas";
 import { CATEGORY_LABEL, METAL_LABEL } from "../catalogo/tipos";
-import { formatarBRL, textoParcelas, textoPix, textoPrazo } from "../lib/dinheiro";
+import { formatarBRL, textoParcelas, textoPrazo } from "../lib/dinheiro";
 import ProductCard from "../components/ProductCard";
 import { CatalogError } from "../components/EstadosCatalogo";
 import Reveal from "../components/Reveal";
 import { useCart } from "../context/CartContext";
+import { useFavorites } from "../context/FavoritesContext";
 
 export default function ProdutoPage() {
   const { slug } = useParams();
   const { data: product, loading, error, related } = useProduct(slug);
   const { addItem } = useCart();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const navigate = useNavigate();
 
   const [activeImage, setActiveImage] = useState(0);
   const [size, setSize] = useState<string | null>(null);
@@ -63,6 +66,12 @@ export default function ProdutoPage() {
   const adjust = variants.find((v) => v.size === size)?.priceAdjustCents ?? 0;
   const price = product.priceCents + adjust;
   const cover = imageUrl(product.images[activeImage]);
+  const favorited = isFavorite(product.id);
+
+  const toggleFav = async () => {
+    const attempted = await toggleFavorite(product);
+    if (!attempted) navigate("/conta");
+  };
 
   return (
     <div className="px-6 pt-8 pb-20 sm:px-16 lg:px-24">
@@ -134,7 +143,6 @@ export default function ProdutoPage() {
           <div className="flex flex-col gap-1">
             <span className="font-serif text-[30px] text-ink">{formatarBRL(price)}</span>
             <span className="text-[13px] text-ink-soft">{textoParcelas(price)}</span>
-            <span className="text-[13px] text-wine">{textoPix(price)}</span>
           </div>
 
           {!product.available && (
@@ -176,25 +184,40 @@ export default function ProdutoPage() {
               letra num colar de letra — e isso é o seletor acima. Prometer
               gravação seria vender algo que a fornecedora não entrega. */}
 
-          <button
-            type="button"
-            disabled={!product.available || needsSize}
-            onClick={() =>
-              addItem({
-                productId: product.id,
-                slug: product.slug,
-                name: product.name,
-                image: cover,
-                priceCents: price,
-                size,
-              })
-            }
-            className="cursor-pointer rounded-full bg-wine px-6 py-3.5 font-serif text-[14px] font-semibold tracking-[0.2em] text-white uppercase transition hover:bg-wine-dark disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {needsSize
-              ? `Escolha ${(product.variantLabel ?? "o tamanho").toLowerCase()}`
-              : "Adicionar à sacola"}
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              disabled={!product.available || needsSize}
+              onClick={() =>
+                addItem({
+                  productId: product.id,
+                  slug: product.slug,
+                  name: product.name,
+                  image: cover,
+                  priceCents: price,
+                  size,
+                })
+              }
+              className="flex-1 cursor-pointer rounded-full bg-wine px-6 py-3.5 font-serif text-[14px] font-semibold tracking-[0.2em] text-white uppercase transition hover:bg-wine-dark disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {needsSize
+                ? `Escolha ${(product.variantLabel ?? "o tamanho").toLowerCase()}`
+                : "Adicionar à sacola"}
+            </button>
+            <button
+              type="button"
+              onClick={toggleFav}
+              aria-label={favorited ? "Remover dos favoritos" : "Favoritar"}
+              aria-pressed={favorited}
+              className="flex h-[50px] w-[50px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-wine/70 bg-none text-wine transition-colors hover:bg-wine hover:text-white"
+            >
+              <Heart
+                className="pointer-events-none h-[18px] w-[18px]"
+                strokeWidth={1.6}
+                fill={favorited ? "currentColor" : "none"}
+              />
+            </button>
+          </div>
 
           <ul className="m-0 flex list-none flex-col gap-3 p-0 pt-2">
             <Fact icon={<Clock className="h-4 w-4" />}>

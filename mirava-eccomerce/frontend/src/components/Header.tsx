@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, Search, X, Heart, User, ShoppingBag } from "lucide-react";
 import Monogram from "./Monogram";
 import { MENUS } from "../data/navegacao";
 import { MENU_CATEGORIES, CATEGORY_LABEL } from "../catalogo/tipos";
 import { useCart } from "../context/CartContext";
+import { useFavorites } from "../context/FavoritesContext";
 import type { MenuKey } from "../types";
 
 // "Prata 925" tem um número no meio — na fonte serifada isso quebra o
@@ -22,11 +23,25 @@ export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const { openCart, itemCount } = useCart();
+  const { products: favorites } = useFavorites();
 
   const goCategory = (menuKey: MenuKey, filter: string) => {
     setOpenMenu(null);
     navigate(`/categoria/${menuKey}/${filter}`);
+  };
+
+  // A seção só existe na home. Se já está lá, rola direto; de qualquer outra
+  // página, navega pra home com a âncora — o Home.tsx espera a seção
+  // renderizar (a busca das avaliações é assíncrona) antes de rolar.
+  const goFeedbacks = () => {
+    setOpenMenu(null);
+    if (location.pathname === "/") {
+      document.getElementById("feedbacks")?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      navigate("/#feedbacks");
+    }
   };
 
   const submitSearch = (e: FormEvent) => {
@@ -97,6 +112,14 @@ export default function Header() {
           >
             Mais Vendidas
           </button>
+
+          <button
+            type="button"
+            onClick={goFeedbacks}
+            className="whitespace-nowrap border-none bg-none py-2.5 font-serif text-[19px] font-normal text-white cursor-pointer hover:text-blush-2"
+          >
+            Feedbacks
+          </button>
         </nav>
 
         <button type="button" onClick={() => navigate("/")} className="flex items-center gap-3.5 border-none bg-none p-0 cursor-pointer">
@@ -135,7 +158,19 @@ export default function Header() {
               : <Search className="h-[18px] w-[18px]" strokeWidth={1.6} />}
           </button>
 
-          <Heart className="h-[18px] w-[18px] cursor-pointer text-white" strokeWidth={1.6} />
+          <button
+            type="button"
+            onClick={() => navigate("/favoritos")}
+            className="relative flex border-none bg-none p-0 text-white cursor-pointer"
+            aria-label="Favoritos"
+          >
+            <Heart className="pointer-events-none flex h-[18px] w-[18px]" strokeWidth={1.6} />
+            {favorites.length > 0 && (
+              <span className="absolute -top-[7px] -right-[9px] flex h-4 w-4 items-center justify-center rounded-full bg-blush-2 text-[9.5px] text-plum">
+                {favorites.length}
+              </span>
+            )}
+          </button>
           <button type="button" onClick={() => navigate("/conta")} className="flex border-none bg-none p-0 cursor-pointer">
             <User className="h-[18px] w-[18px] text-white" strokeWidth={1.6} />
           </button>

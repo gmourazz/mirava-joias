@@ -27,9 +27,12 @@ import (
 const resendAPI = "https://api.resend.com/emails"
 
 type Email struct {
-	apiKey     string
-	remetente  string
-	http       *http.Client
+	apiKey    string
+	remetente string
+	// siteURL alimenta o botão "Fazer minha encomenda" do e-mail de cupom.
+	// Vazio não quebra nada — o botão só some.
+	siteURL string
+	http    *http.Client
 }
 
 // NovoEmail devolve nil quando não há chave configurada.
@@ -38,13 +41,14 @@ type Email struct {
 // vendendo, só não avisa. `Novo` descarta canais nulos, então o sistema
 // funciona igual em desenvolvimento, onde ninguém quer mandar e-mail de
 // verdade a cada teste de checkout.
-func NovoEmail(apiKey, remetente string) *Email {
+func NovoEmail(apiKey, remetente, siteURL string) *Email {
 	if apiKey == "" || remetente == "" {
 		return nil
 	}
 	return &Email{
 		apiKey:    apiKey,
 		remetente: remetente,
+		siteURL:   siteURL,
 		http:      &http.Client{Timeout: 15 * time.Second},
 	}
 }
@@ -72,7 +76,7 @@ func (e *Email) EnviarCupom(ctx context.Context, destinatario string) error {
 			"Com carinho,\nMirava Joias", dominio.WelcomeCouponCode)
 
 	return e.send(ctx, destinatario, "Seu cupom de 10% de boas-vindas · Mirava",
-		texto, corpoCupomHTML(texto))
+		texto, corpoCupomHTML(dominio.WelcomeCouponCode, e.siteURL))
 }
 
 // send é o transporte HTTP compartilhado por Enviar e EnviarCupom — a
@@ -143,22 +147,36 @@ func corpoHTML(ev Evento, p Pedido, texto string) string {
 
 // corpoCupomHTML segue a mesma moldura visual de corpoHTML, mas sem Evento
 // nem Pedido — o e-mail de boas-vindas sai antes de existir pedido.
-func corpoCupomHTML(texto string) string {
+//
+// O código vem numa caixa própria, separado do texto corrido: é a única
+// informação que a cliente realmente precisa copiar, e enterrada num
+// parágrafo ela se perde no meio da frase.
+func corpoCupomHTML(codigo, siteURL string) string {
 	var b strings.Builder
 	b.WriteString(`<div style="font-family:Georgia,serif;background:#fff7fb;padding:32px 16px">`)
-	b.WriteString(`<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px">`)
+	b.WriteString(`<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:36px 32px">`)
 	b.WriteString(`<p style="margin:0 0 4px;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:3px;color:#b49aa6;text-transform:uppercase">Mirava</p>`)
-	b.WriteString(`<h1 style="margin:0 0 20px;font-size:22px;font-weight:normal;color:#8e3b6b">Bem-vinda à Mirava</h1>`)
+	b.WriteString(`<h1 style="margin:0 0 18px;font-size:24px;font-weight:normal;color:#8e3b6b">Bem-vinda à Mirava</h1>`)
+	b.WriteString(`<p style="margin:0 0 22px;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.65;color:#6e5a64">` +
+		`Oi! Que bom te ver por aqui. Seu cupom de boas-vindas já está liberado — é só usar na sua primeira encomenda.</p>`)
 
-	for _, par := range strings.Split(texto, "\n\n") {
-		par = strings.TrimSpace(par)
-		if par == "" {
-			continue
-		}
-		b.WriteString(`<p style="margin:0 0 14px;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.65;color:#6e5a64">` +
-			strings.ReplaceAll(html.EscapeString(par), "\n", "<br>") + `</p>`)
+	b.WriteString(`<div style="margin:0 0 22px;padding:22px;text-align:center;border:1.5px dashed #d46a9f;border-radius:12px;background:#fff9fb">`)
+	b.WriteString(`<p style="margin:0 0 8px;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:2px;color:#b49aa6;text-transform:uppercase">10% de desconto na primeira encomenda</p>`)
+	b.WriteString(`<p style="margin:0;font-family:Georgia,serif;font-size:28px;font-weight:bold;letter-spacing:4px;color:#8e3b6b">` +
+		html.EscapeString(codigo) + `</p>`)
+	b.WriteString(`</div>`)
+
+	b.WriteString(`<p style="margin:0 0 26px;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.65;color:#6e5a64">` +
+		`É só criar sua conta, montar sua sacola e digitar o código na hora de fechar o pedido.</p>`)
+
+	if siteURL != "" {
+		b.WriteString(`<p style="margin:0 0 8px;text-align:center"><a href="` + html.EscapeString(siteURL) +
+			`" style="display:inline-block;background:#d46a9f;color:#ffffff;text-decoration:none;` +
+			`padding:13px 30px;border-radius:999px;font-family:Georgia,serif;font-size:13px;` +
+			`letter-spacing:2px;text-transform:uppercase">Fazer minha encomenda</a></p>`)
 	}
 
+	b.WriteString(`<p style="margin:24px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#6e5a64">Com carinho,<br>Mirava Joias</p>`)
 	b.WriteString(`</div></div>`)
 	return b.String()
 }

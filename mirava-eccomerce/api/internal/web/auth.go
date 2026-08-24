@@ -133,11 +133,19 @@ func (s *Servidor) me(w http.ResponseWriter, r *http.Request) {
 		responder(w, http.StatusInternalServerError, mapa{"error": "falha ao buscar perfil"})
 		return
 	}
+	// adminRole vai junto pro front saber se mostra o link do painel (e qual
+	// nível) — a proteção de verdade é o middleware em cima das rotas
+	// /admin/*, isto aqui é só pra não oferecer um link que vai dar 403.
+	adminRole, err := s.db.AdminRole(r.Context(), user.ID)
+	if err != nil {
+		s.log.Error("falha ao checar admin", "erro", err)
+	}
 	// Telefone e CPF vão junto para o checkout já vir preenchido. São dados da
 	// própria cliente, lidos a partir do usuário do token — nunca de um id no
 	// corpo da requisição.
 	responder(w, http.StatusOK, mapa{
 		"id": user.ID, "email": user.Email, "name": profile.Name,
 		"phone": profile.Phone, "cpf": profile.CPF,
+		"is_admin": adminRole != "", "admin_role": nullIfEmpty(adminRole),
 	})
 }

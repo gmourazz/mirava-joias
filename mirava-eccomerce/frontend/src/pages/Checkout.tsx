@@ -29,7 +29,7 @@ import {
   type ShippingOption,
   type ShippingService,
 } from "../lib/frete";
-import { formatarBRL, textoParcelas, textoPix } from "../lib/dinheiro";
+import { formatarBRL, textoParcelas } from "../lib/dinheiro";
 
 const EMPTY_ADDRESS: NewAddress = {
   label: "Casa",
@@ -621,7 +621,6 @@ export default function Checkout() {
               </div>
               <div className="mt-1.5 flex flex-col items-end gap-0.5">
                 <span className="text-xs text-ink-soft">{textoParcelas(totalCents)}</span>
-                <span className="text-xs text-wine">{textoPix(totalCents)}</span>
               </div>
             </div>
 

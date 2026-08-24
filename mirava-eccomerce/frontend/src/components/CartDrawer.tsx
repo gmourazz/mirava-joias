@@ -4,7 +4,7 @@ import { X, Plus, Minus, Lock, ShoppingBag, Truck, Check } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { img } from "../lib/images";
 import { freeShippingAbove } from "../lib/frete";
-import { formatarBRL, textoParcelas, textoPix } from "../lib/dinheiro";
+import { formatarBRL, textoParcelas } from "../lib/dinheiro";
 
 export default function CartDrawer() {
   const { cartOpen, closeCart, items, removeItem, updateQuantity, subtotalCents } = useCart();
@@ -173,7 +173,7 @@ export default function CartDrawer() {
           )}
         </div>
 
-        {/* Mesma pilha de preço da vitrine — valor, parcelas, Pix — nas mesmas
+        {/* Mesma pilha de preço da vitrine — valor e parcelas — nas mesmas
             fontes e tamanhos do ProductCard. A cliente acabou de ver esse bloco
             embaixo da peça; ele não pode mudar de cara dentro do carrinho. */}
         <div className="border-t border-blush px-8 pt-5 pb-7">
@@ -184,7 +184,6 @@ export default function CartDrawer() {
           {subtotalCents > 0 && (
             <div className="mt-1.5 flex flex-col items-end gap-0.5">
               <span className="text-xs text-ink-soft">{textoParcelas(subtotalCents)}</span>
-              <span className="text-xs text-wine">{textoPix(subtotalCents)}</span>
             </div>
           )}
 

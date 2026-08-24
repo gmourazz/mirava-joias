@@ -6,7 +6,7 @@
 import { api, BASE_URL } from "../lib/api";
 import type { Category, Metal, Product, Review, Variant } from "./tipos";
 
-interface ProductRow {
+export interface ProductRow {
   id: string;
   slug: string;
   name: string;
@@ -29,7 +29,7 @@ interface ProductRow {
   }> | null;
 }
 
-function toProduct(row: ProductRow): Product {
+export function toProduct(row: ProductRow): Product {
   const variants: Variant[] = (row.variants ?? [])
     .map((v) => ({
       id: v.id,

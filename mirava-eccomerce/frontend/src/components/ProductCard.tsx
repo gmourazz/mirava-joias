@@ -1,11 +1,12 @@
 import type { MouseEvent } from "react";
-import { Link } from "react-router-dom";
-import { ShoppingBag } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Heart, ShoppingBag } from "lucide-react";
 import type { Product } from "../catalogo/tipos";
 import { METAL_LABEL } from "../catalogo/tipos";
 import { imageUrl } from "../catalogo/consultas";
-import { formatarBRL, textoParcelas, textoPix } from "../lib/dinheiro";
+import { formatarBRL, textoParcelas } from "../lib/dinheiro";
 import { useCart } from "../context/CartContext";
+import { useFavorites } from "../context/FavoritesContext";
 
 // Sem estrelas de avaliação aqui, de propósito.
 //
@@ -17,6 +18,18 @@ export default function ProductCard({ product }: { product: Product }) {
   const cover = imageUrl(product.images[0]);
   const sizes = product.variants.filter((v) => v.available);
   const { addItem } = useCart();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const navigate = useNavigate();
+  const favorited = isFavorite(product.id);
+
+  // Sem conta, favoritar não existe (a tabela não aceita user_id nulo) —
+  // manda pra tela de entrar em vez de fingir que salvou.
+  const toggleFav = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const attempted = await toggleFavorite(product);
+    if (!attempted) navigate("/conta");
+  };
 
   // Adiciona direto da vitrine, sem abrir a peça. Quando tem tamanho, usa o
   // primeiro disponível — ajustar depois é rapidinho no drawer do carrinho,
@@ -59,6 +72,20 @@ export default function ProductCard({ product }: { product: Product }) {
           <span className="absolute bottom-3 left-3 rounded-full border border-mauve bg-white/94 px-3 py-1.5 text-[9.5px] tracking-[0.14em] text-ink-soft uppercase">
             {METAL_LABEL[product.metal]}
           </span>
+
+          <button
+            type="button"
+            onClick={toggleFav}
+            aria-label={favorited ? "Remover dos favoritos" : "Favoritar"}
+            aria-pressed={favorited}
+            className="absolute top-3 right-3 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-white/85 text-wine transition-colors hover:bg-white"
+          >
+            <Heart
+              className="pointer-events-none h-4 w-4"
+              strokeWidth={1.6}
+              fill={favorited ? "currentColor" : "none"}
+            />
+          </button>
 
           {!product.available && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/75">
@@ -111,7 +138,6 @@ export default function ProductCard({ product }: { product: Product }) {
         </h3>
         <span className="text-[16px] text-ink">{formatarBRL(product.priceCents)}</span>
         <span className="text-xs text-ink-soft">{textoParcelas(product.priceCents)}</span>
-        <span className="text-xs text-wine">{textoPix(product.priceCents)}</span>
       </div>
     </div>
   );

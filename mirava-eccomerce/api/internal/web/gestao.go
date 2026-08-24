@@ -18,10 +18,8 @@ import (
 // entre o pagamento e a postagem a cliente enxerga como "em preparação", e
 // esses passos internos o próprio sistema movimenta.
 //
-// Protegidas pelo CRON_SECRET por enquanto — o mesmo segredo das tarefas
-// agendadas. Quando o painel existir, isto vira login de admin de verdade
-// (a tabela `admins` já está no schema esperando). Trocar depois é mexer no
-// middleware, não nos handlers.
+// Protegidas por protegidoPorAdmin (ver servidor.go e admin.go) — sessão de
+// verdade, checada contra a tabela `admins`.
 
 // Formato dos Correios: 2 letras + 9 dígitos + 2 letras (ex.: AA123456789BR).
 var reRastreio = regexp.MustCompile(`^[A-Z]{2}[0-9]{9}[A-Z]{2}$`)

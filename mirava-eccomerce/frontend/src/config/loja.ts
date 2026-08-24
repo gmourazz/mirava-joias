@@ -24,9 +24,6 @@ export const LOJA = {
    */
   parcelasSemJuros: 3,
 
-  /** Desconto no Pix. Mesmo dando 5%, o Pix continua a venda mais lucrativa. */
-  descontoPixPct: 5,
-
   /** Prazo prometido, contado a partir da confirmação do pagamento. */
   prazo: { minDiasUteis: 10, maxDiasUteis: 20 },
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight, Package } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../lib/api";
@@ -14,12 +14,22 @@ import {
 
 export default function Conta() {
   const { user, loading, login, signup, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Quando o painel manda pra cá porque ninguém estava logada (ver
+  // AdminLayout.tsx), guarda pra onde voltar depois do login — senão a
+  // cliente entra e cai em "Minha conta", em vez do lugar que queria.
+  const from = (location.state as { from?: string } | null)?.from;
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (user && from) navigate(from, { replace: true });
+  }, [user, from, navigate]);
 
   if (loading) return null;
 

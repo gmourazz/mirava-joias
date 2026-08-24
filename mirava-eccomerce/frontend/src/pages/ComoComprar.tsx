@@ -13,7 +13,7 @@ const PAGAMENTOS = [
   {
     icon: QrCode,
     title: "Pix",
-    desc: `${LOJA.descontoPixPct}% de desconto e confirmação na hora — a forma mais rápida de garantir sua peça.`,
+    desc: "Confirmação na hora — a forma mais rápida de garantir sua peça.",
     destaque: true,
   },
   {

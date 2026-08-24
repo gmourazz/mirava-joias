@@ -7,10 +7,14 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError, clearToken, saveToken, currentToken } from "../lib/api";
 
+export type AdminRole = "system" | "admin" | null;
+
 interface User {
   id: string;
   name: string;
   email: string;
+  is_admin: boolean;
+  admin_role: AdminRole;
 }
 
 interface AuthContextValue {

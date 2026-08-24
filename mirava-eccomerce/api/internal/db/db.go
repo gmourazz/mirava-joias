@@ -56,6 +56,14 @@ func isDuplicate(err error) bool {
 	return false
 }
 
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23503" // foreign_key_violation
+	}
+	return false
+}
+
 // ---------------------------------------------------------------------------
 // Catálogo público — o front lia isso direto do Supabase via supabase-js.
 // Agora o front só fala com esta API; select 'published = true' vai
@@ -304,6 +312,58 @@ func (d *DB) CountByCategory(ctx context.Context) (map[string]int, error) {
 	return out, rows.Err()
 }
 
+// ShowcaseReview é uma avaliação real (copiada da Lilly na sincronização,
+// ver ARQUITETURA.md) usada na home. Nunca inventada — é por isso que não
+// existe uma versão "com foto de cliente": a sincronização não traz foto de
+// quem avaliou, só nome, data e texto.
+type ShowcaseReview struct {
+	Author      string   `json:"author"`
+	Text        string   `json:"text"`
+	ProductName string   `json:"product_name"`
+	ProductSlug string   `json:"product_slug"`
+	Rating      *float64 `json:"rating"`
+}
+
+// ShowcaseReviews sorteia avaliações reais com texto de verdade, para a
+// seção "Quem já comprou conta" da home.
+//
+// A extração da Lilly tem ruído: o nome às vezes vem prefixado com
+// "Avaliações " (rótulo da seção que grudou no dado), e volta e meia o
+// "texto" da avaliação é na verdade o nome+data da avaliação SEGUINTE, um
+// erro do parser da página dela. Os dois filtros abaixo existem por causa
+// disso — não é frescura, é a diferença entre mostrar avaliação de verdade e
+// mostrar lixo de scraping como se fosse depoimento de cliente.
+func (d *DB) ShowcaseReviews(ctx context.Context, limit int) ([]ShowcaseReview, error) {
+	if limit <= 0 || limit > 40 {
+		limit = 15
+	}
+
+	rows, err := d.pool.Query(ctx, `
+		select p.name, p.slug, p.rating::float8,
+		       regexp_replace(r.value->>'author', '^Avaliações\s+', '') as author,
+		       trim(r.value->>'text') as text
+		from products p, jsonb_array_elements(p.reviews) as r(value)
+		where p.published = true
+		  and length(trim(r.value->>'text')) >= 12
+		  and (r.value->>'text') !~ '\d{2}/\d{2}/\d{4}'
+		order by random()
+		limit $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ShowcaseReview{}
+	for rows.Next() {
+		var rv ShowcaseReview
+		if err := rows.Scan(&rv.ProductName, &rv.ProductSlug, &rv.Rating, &rv.Author, &rv.Text); err != nil {
+			return nil, err
+		}
+		out = append(out, rv)
+	}
+	return out, rows.Err()
+}
+
 // ---------------------------------------------------------------------------
 // Checkout — preço REAL, lido do banco.
 // ---------------------------------------------------------------------------
@@ -466,6 +526,84 @@ func (d *DB) UpdateProfile(ctx context.Context, userID string, p Profile) error 
 	_, err := d.pool.Exec(ctx, `
 		update profiles set name = $2, phone = nullif($3,''), cpf = nullif($4,'')
 		where id = $1`, userID, p.Name, p.Phone, p.CPF)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// Favoritos
+// ---------------------------------------------------------------------------
+
+var ErrProductNotFound = errors.New("peça não encontrada")
+
+// FavoriteProducts lista as peças favoritadas, mais recentes primeiro — para
+// a tela "Meus favoritos". Só as publicadas: se a dona despublicar uma peça
+// favoritada, ela some da lista sem apagar a linha em `favorites`.
+func (d *DB) FavoriteProducts(ctx context.Context, userID string) ([]CatalogProduct, error) {
+	rows, err := d.pool.Query(ctx, `
+		select p.id::text, p.slug, p.name, p.description, p.price_cents,
+		       p.category, p.metal, p.images, p.featured,
+		       coalesce(sp.available, true),
+		       p.rating::float8, coalesce(p.rating_count, 0), coalesce(p.reviews, '[]'::jsonb),
+		       p.variant_label
+		from favorites f
+		join products p on p.id = f.product_id
+		left join supplier_products sp on sp.id = p.supplier_product_id
+		where f.user_id = $1 and p.published = true
+		order by f.created_at desc`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	products := []CatalogProduct{}
+	ids := []string{}
+	for rows.Next() {
+		var p CatalogProduct
+		var reviewsRaw []byte
+		if err := rows.Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.PriceCents,
+			&p.Category, &p.Metal, &p.Images, &p.Featured, &p.Available,
+			&p.Rating, &p.RatingCount, &reviewsRaw, &p.VariantLabel); err != nil {
+			return nil, err
+		}
+		if err := unmarshalReviews(reviewsRaw, &p.Reviews); err != nil {
+			return nil, err
+		}
+		p.Variants = []ProductVariant{}
+		products = append(products, p)
+		ids = append(ids, p.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	variantsByProduct, err := d.variantsFor(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range products {
+		products[i].Variants = variantsByProduct[products[i].ID]
+	}
+	return products, nil
+}
+
+// AddFavorite é idempotente: favoritar de novo a mesma peça não é erro.
+// ErrProductNotFound quando o product_id não existe — evita favorito
+// "fantasma" apontando pra nada.
+func (d *DB) AddFavorite(ctx context.Context, userID, productID string) error {
+	_, err := d.pool.Exec(ctx, `
+		insert into favorites (user_id, product_id) values ($1, $2)
+		on conflict (user_id, product_id) do nothing`, userID, productID)
+	if isForeignKeyViolation(err) {
+		return ErrProductNotFound
+	}
+	return err
+}
+
+// RemoveFavorite filtra por user_id: sem isso, a cliente A desfavoritaria
+// peça da cliente B só adivinhando o product_id.
+func (d *DB) RemoveFavorite(ctx context.Context, userID, productID string) error {
+	_, err := d.pool.Exec(ctx, `
+		delete from favorites where user_id = $1 and product_id = $2`, userID, productID)
 	return err
 }
 
@@ -1284,4 +1422,596 @@ func (d *DB) OrdersToShip(ctx context.Context) ([]PendingShipment, error) {
 		}
 	}
 	return pedidos, nil
+}
+
+// ---------------------------------------------------------------------------
+// Painel administrativo — visível só para quem está na tabela `admins`
+// (ver internal/web/servidor.go, protegidoPorAdmin).
+// ---------------------------------------------------------------------------
+
+var ErrAdminUserNotFound = errors.New("não existe conta com esse e-mail")
+
+// AdminRole confere a tabela própria de admins — nunca um campo em `users`
+// que a própria cliente poderia editar (ver comentário no schema.sql).
+// Devolve "" para quem não é admin, "admin" para acesso operacional ou
+// "system" para a dona (acesso total, inclusive gerenciar outros admins).
+func (d *DB) AdminRole(ctx context.Context, userID string) (string, error) {
+	var role string
+	err := d.pool.QueryRow(ctx,
+		`select role from admins where user_id = $1`, userID).Scan(&role)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return role, err
+}
+
+type AdminUser struct {
+	UserID string `json:"user_id"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+}
+
+// ListAdmins traz quem tem acesso ao painel, para a tela de gestão de
+// administradores (só quem é "system" chega nela — ver protegidoPorSystem).
+func (d *DB) ListAdmins(ctx context.Context) ([]AdminUser, error) {
+	rows, err := d.pool.Query(ctx, `
+		select a.user_id::text, u.name, u.email, a.role
+		from admins a join users u on u.id = a.user_id
+		order by a.role, u.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []AdminUser{}
+	for rows.Next() {
+		var a AdminUser
+		if err := rows.Scan(&a.UserID, &a.Name, &a.Email, &a.Role); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// AddAdmin promove quem já tem conta na loja — nunca cria conta nova.
+// on conflict/update permite corrigir o nível de quem já era admin sem
+// precisar remover e adicionar de novo.
+func (d *DB) AddAdmin(ctx context.Context, email, role string) error {
+	var userID string
+	err := d.pool.QueryRow(ctx, `select id::text from users where email = $1`, email).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrAdminUserNotFound
+	}
+	if err != nil {
+		return err
+	}
+	_, err = d.pool.Exec(ctx, `
+		insert into admins (user_id, role) values ($1, $2)
+		on conflict (user_id) do update set role = excluded.role`, userID, role)
+	return err
+}
+
+func (d *DB) RemoveAdmin(ctx context.Context, userID string) error {
+	_, err := d.pool.Exec(ctx, `delete from admins where user_id = $1`, userID)
+	return err
+}
+
+// CountSystemAdmins existe para uma única checagem: nunca deixar a loja sem
+// nenhuma conta "system" — sem isso, um erro de clique tiraria o acesso de
+// todo mundo ao mesmo tempo, sem ninguém que consiga devolver.
+func (d *DB) CountSystemAdmins(ctx context.Context) (int, error) {
+	var n int
+	err := d.pool.QueryRow(ctx, `select count(*) from admins where role = 'system'`).Scan(&n)
+	return n, err
+}
+
+type BatchStatus struct {
+	ID             string        `json:"id"`
+	Number         int           `json:"number"`
+	CostCents      dominio.Cents `json:"cost_cents"`
+	GoalCents      dominio.Cents `json:"goal_cents"`
+	OldestPaidAt   *time.Time    `json:"oldest_paid_at"`
+	OldestDaysUtil int           `json:"oldest_business_days"`
+	OrderCount     int           `json:"order_count"`
+}
+
+type SyncSummary struct {
+	ID            string     `json:"id"`
+	Status        string     `json:"status"`
+	Processed     int        `json:"processed"`
+	Created       int        `json:"created"`
+	Updated       int        `json:"updated"`
+	Failed        int        `json:"failed"`
+	LockedPrices  int        `json:"locked_prices"`
+	Error         *string    `json:"error"`
+	StartedAt     time.Time  `json:"started_at"`
+	FinishedAt    *time.Time `json:"finished_at"`
+}
+
+type DashboardStats struct {
+	RevenueTodayCents  dominio.Cents  `json:"revenue_today_cents"`
+	RevenueMonthCents  dominio.Cents  `json:"revenue_month_cents"`
+	OrdersToday        int            `json:"orders_today"`
+	OrdersMonth        int            `json:"orders_month"`
+	AverageTicketCents dominio.Cents  `json:"average_ticket_cents"`
+	ItemsCostMonthCents dominio.Cents `json:"items_cost_month_cents"`
+	FeesMonthCents     dominio.Cents  `json:"fees_month_cents"`
+	// ProfitMonthCents é bruto: receita − custo das peças − taxa do Mercado
+	// Pago − embalagem estimada (packagingPerOrder × pedidos do mês). NÃO
+	// desconta frete pago aos Correios — isso só existe agregado por lote
+	// (batches.shipping_cents), não por pedido, então misturar os dois
+	// inventaria uma precisão que o dado não tem.
+	ProfitMonthCents dominio.Cents  `json:"profit_month_cents"`
+	StatusCounts     map[string]int `json:"status_counts"`
+	OpenBatch        *BatchStatus   `json:"open_batch"`
+	LastSync         *SyncSummary   `json:"last_sync"`
+}
+
+// paidStatuses é o filtro repetido em todo lugar que soma dinheiro de
+// pedido: conta como venda o que já foi pago e não voltou atrás.
+const paidStatusesSQL = `status not in ('awaiting_payment','cancelled','refunded','out_of_stock') and paid_at is not null`
+
+// DashboardStats monta a tela inicial do painel — venda de hoje e do mês,
+// ticket médio, lucro estimado, pedidos por status, o lote aberto e a
+// última sincronização. Cinco consultas pequenas em vez de uma só gigante:
+// mais fácil de ler e de testar cada pedaço separado.
+func (d *DB) DashboardStats(ctx context.Context, packagingPerOrder dominio.Cents) (*DashboardStats, error) {
+	var s DashboardStats
+
+	err := d.pool.QueryRow(ctx, `
+		select
+		  coalesce(sum(total_cents) filter (where paid_at::date = current_date), 0),
+		  coalesce(sum(total_cents) filter (where paid_at >= date_trunc('month', now())), 0),
+		  count(*) filter (where paid_at::date = current_date),
+		  count(*) filter (where paid_at >= date_trunc('month', now()))
+		from orders where `+paidStatusesSQL).
+		Scan(&s.RevenueTodayCents, &s.RevenueMonthCents, &s.OrdersToday, &s.OrdersMonth)
+	if err != nil {
+		return nil, err
+	}
+	if s.OrdersMonth > 0 {
+		s.AverageTicketCents = s.RevenueMonthCents / dominio.Cents(s.OrdersMonth)
+	}
+
+	err = d.pool.QueryRow(ctx, `
+		select coalesce(sum(oi.unit_cost_cents * oi.quantity), 0)
+		from order_items oi
+		join orders o on o.id = oi.order_id
+		where o.`+paidStatusesSQL+` and o.paid_at >= date_trunc('month', now())`).
+		Scan(&s.ItemsCostMonthCents)
+	if err != nil {
+		return nil, err
+	}
+
+	err = d.pool.QueryRow(ctx, `
+		select coalesce(sum(p.fee_cents), 0)
+		from payments p
+		join orders o on o.id = p.order_id
+		where o.`+paidStatusesSQL+` and o.paid_at >= date_trunc('month', now())
+		  and p.status = 'approved'`).
+		Scan(&s.FeesMonthCents)
+	if err != nil {
+		return nil, err
+	}
+
+	packagingMonth := packagingPerOrder * dominio.Cents(s.OrdersMonth)
+	s.ProfitMonthCents = s.RevenueMonthCents - s.ItemsCostMonthCents - s.FeesMonthCents - packagingMonth
+
+	statusRows, err := d.pool.Query(ctx, `select status, count(*) from orders group by status`)
+	if err != nil {
+		return nil, err
+	}
+	s.StatusCounts = map[string]int{}
+	for statusRows.Next() {
+		var st string
+		var n int
+		if err := statusRows.Scan(&st, &n); err != nil {
+			statusRows.Close()
+			return nil, err
+		}
+		s.StatusCounts[st] = n
+	}
+	statusRows.Close()
+	if err := statusRows.Err(); err != nil {
+		return nil, err
+	}
+
+	var batch BatchStatus
+	var oldest *time.Time
+	err = d.pool.QueryRow(ctx, `
+		select b.id::text, b.number, b.total_cost_cents,
+		       (select min(o.paid_at) from orders o
+		         where o.batch_id = b.id and o.status not in ('cancelled','refunded','out_of_stock')),
+		       (select count(*) from orders o
+		         where o.batch_id = b.id and o.status not in ('cancelled','refunded','out_of_stock'))
+		from batches b where b.status = 'open' limit 1`).
+		Scan(&batch.ID, &batch.Number, &batch.CostCents, &oldest, &batch.OrderCount)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	if err == nil {
+		batch.GoalCents = dominio.FreeShippingGoal
+		if oldest != nil {
+			batch.OldestPaidAt = oldest
+			batch.OldestDaysUtil = dominio.BusinessDaysBetween(*oldest, time.Now())
+		}
+		s.OpenBatch = &batch
+	}
+
+	last, err := d.RecentSyncs(ctx, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(last) > 0 {
+		s.LastSync = &last[0]
+	}
+
+	return &s, nil
+}
+
+// RecentSyncs traz as últimas rodadas de sincronização com a Lilly, mais
+// recente primeiro — para a cliente ver se a última rodou de verdade antes
+// de clicar em "sincronizar" de novo.
+func (d *DB) RecentSyncs(ctx context.Context, limit int) ([]SyncSummary, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+	rows, err := d.pool.Query(ctx, `
+		select id::text, status, processed, created_count, updated_count,
+		       failed, locked_prices, error, started_at, finished_at
+		from syncs order by started_at desc limit $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []SyncSummary{}
+	for rows.Next() {
+		var s SyncSummary
+		if err := rows.Scan(&s.ID, &s.Status, &s.Processed, &s.Created, &s.Updated,
+			&s.Failed, &s.LockedPrices, &s.Error, &s.StartedAt, &s.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+type AdminOrder struct {
+	ID           string        `json:"id"`
+	Number       int           `json:"number"`
+	Status       string        `json:"status"`
+	CustomerName string        `json:"customer_name"`
+	TotalCents   dominio.Cents `json:"total_cents"`
+	CreatedAt    time.Time     `json:"created_at"`
+	PaidAt       *time.Time    `json:"paid_at"`
+}
+
+// AllOrders é a listagem ampla do painel — todos os pedidos, de qualquer
+// cliente, ao contrário de OrdersForUser (que filtra por dono) e
+// OrdersToShip (que filtra pela fila de despacho). Filtro de status opcional.
+func (d *DB) AllOrders(ctx context.Context, status string, limit int) ([]AdminOrder, error) {
+	if limit <= 0 || limit > 300 {
+		limit = 100
+	}
+	sql := `select id::text, number, status, customer_name, total_cents, created_at, paid_at
+		from orders`
+	args := []any{}
+	if status != "" {
+		sql += ` where status = $1`
+		args = append(args, status)
+	}
+	sql += ` order by created_at desc limit ` + fmt.Sprintf("$%d", len(args)+1)
+	args = append(args, limit)
+
+	rows, err := d.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []AdminOrder{}
+	for rows.Next() {
+		var o AdminOrder
+		if err := rows.Scan(&o.ID, &o.Number, &o.Status, &o.CustomerName,
+			&o.TotalCents, &o.CreatedAt, &o.PaidAt); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Detalhe do pedido (admin) — tudo que OrdersForUser/OrdersToShip omitem de
+// propósito para a cliente (custo, dados de pagamento) porque aqui é a dona
+// vendo, não a cliente.
+// ---------------------------------------------------------------------------
+
+type AdminOrderItem struct {
+	Name       string        `json:"name"`
+	SKU        *string       `json:"sku"`
+	Size       *string       `json:"size"`
+	Quantity   int           `json:"quantity"`
+	PriceCents dominio.Cents `json:"unit_price_cents"`
+	CostCents  dominio.Cents `json:"unit_cost_cents"`
+}
+
+type AdminPayment struct {
+	MPPaymentID  string        `json:"mp_payment_id"`
+	Status       string        `json:"status"`
+	Method       *string       `json:"method"`
+	Installments *int          `json:"installments"`
+	AmountCents  dominio.Cents `json:"amount_cents"`
+	FeeCents     *dominio.Cents `json:"fee_cents"`
+	NetCents     *dominio.Cents `json:"net_cents"`
+	CreatedAt    time.Time     `json:"created_at"`
+}
+
+type AdminOrderDetail struct {
+	ID             string          `json:"id"`
+	Number         int             `json:"number"`
+	Status         string          `json:"status"`
+	CustomerName   string          `json:"customer_name"`
+	CustomerEmail  string          `json:"customer_email"`
+	CustomerPhone  *string         `json:"customer_phone"`
+	CustomerCPF    *string         `json:"customer_cpf"`
+	Address        json.RawMessage `json:"address"`
+	SubtotalCents  dominio.Cents   `json:"subtotal_cents"`
+	ShippingCents  dominio.Cents   `json:"shipping_cents"`
+	DiscountCents  dominio.Cents   `json:"discount_cents"`
+	TotalCents     dominio.Cents   `json:"total_cents"`
+	ShippingMethod *string         `json:"shipping_method"`
+	Engraving      *string         `json:"engraving"`
+	Notes          *string         `json:"notes"`
+	TrackingCode   *string         `json:"tracking_code"`
+	CreatedAt      time.Time       `json:"created_at"`
+	PaidAt         *time.Time      `json:"paid_at"`
+	ShippedAt      *time.Time      `json:"shipped_at"`
+	Items          []AdminOrderItem `json:"items"`
+	Payments       []AdminPayment   `json:"payments"`
+}
+
+func (d *DB) AdminOrderDetail(ctx context.Context, orderID string) (*AdminOrderDetail, error) {
+	var o AdminOrderDetail
+	err := d.pool.QueryRow(ctx, `
+		select id::text, number, status, customer_name, customer_email,
+		       customer_phone, customer_cpf, address,
+		       subtotal_cents, shipping_cents, discount_cents, total_cents,
+		       shipping_method, engraving, notes, tracking_code,
+		       created_at, paid_at, shipped_at
+		from orders where id = $1`, orderID).
+		Scan(&o.ID, &o.Number, &o.Status, &o.CustomerName, &o.CustomerEmail,
+			&o.CustomerPhone, &o.CustomerCPF, &o.Address,
+			&o.SubtotalCents, &o.ShippingCents, &o.DiscountCents, &o.TotalCents,
+			&o.ShippingMethod, &o.Engraving, &o.Notes, &o.TrackingCode,
+			&o.CreatedAt, &o.PaidAt, &o.ShippedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	itemRows, err := d.pool.Query(ctx, `
+		select name_snapshot, supplier_sku, size, quantity, unit_price_cents, unit_cost_cents
+		from order_items where order_id = $1 order by id`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	o.Items = []AdminOrderItem{}
+	for itemRows.Next() {
+		var it AdminOrderItem
+		if err := itemRows.Scan(&it.Name, &it.SKU, &it.Size, &it.Quantity, &it.PriceCents, &it.CostCents); err != nil {
+			itemRows.Close()
+			return nil, err
+		}
+		o.Items = append(o.Items, it)
+	}
+	itemRows.Close()
+	if err := itemRows.Err(); err != nil {
+		return nil, err
+	}
+
+	payRows, err := d.pool.Query(ctx, `
+		select mp_payment_id, status, method, installments, amount_cents, fee_cents, net_cents, created_at
+		from payments where order_id = $1 order by created_at`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	o.Payments = []AdminPayment{}
+	for payRows.Next() {
+		var p AdminPayment
+		if err := payRows.Scan(&p.MPPaymentID, &p.Status, &p.Method, &p.Installments,
+			&p.AmountCents, &p.FeeCents, &p.NetCents, &p.CreatedAt); err != nil {
+			payRows.Close()
+			return nil, err
+		}
+		o.Payments = append(o.Payments, p)
+	}
+	payRows.Close()
+	if err := payRows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &o, nil
+}
+
+var ErrStatusChanged = errors.New("o status mudou enquanto a tela estava aberta — recarregue e tente de novo")
+
+// AdminAdvanceStatus muda o status manualmente pelo painel. Diferente do que
+// o webhook faz sozinho, aqui tem uma pessoa decidindo — por isso o evento
+// fica marcado origin='admin', não 'system'. O `where status = from` é a
+// mesma trava de corrida que MarkPaid e MarkShipped usam: se o status já
+// tiver mudado (outra aba, outro admin), a query não afeta nenhuma linha e
+// devolve ErrStatusChanged em vez de sobrescrever uma decisão mais recente.
+func (d *DB) AdminAdvanceStatus(ctx context.Context, orderID string, from, to dominio.Status) error {
+	tx, err := d.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `update orders set status = $2 where id = $1 and status = $3`,
+		orderID, to, from)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrStatusChanged
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into order_events (order_id, from_status, to_status, origin)
+		values ($1, $2, $3, 'admin')`, orderID, from, to); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// ---------------------------------------------------------------------------
+// Lista de compra do lote — o que copiar pro site da Lilly no sábado de
+// manhã. Espelha a view v_shopping_list (schema.sql): agrupado por SKU,
+// porque quem compra na Lilly compra por código, não por pedido.
+// ---------------------------------------------------------------------------
+
+type ShoppingItem struct {
+	SKU           *string       `json:"sku"`
+	Name          string        `json:"name"`
+	Quantity      int           `json:"quantity"`
+	UnitCostCents dominio.Cents `json:"unit_cost_cents"`
+	SubtotalCents dominio.Cents `json:"subtotal_cents"`
+}
+
+func (d *DB) ShoppingList(ctx context.Context, batchID string) ([]ShoppingItem, error) {
+	rows, err := d.pool.Query(ctx, `
+		select i.supplier_sku, i.name_snapshot, sum(i.quantity)::int,
+		       max(i.unit_cost_cents), sum(i.unit_cost_cents * i.quantity)
+		from orders o
+		join order_items i on i.order_id = o.id
+		where o.batch_id = $1 and o.status not in ('cancelled','refunded','out_of_stock')
+		group by i.supplier_sku, i.name_snapshot
+		order by i.supplier_sku`, batchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ShoppingItem{}
+	for rows.Next() {
+		var it ShoppingItem
+		if err := rows.Scan(&it.SKU, &it.Name, &it.Quantity, &it.UnitCostCents, &it.SubtotalCents); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Gestão de produtos (admin) — publicar/despublicar, corrigir preço, e a
+// fila de preços travados pelo disjuntor (ver apply_synced_cost no schema).
+// ---------------------------------------------------------------------------
+
+type AdminProduct struct {
+	ID                  string   `json:"id"`
+	Slug                string   `json:"slug"`
+	Name                string   `json:"name"`
+	Category            string   `json:"category"`
+	Metal               string   `json:"metal"`
+	PriceCents          dominio.Cents `json:"price_cents"`
+	CostCents           dominio.Cents `json:"cost_cents"`
+	Published           bool     `json:"published"`
+	Featured            bool     `json:"featured"`
+	AutoPrice           bool     `json:"auto_price"`
+	SuggestedPriceCents *dominio.Cents `json:"suggested_price_cents"`
+	SuggestionReason    *string  `json:"suggestion_reason"`
+}
+
+// AdminListProducts é o inventário completo — ao contrário de ListProducts
+// (vitrine), não filtra published: a dona precisa ver o que está fora do ar
+// também. `pendingOnly` mostra só quem o disjuntor travou, esperando revisão.
+func (d *DB) AdminListProducts(ctx context.Context, search string, pendingOnly bool, limit int) ([]AdminProduct, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	sql := `
+		select id::text, slug, name, category, metal, price_cents, cost_cents,
+		       published, featured, auto_price, suggested_price_cents, suggestion_reason
+		from products where true`
+	args := []any{}
+	arg := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+
+	if pendingOnly {
+		sql += ` and suggested_price_cents is not null`
+	}
+	if search != "" {
+		sql += ` and name ilike ` + arg("%"+search+"%")
+	}
+	sql += ` order by (suggested_price_cents is not null) desc, updated_at desc limit ` + arg(limit)
+
+	rows, err := d.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []AdminProduct{}
+	for rows.Next() {
+		var p AdminProduct
+		if err := rows.Scan(&p.ID, &p.Slug, &p.Name, &p.Category, &p.Metal,
+			&p.PriceCents, &p.CostCents, &p.Published, &p.Featured, &p.AutoPrice,
+			&p.SuggestedPriceCents, &p.SuggestionReason); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// AdminProductPatch é o que a tela de produto deixa a dona mudar — nunca
+// custo (isso é só a sincronização quem grava) nem categoria/metal (viriam
+// da Lilly errados seria bug de extração, não algo pra corrigir na mão aqui).
+type AdminProductPatch struct {
+	PriceCents *dominio.Cents `json:"price_cents"`
+	Published  *bool          `json:"published"`
+	Featured   *bool          `json:"featured"`
+	// AcceptSuggestion aplica suggested_price_cents como price_cents e limpa
+	// a sugestão — o "aceitar" de um clique só da fila do disjuntor.
+	AcceptSuggestion bool `json:"accept_suggestion"`
+}
+
+func (d *DB) AdminUpdateProduct(ctx context.Context, id string, patch AdminProductPatch) error {
+	if patch.AcceptSuggestion {
+		_, err := d.pool.Exec(ctx, `
+			update products
+			set price_cents = suggested_price_cents,
+			    suggested_price_cents = null, suggestion_reason = null
+			where id = $1 and suggested_price_cents is not null`, id)
+		return err
+	}
+
+	sql := `update products set updated_at = now()`
+	args := []any{}
+	arg := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+
+	if patch.PriceCents != nil {
+		sql += `, price_cents = ` + arg(*patch.PriceCents) +
+			`, suggested_price_cents = null, suggestion_reason = null`
+	}
+	if patch.Published != nil {
+		sql += `, published = ` + arg(*patch.Published)
+	}
+	if patch.Featured != nil {
+		sql += `, featured = ` + arg(*patch.Featured)
+	}
+	if len(args) == 0 {
+		return nil // nada pra mudar
+	}
+	args = append(args, id)
+	sql += fmt.Sprintf(" where id = $%d", len(args))
+
+	_, err := d.pool.Exec(ctx, sql, args...)
+	return err
 }

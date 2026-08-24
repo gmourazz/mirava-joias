@@ -1,6 +1,6 @@
 export const ANNOUNCEMENTS = [
   { text: "Frete grátis acima de R$ 350", delay: "0s" },
-  { text: "Até 3x sem juros · 5% off no PIX", delay: "4s" },
+  { text: "Até 3x sem juros no cartão", delay: "4s" },
   { text: "Pagamento 100% seguro", delay: "8s" },
 ];
 
@@ -64,7 +64,7 @@ export const ENGRAVE_STYLES = [
 
 export const TRUST = [
   { icon: "truck", title: "Frete para todo o Brasil", desc: "Grátis acima de R$ 350" },
-  { icon: "card", title: "Até 3x sem juros", desc: "5% de desconto no PIX" },
+  { icon: "card", title: "Até 3x sem juros", desc: "No cartão de crédito" },
   { icon: "shield", title: "Entrega segura", desc: "Compra e pagamento no site" },
   { icon: "message", title: "Atendimento por e-mail", desc: "Dúvidas antes e depois da compra" },
 ];
@@ -93,7 +93,7 @@ export const FAQ = [
   },
   {
     q: "Quais as formas de pagamento?",
-    a: "Pix, com desconto à vista, ou cartão de crédito com parcelamento sem juros. Você escolhe na hora de finalizar a compra.",
+    a: "Pix ou cartão de crédito, com parcelamento sem juros. Você escolhe na hora de finalizar a compra.",
   },
   {
     q: "Como descubro meu tamanho de anel?",

@@ -92,6 +92,7 @@ func main() {
 	canalEmail := notificacao.NovoEmail(
 		os.Getenv("RESEND_API_KEY"),
 		os.Getenv("EMAIL_REMETENTE"),
+		os.Getenv("SITE_URL"),
 	)
 	if canalEmail == nil {
 		log.Warn("e-mail não configurado — pedidos serão criados sem aviso à cliente. " +

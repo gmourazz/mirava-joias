@@ -161,6 +161,10 @@ create unique index uq_address_primary
 -- ---------------------------------------------------------------------------
 create table public.admins (
   user_id    uuid primary key references public.users(id) on delete cascade,
+  -- system = dona/master: acesso total, inclusive gerenciar outros admins.
+  -- admin  = equipe: acesso operacional (painel, pedidos, sincronizar),
+  --          sem poder promover ou remover outros admins.
+  role       text not null default 'admin' check (role in ('system','admin')),
   created_at timestamptz not null default now()
 );
 
