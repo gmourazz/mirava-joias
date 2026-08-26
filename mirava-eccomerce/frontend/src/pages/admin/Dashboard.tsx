@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  AlertCircle, CalendarDays, ChevronDown, Copy, Loader2, Receipt,
-  RefreshCw, ShoppingBag, Sparkles, Wallet, type LucideIcon,
+  AlertCircle, CalendarDays, ChevronDown, ChevronRight, Copy, EyeOff,
+  Loader2, Package, PackageSearch, Receipt, RefreshCw, ShieldAlert,
+  ShoppingBag, Sparkles, Wallet, type LucideIcon,
 } from "lucide-react";
 import { ApiError } from "../../lib/api";
 import { formatarBRL } from "../../lib/dinheiro";
 import { formatDate } from "../../lib/pedidos";
 import {
-  getDashboard, getShoppingList, triggerSync,
-  STATUS_LABEL, SYNC_STATUS_LABEL,
-  type DashboardStats, type ShoppingItem,
+  getDashboard, getShoppingList, listAdminProducts, triggerSync,
+  PRONTOS_PARA_DESPACHAR, STATUS_LABEL, SYNC_STATUS_LABEL,
+  type AdminProduct, type DashboardStats, type ShoppingItem,
 } from "../../lib/admin";
 import RevenueChart from "../../components/admin/RevenueChart";
 import BarList, { type BarListItem } from "../../components/admin/BarList";
+import MetricCard from "../../components/admin/MetricCard";
 
 function topProductItems(products: DashboardStats["top_products"]): BarListItem[] {
   return products.map((p) => ({
@@ -35,6 +38,7 @@ function statusItems(counts: DashboardStats["status_counts"]): BarListItem[] {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [produtos, setProdutos] = useState<AdminProduct[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
@@ -51,6 +55,10 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     void carregar();
+    // Catálogo completo só pra "Saúde do catálogo" — vem à parte porque
+    // /admin/dashboard não devolve contagem de produto nenhuma; se falhar,
+    // a seção some, o resto do painel continua de pé.
+    listAdminProducts().then(setProdutos).catch(() => setProdutos(null));
   }, []);
 
   return (
@@ -81,19 +89,24 @@ export default function AdminDashboard() {
         <p className="m-0 text-[13px] text-mauve">Carregando…</p>
       ) : stats ? (
         <>
-          <section className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
-            <Cartao icon={Wallet} titulo="Receita hoje" valor={formatarBRL(stats.revenue_today_cents)} />
-            <Cartao icon={CalendarDays} titulo="Receita do mês" valor={formatarBRL(stats.revenue_month_cents)} />
-            <Cartao icon={Sparkles} titulo="Lucro estimado do mês" valor={formatarBRL(stats.profit_month_cents)} destaque />
-            <Cartao icon={ShoppingBag} titulo="Pedidos hoje" valor={String(stats.orders_today)} />
-            <Cartao icon={ShoppingBag} titulo="Pedidos do mês" valor={String(stats.orders_month)} />
-            <Cartao icon={Receipt} titulo="Ticket médio" valor={formatarBRL(stats.average_ticket_cents)} />
+          <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+            <MetricCard icon={CalendarDays} titulo="Receita do mês" valor={formatarBRL(stats.revenue_month_cents)} />
+            <MetricCard icon={Sparkles} titulo="Lucro estimado do mês" valor={formatarBRL(stats.profit_month_cents)} destaque />
+            <MetricCard icon={Receipt} titulo="Ticket médio" valor={formatarBRL(stats.average_ticket_cents)} />
           </section>
 
-          <p className="m-0 mt-2 text-[11px] leading-relaxed text-mauve">
-            Lucro estimado = receita − custo das peças − taxa do Mercado Pago − embalagem.
-            Não inclui o frete pago aos Correios (esse custo só existe somado por lote, não por pedido).
-          </p>
+          <section className="mt-3.5 flex flex-wrap items-stretch rounded-[16px] border border-blush bg-white">
+            <FaixaDia icon={Wallet} titulo="Receita hoje" valor={formatarBRL(stats.revenue_today_cents)} />
+            <FaixaDia icon={ShoppingBag} titulo="Pedidos hoje" valor={String(stats.orders_today)} />
+            <FaixaDia icon={ShoppingBag} titulo="Pedidos do mês" valor={String(stats.orders_month)} />
+            <p className="m-0 flex flex-1 items-center px-5 py-3.5 text-[11px] leading-relaxed text-mauve">
+              Lucro estimado = receita − custo das peças − taxa do Mercado Pago − embalagem.
+              Não inclui o frete pago aos Correios (esse custo só existe somado por lote, não por pedido).
+            </p>
+          </section>
+
+          <TarefasCard stats={stats} onIrParaLote={() => document.getElementById("lote")?.scrollIntoView({ behavior: "smooth" })} />
+          <SaudeCatalogoCard produtos={produtos} />
 
           <section className="mt-9 rounded-[18px] border border-blush bg-white p-6 shadow-[0_8px_26px_-14px_rgba(92,42,70,0.22)]">
             <div className="mb-1 flex items-baseline justify-between">
@@ -124,30 +137,139 @@ export default function AdminDashboard() {
   );
 }
 
-function Cartao({
-  icon: Icon, titulo, valor, destaque = false,
+/** Uma fatia da faixa "hoje" — divisória vertical entre as fatias, exceto
+ *  a última (a nota fica ali do lado, sem divisória dupla). */
+function FaixaDia({ icon: Icon, titulo, valor }: { icon: LucideIcon; titulo: string; valor: string }) {
+  return (
+    <div className="flex items-center gap-3 border-r border-blush px-5 py-3.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blush text-wine-dark">
+        <Icon className="h-[15px] w-[15px]" strokeWidth={1.8} />
+      </span>
+      <div>
+        <p className="m-0 text-[10px] tracking-[0.08em] text-mauve uppercase">{titulo}</p>
+        <p className="m-0 font-serif text-[17px] text-ink">{valor}</p>
+      </div>
+    </div>
+  );
+}
+
+interface Tarefa {
+  titulo: string;
+  detalhe: string;
+  acaoLabel: string;
+  ir: () => void;
+  icon: LucideIcon;
+}
+
+/** "Precisa de você hoje" — sempre derivado de campos que a API já manda
+ *  (status_counts, open_batch, last_sync). Nada aqui é inventado: se um
+ *  número zerar, a tarefa correspondente simplesmente não aparece. */
+function TarefasCard({ stats, onIrParaLote }: { stats: DashboardStats; onIrParaLote: () => void }) {
+  const navigate = useNavigate();
+
+  const prontos = Object.entries(stats.status_counts)
+    .filter(([status]) => PRONTOS_PARA_DESPACHAR.includes(status))
+    .reduce((soma, [, n]) => soma + n, 0);
+  const loteNoTeto = stats.open_batch != null && stats.open_batch.oldest_business_days >= 5;
+  const travados = stats.last_sync?.locked_prices ?? 0;
+
+  const tarefas: Tarefa[] = [];
+  if (prontos > 0) {
+    tarefas.push({
+      titulo: `${prontos} ${prontos === 1 ? "pedido pago" : "pedidos pagos"} esperando despacho`,
+      detalhe: "Confira o mais antigo primeiro",
+      acaoLabel: "Ver pedidos",
+      icon: ShoppingBag,
+      ir: () => navigate("/admin/pedidos", { state: { quickFilter: "pronto" } }),
+    });
+  }
+  if (loteNoTeto && stats.open_batch) {
+    tarefas.push({
+      titulo: `Lote #${stats.open_batch.number} no teto de prazo`,
+      detalhe: `Pedido mais antigo com ${stats.open_batch.oldest_business_days} dias úteis`,
+      acaoLabel: "Ver lote",
+      icon: Package,
+      ir: onIrParaLote,
+    });
+  }
+  if (travados > 0) {
+    tarefas.push({
+      titulo: `${travados} ${travados === 1 ? "preço travado" : "preços travados"} pelo disjuntor`,
+      detalhe: "Custo mudou mais que o esperado na última sincronização",
+      acaoLabel: "Revisar preços",
+      icon: ShieldAlert,
+      ir: () => navigate("/admin/produtos", { state: { pendentes: true } }),
+    });
+  }
+
+  if (tarefas.length === 0) return null;
+
+  return (
+    <section className="mt-6 rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
+      <div className="mb-4 flex items-baseline justify-between gap-2">
+        <h2 className="m-0 font-serif text-[15px]">Precisa de você hoje</h2>
+        <span className="rounded-full bg-blush px-2.5 py-1 text-[10.5px] font-semibold text-wine-dark">
+          {tarefas.length} {tarefas.length === 1 ? "pendência" : "pendências"}
+        </span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {tarefas.map((t) => (
+          <button
+            key={t.titulo}
+            type="button"
+            onClick={t.ir}
+            className="flex w-full cursor-pointer items-center gap-3 rounded-[12px] border border-transparent bg-cream/40 p-3.5 text-left transition-colors hover:border-blush hover:bg-white"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blush text-wine-dark">
+              <t.icon className="h-[15px] w-[15px]" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <p className="m-0 truncate text-[13.5px] font-medium text-ink">{t.titulo}</p>
+              <p className="m-0 text-[11.5px] text-mauve">{t.detalhe}</p>
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-wine">
+              {t.acaoLabel}
+              <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Contagens reais tiradas do catálogo já carregado — nada de "sem foto"
+ *  ou "sem giro há 30 dias" aqui: a API de produtos não guarda isso, e um
+ *  número inventado num painel financeiro é pior que nenhum número. */
+function SaudeCatalogoCard({ produtos }: { produtos: AdminProduct[] | null }) {
+  if (!produtos) return null;
+
+  const publicados = produtos.filter((p) => p.published).length;
+  const ocultos = produtos.length - publicados;
+  const travados = produtos.filter((p) => p.suggested_price_cents != null).length;
+
+  return (
+    <section className="mt-6 rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
+      <h2 className="m-0 mb-4 font-serif text-[15px]">Saúde do catálogo</h2>
+      <div className="grid grid-cols-3 gap-3">
+        <MiniStat icon={Package} label="Publicados" valor={publicados} />
+        <MiniStat icon={EyeOff} label="Ocultos" valor={ocultos} />
+        <MiniStat icon={PackageSearch} label="Travados p/ revisão" valor={travados} atencao={travados > 0} />
+      </div>
+    </section>
+  );
+}
+
+function MiniStat({
+  icon: Icon, label, valor, atencao = false,
 }: {
-  icon: LucideIcon; titulo: string; valor: string; destaque?: boolean;
+  icon: LucideIcon; label: string; valor: number; atencao?: boolean;
 }) {
   return (
-    <div
-      className={`rounded-[16px] border p-4 shadow-[0_6px_20px_-10px_rgba(92,42,70,0.25)] transition-shadow hover:shadow-[0_10px_26px_-10px_rgba(92,42,70,0.3)] ${
-        destaque
-          ? "border-wine/40 bg-[linear-gradient(160deg,#fff9fb_0%,#fdeaf2_100%)]"
-          : "border-blush bg-white"
-      }`}
-    >
-      <div className="flex items-center gap-2.5">
-        <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-            destaque ? "bg-wine text-white" : "bg-blush text-wine-dark"
-          }`}
-        >
-          <Icon className="h-[15px] w-[15px]" strokeWidth={1.8} />
-        </span>
-        <p className="m-0 text-[10.5px] tracking-[0.08em] text-ink-soft uppercase">{titulo}</p>
-      </div>
-      <p className={`m-0 mt-2.5 font-serif text-[21px] ${destaque ? "text-wine-dark" : "text-ink"}`}>{valor}</p>
+    <div className={`rounded-[12px] border p-3.5 ${atencao ? "border-warning/40 bg-warning-soft" : "border-blush bg-cream/40"}`}>
+      <Icon className={`h-4 w-4 ${atencao ? "text-warning" : "text-mauve"}`} strokeWidth={1.8} />
+      <p className={`m-0 mt-2 font-serif text-[19px] ${atencao ? "text-warning" : "text-ink"}`}>{valor}</p>
+      <p className="m-0 text-[10.5px] tracking-[0.04em] text-ink-soft uppercase">{label}</p>
     </div>
   );
 }
@@ -190,7 +312,7 @@ function LoteCard({ batch }: { batch: DashboardStats["open_batch"] }) {
 
   if (!batch) {
     return (
-      <div className="rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
+      <div id="lote" className="rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
         <h3 className="m-0 mb-1 font-serif text-[15px]">Lote</h3>
         <p className="m-0 text-[12.5px] text-ink-soft">Nenhum lote aberto no momento.</p>
       </div>
@@ -201,7 +323,7 @@ function LoteCard({ batch }: { batch: DashboardStats["open_batch"] }) {
   const perto = batch.oldest_business_days >= 5;
 
   return (
-    <div className="rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
+    <div id="lote" className="rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="m-0 font-serif text-[15px]">Lote #{batch.number}</h3>
         <span className="text-[11.5px] text-mauve">{batch.order_count} pedidos</span>
@@ -290,7 +412,20 @@ function SincronizacaoCard({
   return (
     <div className="rounded-[16px] border border-blush bg-white p-5 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="m-0 font-serif text-[15px]">Catálogo</h3>
+        <span className="flex items-center gap-2">
+          <h3 className="m-0 font-serif text-[15px]">Catálogo</h3>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[9.5px] font-semibold tracking-[0.05em] uppercase ${
+              emAndamento
+                ? "animate-pulse bg-warning-soft text-warning"
+                : sync?.status === "error"
+                  ? "bg-danger-soft text-danger"
+                  : "bg-cream text-mauve"
+            }`}
+          >
+            {emAndamento ? "rodando" : sync ? (SYNC_STATUS_LABEL[sync.status] ?? sync.status) : "ocioso"}
+          </span>
+        </span>
         <button
           type="button"
           onClick={() => void sincronizar()}

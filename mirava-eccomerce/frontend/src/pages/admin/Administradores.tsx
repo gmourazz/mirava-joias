@@ -71,7 +71,10 @@ export default function AdminAdministradores() {
         admins; Admin tem acesso operacional, sem esta tela.
       </p>
 
-      <form onSubmit={adicionar} className="mb-6 flex flex-wrap items-center gap-2.5">
+      <form
+        onSubmit={adicionar}
+        className="mb-6 flex flex-wrap items-center gap-2.5 rounded-[16px] border border-blush bg-white p-4 shadow-[0_6px_20px_-12px_rgba(92,42,70,0.2)]"
+      >
         <input
           type="email"
           value={email}

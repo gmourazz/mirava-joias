@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { ApiError } from "../../lib/api";
 import { formatarBRL } from "../../lib/dinheiro";
 import { listAdminProducts, updateAdminProduct, type AdminProduct } from "../../lib/admin";
 
 export default function AdminProdutos() {
+  const location = useLocation();
   const [produtos, setProdutos] = useState<AdminProduct[]>([]);
   const [busca, setBusca] = useState("");
-  const [pendentes, setPendentes] = useState(false);
+  const [pendentes, setPendentes] = useState(() => (location.state as { pendentes?: boolean } | null)?.pendentes ?? false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -151,6 +153,7 @@ function ProdutoLinha({
   return (
     <div className="rounded-[14px] border border-blush bg-white p-4 shadow-[0_6px_18px_-12px_rgba(92,42,70,0.18)]">
       <div className="flex flex-wrap items-center gap-3">
+        <span className="h-11 w-11 shrink-0 rounded-[11px] border border-blush bg-[repeating-linear-gradient(135deg,#fdf1f5_0_5px,#f8e3ea_5px_10px)]" />
         <div className="min-w-0 flex-1">
           <p className="m-0 truncate text-[13.5px] text-ink">{produto.name}</p>
           <p className="m-0 text-[11px] text-mauve">

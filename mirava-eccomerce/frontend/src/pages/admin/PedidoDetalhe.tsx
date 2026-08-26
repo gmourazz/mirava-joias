@@ -8,6 +8,7 @@ import {
   advanceOrderStatus, getOrderDetail, NEXT_STATUSES, STATUS_LABEL,
   type AdminOrderDetail,
 } from "../../lib/admin";
+import StatusPill from "../../components/admin/StatusPill";
 
 // Transições sem volta fácil — pede confirmação antes de aplicar.
 const CONFIRMAR = new Set(["cancelled", "refunded", "out_of_stock"]);
@@ -68,9 +69,7 @@ export default function AdminPedidoDetalhe() {
             {pedido.paid_at && ` · pago em ${formatDate(pedido.paid_at)}`}
           </p>
         </div>
-        <span className="rounded-full border border-blush bg-cream/60 px-4 py-1.5 text-[12px] font-medium text-wine-dark">
-          {STATUS_LABEL[pedido.status] ?? pedido.status}
-        </span>
+        <StatusPill status={pedido.status} />
       </div>
 
       <div className="grid gap-6 sm:grid-cols-[1.4fr_1fr]">

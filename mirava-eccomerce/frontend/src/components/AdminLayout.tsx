@@ -7,11 +7,13 @@
 // essa checagem. Login exigido; depois disso, `admins.role` decide o resto
 // (ver protegidoPorAdmin/protegidoPorSystem no Go, que são a proteção real).
 
+import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Lock, LogIn, LogOut, Package, ShoppingBag, Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { listAllOrders, PRONTOS_PARA_DESPACHAR } from "../lib/admin";
 import Monogram from "./Monogram";
 
 const NAV = [
@@ -24,6 +26,17 @@ export default function AdminLayout() {
   const { user, loading, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Contador na aba "Pedidos" — quantos já pagos ainda esperam despacho.
+  // Falhou a busca? Sem drama, só não mostra o número; a lista continua
+  // certa quando a pessoa abrir a aba de verdade.
+  const [pendentes, setPendentes] = useState<number | null>(null);
+  useEffect(() => {
+    if (!user?.is_admin) return;
+    listAllOrders()
+      .then((pedidos) => setPendentes(pedidos.filter((p) => PRONTOS_PARA_DESPACHAR.includes(p.status)).length))
+      .catch(() => setPendentes(null));
+  }, [user?.is_admin]);
 
   if (loading) return null;
 
@@ -63,7 +76,9 @@ export default function AdminLayout() {
           onClick={() => navigate("/")}
           className="flex cursor-pointer items-center gap-3 border-none border-b border-blush bg-none px-6 py-6 text-left"
         >
-          <Monogram className="h-7 w-9 shrink-0" color="#8E3B6B" />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[linear-gradient(140deg,#d46a9f_0%,#e087ac_100%)]">
+            <Monogram className="h-5 w-7" color="#ffffff" />
+          </span>
           <span className="flex flex-col">
             <span className="font-script text-[22px] leading-none text-wine-dark">Mirava</span>
             <span className="mt-1 text-[9px] tracking-[0.16em] text-mauve uppercase">
@@ -77,18 +92,30 @@ export default function AdminLayout() {
             const active = item.end
               ? location.pathname === item.to
               : location.pathname.startsWith(item.to);
+            const badge = item.to === "/admin/pedidos" ? pendentes : null;
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-3 rounded-[12px] px-3.5 py-2.5 text-[13.5px] transition-colors ${
+                className={`flex items-center justify-between gap-3 rounded-[12px] px-3.5 py-2.5 text-[13.5px] transition-colors ${
                   active
                     ? "bg-[linear-gradient(135deg,#d46a9f_0%,#8e3b6b_100%)] text-white shadow-[0_6px_16px_-4px_rgba(142,59,107,0.5)]"
                     : "text-ink-soft hover:bg-cream"
                 }`}
               >
-                <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.8} />
-                {item.label}
+                <span className="flex items-center gap-3">
+                  <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+                  {item.label}
+                </span>
+                {!!badge && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
+                      active ? "bg-white/25 text-white" : "bg-blush text-wine-dark"
+                    }`}
+                  >
+                    {badge}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -100,7 +127,7 @@ export default function AdminLayout() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="m-0 truncate text-[12.5px] text-ink">{user.name}</p>
-            <p className="m-0 text-[10.5px] text-mauve">
+            <p className="m-0 text-[10.5px] tracking-[0.08em] text-mauve uppercase">
               {user.admin_role === "system" ? "Master" : "Admin"}
             </p>
           </div>
@@ -108,7 +135,7 @@ export default function AdminLayout() {
             type="button"
             onClick={logout}
             aria-label="Sair"
-            className="flex shrink-0 cursor-pointer items-center border-none bg-none p-1.5 text-mauve hover:text-wine-dark"
+            className="flex shrink-0 cursor-pointer items-center rounded-[8px] border-none bg-none p-1.5 text-mauve hover:bg-cream hover:text-wine-dark"
           >
             <LogOut className="h-4 w-4" strokeWidth={1.8} />
           </button>

@@ -97,6 +97,11 @@ export function listAllOrders(status?: string): Promise<AdminOrder[]> {
   return api<AdminOrder[] | null>(`/admin/pedidos${qs}`, { authenticated: true }).then((r) => r ?? []);
 }
 
+/** Pago, e ainda não chegou em "enviado" — é o que a dona precisa mexer.
+ *  Usado no filtro rápido de Pedidos e no contador da sidebar; um lugar
+ *  só, pra não desalinhar. */
+export const PRONTOS_PARA_DESPACHAR = ["paid", "in_batch", "purchased_from_supplier", "received_by_owner"];
+
 /** Dispara a sincronização com a Lilly. A API responde na hora (202) e
  *  continua rodando em segundo plano — pode levar horas no catálogo
  *  inteiro. Acompanhe pelo `last_sync` do dashboard. */
