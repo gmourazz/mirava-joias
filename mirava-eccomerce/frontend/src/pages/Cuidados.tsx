@@ -15,7 +15,7 @@ const DICAS = [
   {
     icon: Bath,
     title: "Tire para o banho",
-    desc: "Sabonete, xampu e água quente opacam o brilho com o tempo — melhor guardar a peça seca antes de entrar.",
+    desc: "Sabonete, xampu e água quente opacam o brilho com o tempo, melhor guardar a peça seca antes de entrar.",
   },
   {
     icon: Waves,
@@ -25,7 +25,7 @@ const DICAS = [
   {
     icon: Droplets,
     title: "Perfume e hidratante por último",
-    desc: "Aplique tudo antes de colocar a joia — o álcool e os óleos desses produtos são os maiores vilões do brilho.",
+    desc: "Aplique tudo antes de colocar a joia, o álcool e os óleos desses produtos são os maiores vilões do brilho.",
   },
   {
     icon: Ban,
@@ -50,7 +50,7 @@ export default function Cuidados() {
   return (
     <div>
       <PageHero icon={Sparkles} kicker="Pra durar" title="Cuidados com a peça">
-        Prata 925 e banho de ouro pedem pouco cuidado — o suficiente pra
+        Prata 925 e banho de ouro pedem pouco cuidado, o suficiente pra
         manter o brilho por muito mais tempo.
       </PageHero>
 
@@ -101,7 +101,7 @@ export default function Cuidados() {
         >
           <p className="m-0 text-[13.5px] leading-relaxed text-ink-soft">
             Guarde separadas e sequinhas, de preferência num saquinho ou
-            caixinha fechada — joias soltas juntas se arranham entre si.
+            caixinha fechada, joias soltas juntas se arranham entre si.
           </p>
         </Reveal>
       </section>

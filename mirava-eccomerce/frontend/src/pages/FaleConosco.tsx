@@ -45,7 +45,7 @@ export default function FaleConosco() {
             <div>
               <h2 className="m-0 font-serif text-[24px] font-normal text-ink">Escreva pra gente</h2>
               <p className="m-0 mt-2.5 text-[13.5px] leading-relaxed text-ink-soft">
-                Se for sobre um pedido já feito, inclua o número dele — assim
+                Se for sobre um pedido já feito, inclua o número dele, assim
                 a gente resolve mais rápido. Pra troca ou devolução, veja
                 antes o que precisamos em{" "}
                 <Link to="/cuidados" className="text-wine underline">cuidados com a peça</Link>.

@@ -19,6 +19,8 @@ import PrazosEntrega from "./pages/PrazosEntrega";
 import FaleConosco from "./pages/FaleConosco";
 import GuiaDeTamanhos from "./pages/GuiaDeTamanhos";
 import Cuidados from "./pages/Cuidados";
+import Privacidade from "./pages/Privacidade";
+import Termos from "./pages/Termos";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminPedidos from "./pages/admin/Pedidos";
 import AdminPedidoDetalhe from "./pages/admin/PedidoDetalhe";
@@ -59,6 +61,8 @@ export default function App() {
                 <Route path="/fale-conosco" element={<FaleConosco />} />
                 <Route path="/guia-de-tamanhos" element={<GuiaDeTamanhos />} />
                 <Route path="/cuidados" element={<Cuidados />} />
+                <Route path="/privacidade" element={<Privacidade />} />
+                <Route path="/termos" element={<Termos />} />
               </Route>
             </Routes>
           </CartProvider>

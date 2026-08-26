@@ -18,7 +18,7 @@ export const HERO_SLIDES = [
     kicker: "Agenda de agosto aberta",
     script: "Gravação",
     title: "Inicial, data ou frase gravada à mão",
-    text: "Escolha o que fica marcado na sua joia — a gravação é feita peça por peça, sem custo extra.",
+    text: "Escolha o que fica marcado na sua joia, a gravação é feita peça por peça, sem custo extra.",
     cta: "Quero gravar",
     cta2: "Ver exemplos",
     seed: "hero-b",
@@ -71,7 +71,7 @@ export const TRUST = [
 
 export const FOOTER_COLS = [
   { title: "A marca", links: ["Sobre a Mirava", "Como comprar", "Prazos de entrega"] },
-  { title: "Ajuda", links: ["Fale conosco", "Guia de tamanhos", "Cuidados com a peça"] },
+  { title: "Ajuda", links: ["Fale conosco", "Guia de tamanhos", "Cuidados com a peça", "Termos de uso", "Política de privacidade"] },
   { title: "Contato", links: ["miravajoias@gmail.com", "@miravajoias"] },
 ];
 

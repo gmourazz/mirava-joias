@@ -13,7 +13,7 @@ const PAGAMENTOS = [
   {
     icon: QrCode,
     title: "Pix",
-    desc: "Confirmação na hora — a forma mais rápida de garantir sua peça.",
+    desc: "Confirmação na hora, a forma mais rápida de garantir sua peça.",
     destaque: true,
   },
   {
@@ -25,7 +25,7 @@ const PAGAMENTOS = [
   {
     icon: Banknote,
     title: "Pagamento 100% seguro",
-    desc: "Processado por um gateway certificado — a Mirava nunca vê nem guarda o número do seu cartão.",
+    desc: "Processado por um gateway certificado, a Mirava nunca vê nem guarda o número do seu cartão.",
     destaque: false,
   },
 ];

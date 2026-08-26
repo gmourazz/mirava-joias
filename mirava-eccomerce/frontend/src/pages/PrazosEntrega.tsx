@@ -18,7 +18,7 @@ const ETAPAS = [
   {
     icon: Sparkles,
     title: "Peça preparada",
-    desc: "Cada peça é conferida e preparada com cuidado — é sob encomenda, não sai de prateleira.",
+    desc: "Cada peça é conferida e preparada com cuidado, é sob encomenda, não sai de prateleira.",
   },
   {
     icon: PackageCheck,

@@ -27,6 +27,16 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Aba do navegador diferente aqui dentro, pra dar pra distinguir várias
+  // abas abertas ao mesmo tempo (loja + admin). Volta ao título da loja
+  // quando sai da área /admin.
+  useEffect(() => {
+    document.title = "Admin - Mirava";
+    return () => {
+      document.title = "Mirava Joias";
+    };
+  }, []);
+
   // Contador na aba "Pedidos" — quantos já pagos ainda esperam despacho.
   // Falhou a busca? Sem drama, só não mostra o número; a lista continua
   // certa quando a pessoa abrir a aba de verdade.

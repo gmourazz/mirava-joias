@@ -21,7 +21,7 @@ const AROS = [
 
 const COLARES = [
   { nome: "Choker", cm: "35 a 40 cm", desc: "roça no pescoço, bem justinho" },
-  { nome: "Princesa", cm: "42 a 48 cm", desc: "cai na base do colo — o comprimento mais usado" },
+  { nome: "Princesa", cm: "42 a 48 cm", desc: "cai na base do colo, o comprimento mais usado" },
   { nome: "Matinê", cm: "50 a 60 cm", desc: "desce um pouco abaixo do colo" },
   { nome: "Longo", cm: "70 cm ou mais", desc: "para usar solto ou dobrado em volta" },
 ];
@@ -43,8 +43,8 @@ export default function GuiaDeTamanhos() {
   return (
     <div>
       <PageHero icon={Ruler} kicker="Para acertar de primeira" title="Guia de tamanhos">
-        Cada página de produto mostra os tamanhos disponíveis daquela peça —
-        este guia é pra você descobrir qual é o seu.
+        Cada página de produto mostra os tamanhos disponíveis daquela peça.
+        Este guia é pra você descobrir qual é o seu.
       </PageHero>
 
       <section className="px-6 py-[92px] sm:px-16 lg:px-24">
@@ -59,7 +59,7 @@ export default function GuiaDeTamanhos() {
               <p className="m-0 mt-2.5 max-w-[520px] text-[13.5px] leading-relaxed text-ink-soft">
                 Meça um anel que já fica bom no dedo (a circunferência
                 interna, não o diâmetro) com uma fita métrica ou um
-                barbante — depois é só comparar com a numeração de aro
+                barbante, depois é só comparar com a numeração de aro
                 abaixo, padrão usado por joalherias no Brasil.
               </p>
               <div className="mt-6 grid grid-cols-3 gap-2.5 sm:grid-cols-5">
@@ -106,7 +106,7 @@ export default function GuiaDeTamanhos() {
               </span>
               <h2 className="m-0 mt-2 font-serif text-[24px] font-normal text-ink">Com folga de 1 a 2 cm</h2>
               <p className="m-0 mt-2.5 max-w-[480px] text-[13.5px] leading-relaxed text-ink-soft">
-                Meça o pulso com fita métrica e some a folga — é essa medida
+                Meça o pulso com fita métrica e some a folga, é essa medida
                 final que indica o tamanho:
               </p>
               <div className="mt-6 flex flex-wrap gap-3.5">

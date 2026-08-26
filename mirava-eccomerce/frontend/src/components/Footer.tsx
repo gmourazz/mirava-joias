@@ -1,11 +1,12 @@
-import { AtSign, MessageCircle } from "lucide-react";
+import { ChevronRight, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 import Monogram from "./Monogram";
+import InstagramIcon from "./InstagramIcon";
 import { FOOTER_COLS } from "../data/content";
 import { LOJA } from "../config/loja";
 
 // Onde cada texto do rodapé leva. Fica separado de FOOTER_COLS de propósito:
-// aquele array é copy da marca, isto aqui é estrutura de rota — mexer no
+// aquele array é copy da marca, isto aqui é estrutura de rota, mexer no
 // texto do link não deveria arriscar quebrar a URL, e vice-versa.
 const FOOTER_ROUTES: Record<string, string> = {
   "Sobre a Mirava": "/sobre",
@@ -14,6 +15,8 @@ const FOOTER_ROUTES: Record<string, string> = {
   "Fale conosco": "/fale-conosco",
   "Guia de tamanhos": "/guia-de-tamanhos",
   "Cuidados com a peça": "/cuidados",
+  "Termos de uso": "/termos",
+  "Política de privacidade": "/privacidade",
 };
 
 export default function Footer() {
@@ -28,10 +31,10 @@ export default function Footer() {
           </p>
           <div className="flex gap-3.5">
             <a href="https://instagram.com/miravajoias" target="_blank" rel="noreferrer" aria-label="Instagram">
-              <AtSign className="h-[18px] w-[18px] cursor-pointer text-white transition-colors hover:text-blush-2" strokeWidth={1.6} />
+              <InstagramIcon className="h-[18px] w-[18px] cursor-pointer text-white transition-colors hover:text-blush-2" strokeWidth={1.6} />
             </a>
             <a href={`mailto:${LOJA.email}`} aria-label="E-mail">
-              <MessageCircle className="h-[18px] w-[18px] cursor-pointer text-white transition-colors hover:text-blush-2" strokeWidth={1.6} />
+              <Mail className="h-[18px] w-[18px] cursor-pointer text-white transition-colors hover:text-blush-2" strokeWidth={1.6} />
             </a>
           </div>
         </div>
@@ -42,25 +45,30 @@ export default function Footer() {
               const to = FOOTER_ROUTES[l];
               if (to) {
                 return (
-                  <Link key={l} to={to} className="text-[13.5px] text-blush/78 transition-colors duration-300 hover:text-blush-2">
+                  <Link
+                    key={l}
+                    to={to}
+                    className="flex items-center gap-1.5 text-[13.5px] text-blush/78 transition-colors duration-300 hover:text-blush-2"
+                  >
+                    <ChevronRight className="h-3 w-3 shrink-0 text-blush-2/70" strokeWidth={2} />
                     {l}
                   </Link>
                 );
               }
               // "Contato": e-mail e @instagram viram link direto em vez de rota interna.
-              const href = l.includes("@") && l.includes(".")
-                ? `mailto:${l}`
-                : l.startsWith("@")
-                  ? `https://instagram.com/${l.slice(1)}`
-                  : undefined;
+              const isEmail = l.includes("@") && l.includes(".");
+              const isInsta = l.startsWith("@");
+              const href = isEmail ? `mailto:${l}` : isInsta ? `https://instagram.com/${l.slice(1)}` : undefined;
+              const Icone = isEmail ? Mail : isInsta ? InstagramIcon : null;
               return href ? (
                 <a
                   key={l}
                   href={href}
                   target={href.startsWith("http") ? "_blank" : undefined}
                   rel={href.startsWith("http") ? "noreferrer" : undefined}
-                  className="text-[13.5px] text-blush/78 transition-colors duration-300 hover:text-blush-2"
+                  className="flex items-center gap-1.5 text-[13.5px] text-blush/78 transition-colors duration-300 hover:text-blush-2"
                 >
+                  {Icone && <Icone className="h-3.5 w-3.5 shrink-0 text-blush-2/70" strokeWidth={1.8} />}
                   {l}
                 </a>
               ) : (

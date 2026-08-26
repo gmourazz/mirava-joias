@@ -25,7 +25,7 @@ export default function Sobre() {
   return (
     <div>
       <PageHero icon={Sparkles} kicker="Nossa história" title="Uma joia deveria significar algo">
-        Antes de ser bonita, feita para você — prata 925 e banho de ouro,
+        Antes de ser bonita, feita para você. Prata 925 e banho de ouro,
         sob encomenda.
       </PageHero>
 
@@ -54,7 +54,7 @@ export default function Sobre() {
             <p className="m-0 text-[15.5px] leading-relaxed text-ink-soft">
               Trabalhamos com prata 925 maciça e banho de ouro 18k sobre
               prata, com garantia de 12 meses no acabamento. São peças
-              pensadas pra acompanhar o dia a dia sem perder o brilho — e,
+              pensadas pra acompanhar o dia a dia sem perder o brilho e,
               quando você quer, pra levar junto uma inicial, uma data ou uma
               frase gravada à mão.
             </p>
