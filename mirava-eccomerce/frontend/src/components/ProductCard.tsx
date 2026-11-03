@@ -65,6 +65,8 @@ export default function ProductCard({ product }: { product: Product }) {
           <span className="absolute top-2.5 left-2.5 rounded-full bg-white px-3 py-[5px] text-[12px] font-semibold text-muted">
             Indisponível
           </span>
+        ) : product.promoPct > 0 ? (
+          <span className="absolute top-2.5 left-2.5 rounded-full bg-teal px-3 py-[5px] text-[12px] font-semibold text-white">−{product.promoPct}%</span>
         ) : (
           product.isNew && (
             <span className="absolute top-2.5 left-2.5 rounded-full bg-white px-3 py-[5px] text-[12px] font-semibold text-teal">Novo</span>
@@ -97,6 +99,7 @@ export default function ProductCard({ product }: { product: Product }) {
       <Link to={href} className="grid gap-[5px] px-1.5 text-text hover:text-text">
         <span className="text-[15px] leading-[1.35] font-medium">{product.name}</span>
         <span className="flex flex-wrap items-baseline gap-x-2">
+          {product.promoPct > 0 && <s className="text-[13px] text-muted">{formatarBRL(product.listPriceCents)}</s>}
           <span className="text-[17px] font-bold text-teal [font-variant-numeric:tabular-nums]">{formatarBRL(product.priceCents)}</span>
           {temDescontoPix && <span className="text-[12.5px] text-muted">{formatarBRL(precoPix(product.priceCents))} no Pix</span>}
         </span>

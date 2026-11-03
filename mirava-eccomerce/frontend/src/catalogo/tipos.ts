@@ -7,9 +7,9 @@
 //     lib/images.ts), não identificadores de código. Trocar para inglês
 //     quebraria as imagens do catálogo sem trazer benefício real.
 
-export type Category =
-  | "aneis" | "colares" | "pulseiras" | "berloques"
-  | "brincos" | "conjuntos" | "outros";
+/** Slug da categoria. As categorias são editáveis no painel (tabela
+ *  `categories`), então qualquer texto vale; as de fábrica estão abaixo. */
+export type Category = string;
 
 export type Metal = "prata" | "ouro";
 
@@ -33,7 +33,12 @@ export interface Product {
   slug: string;
   name: string;
   description: string | null;
+  /** Preço com a promoção ativa (o que a cliente paga pela peça). */
   priceCents: number;
+  /** Preço cheio e % da promoção (decisão 32): com promoção, a loja mostra
+   *  o cheio riscado. Sem promoção, listPriceCents = priceCents. */
+  listPriceCents: number;
+  promoPct: number;
   category: Category;
   metal: Metal;
   images: string[];
@@ -52,7 +57,9 @@ export interface Product {
   isNew: boolean;
 }
 
-export const CATEGORY_LABEL: Record<Category, string> = {
+/** Rótulos de fábrica — reserva enquanto /categorias não respondeu. O rótulo
+ *  de verdade vem do banco (catalogo/categorias.ts). */
+export const CATEGORY_LABEL: Record<string, string> = {
   aneis: "Anéis",
   colares: "Colares",
   pulseiras: "Pulseiras",

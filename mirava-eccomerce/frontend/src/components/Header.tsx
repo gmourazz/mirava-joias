@@ -5,7 +5,8 @@ import {
   LogOut, Menu, Moon, Package, Search, ShoppingBag, Sparkles, Sun, Tag, User, X,
   type LucideIcon,
 } from "lucide-react";
-import { MENU_CATEGORIES, CATEGORY_LABEL, type Category } from "../catalogo/tipos";
+import type { Category } from "../catalogo/tipos";
+import { useCategorias, type CategoriaLoja } from "../catalogo/categorias";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useFavorites } from "../context/FavoritesContext";
@@ -26,7 +27,7 @@ interface NavItem extends NavLink {
   items?: NavLink[];
 }
 
-const CATEGORY_ICON: Record<Category, LucideIcon> = {
+const CATEGORY_ICON: Record<Category, LucideIcon | undefined> = {
   aneis: Circle,
   colares: Heart,
   pulseiras: Link2,
@@ -36,18 +37,20 @@ const CATEGORY_ICON: Record<Category, LucideIcon> = {
   outros: Gem,
 };
 
-const categoryLinks = (base: string): NavLink[] =>
-  MENU_CATEGORIES.map((c) => ({
-    label: CATEGORY_LABEL[c],
-    to: `${base}/${c}`,
-    Icon: CATEGORY_ICON[c],
+// As categorias vêm do painel (ordem e rótulo editáveis); ícone de fábrica
+// para as conhecidas, joia para as novas.
+const categoryLinks = (cats: CategoriaLoja[], base: string): NavLink[] =>
+  cats.map((c) => ({
+    label: c.label,
+    to: `${base}/${c.slug}`,
+    Icon: CATEGORY_ICON[c.slug] ?? Gem,
   }));
 
 // Presentes filtra por preço máximo (?ate= em centavos); a página de
 // categoria aplica o teto.
 const presentes = (cents: number) => `/categoria/colecoes/todos?ate=${cents}`;
 
-const NAV: NavItem[] = [
+const buildNav = (cats: CategoriaLoja[]): NavItem[] => [
   { label: "Lançamentos", to: "/categoria/colecoes/todos?ordem=novos", Icon: Sparkles },
   {
     label: "Joias",
@@ -55,12 +58,12 @@ const NAV: NavItem[] = [
     Icon: Gem,
     items: [
       { label: "Mais vendidos", to: "/categoria/colecoes/todos", Icon: Flame },
-      ...categoryLinks("/categoria/colecoes"),
+      ...categoryLinks(cats, "/categoria/colecoes"),
     ],
   },
   { label: "Berloques", to: "/categoria/colecoes/berloques", Icon: Link2 },
-  { label: "Prata", to: "/categoria/prata/todos", Icon: Moon, items: categoryLinks("/categoria/prata") },
-  { label: "Ouro 18k", to: "/categoria/ouro/todos", Icon: Sun, items: categoryLinks("/categoria/ouro") },
+  { label: "Prata", to: "/categoria/prata/todos", Icon: Moon, items: categoryLinks(cats, "/categoria/prata") },
+  { label: "Ouro 18k", to: "/categoria/ouro/todos", Icon: Sun, items: categoryLinks(cats, "/categoria/ouro") },
   {
     label: "Presentes",
     to: presentes(20000),
@@ -83,6 +86,7 @@ function initials(name: string) {
 }
 
 export default function Header() {
+  const NAV = buildNav(useCategorias());
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);

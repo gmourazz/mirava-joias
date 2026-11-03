@@ -4,6 +4,9 @@
 // "Mais vendidos" vem ordenado do banco (units_sold: a venda da própria
 // Mirava manda, a posição na vitrine da fornecedora só desempata). "Até R$ 79"
 // filtra essa mesma lista, porque a API ainda não tem filtro de preço.
+//
+// Quando a dona monta a vitrine no painel (Vitrine → queridinhas /
+// lançamentos), essas abas mostram a escolha dela, na ordem dela.
 
 import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -11,6 +14,7 @@ import { useProducts } from "../catalogo/hooks";
 import type { ProductFilter } from "../catalogo/consultas";
 import { imageUrl } from "../catalogo/consultas";
 import ProductCard from "./ProductCard";
+import { useShowcase, type ShowcaseSlot } from "../lib/extras";
 import SectionHeading from "./SectionHeading";
 
 interface Aba {
@@ -19,12 +23,13 @@ interface Aba {
   title: string;
   filter: ProductFilter;
   maxCents?: number;
+  slot?: ShowcaseSlot;
 }
 
 const ABAS: Aba[] = [
-  { key: "top", label: "Mais vendidos", title: "Mais vendidos", filter: { bestSellers: true, limit: 16 } },
+  { key: "top", label: "Mais vendidos", title: "Mais vendidos", filter: { bestSellers: true, limit: 16 }, slot: "queridinhas" },
   // Sem bestSellers a API devolve as peças mais recentes primeiro.
-  { key: "novos", label: "Lançamentos", title: "Lançamentos", filter: { limit: 16 } },
+  { key: "novos", label: "Lançamentos", title: "Lançamentos", filter: { limit: 16 }, slot: "lancamentos" },
   { key: "destaques", label: "Destaques", title: "Destaques da Mirava", filter: { featured: true, limit: 16 } },
   { key: "ate79", label: "Até R$ 79", title: "Até R$ 79", filter: { bestSellers: true, limit: 48 }, maxCents: 7990 },
   { key: "ouro", label: "Banhados a ouro", title: "Banhados a ouro", filter: { metal: "ouro", bestSellers: true, limit: 16 } },
@@ -33,9 +38,13 @@ const ABAS: Aba[] = [
 export default function MaisVendidos() {
   const [aba, setAba] = useState(ABAS[0]);
   const trilho = useRef<HTMLDivElement>(null);
-  const { data, loading } = useProducts(aba.filter);
+  const { data, loading: loadingAuto } = useProducts(aba.filter);
+  const vitrine = useShowcase();
+  const escolhidas = aba.slot ? vitrine.data[aba.slot] : [];
+  const usaVitrine = escolhidas.length > 0;
+  const loading = vitrine.loading || loadingAuto;
 
-  const pecas = data
+  const pecas = (usaVitrine ? escolhidas : data)
     .filter((p) => imageUrl(p.images[0]))
     .filter((p) => !aba.maxCents || p.priceCents <= aba.maxCents)
     .slice(0, 12);

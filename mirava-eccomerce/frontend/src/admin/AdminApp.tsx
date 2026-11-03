@@ -10,7 +10,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { Activity, Bell, Box, ExternalLink, LayoutGrid, Lock, LogOut, Menu, RefreshCw, Search, Settings, ShoppingBag, Users, Wallet, X, type LucideIcon } from "lucide-react";
+import { Activity, Bell, Box, ExternalLink, LayoutGrid, Lock, LogOut, Menu, RefreshCw, Repeat, Search, Settings, ShoppingBag, Ticket, Users, Wallet, X, Sparkles, Zap, Megaphone, Image, type LucideIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../lib/api";
 import { adminApi, type Summary } from "./api";
@@ -22,27 +22,46 @@ import Sincronizacao from "./Sincronizacao";
 import Clientes from "./Clientes";
 import Atividades from "./Atividades";
 import Configuracoes from "./Configuracoes";
+import Cupons from "./Cupons";
+import Marketing from "./Marketing";
+import Conteudo from "./Conteudo";
+import Trocas from "./Trocas";
+import Vitrine from "./Vitrine";
+import Automacoes from "./Automacoes";
 
-const NAV: { to: string; label: string; Icon: LucideIcon }[] = [
+// Ordem do design v5. "despacho" = o que o papel de despacho vê (decisão 27).
+const NAV: { to: string; label: string; Icon: LucideIcon; despacho?: boolean }[] = [
   { to: "/admin", label: "Visão geral", Icon: LayoutGrid },
-  { to: "/admin/pedidos", label: "Pedidos", Icon: ShoppingBag },
   { to: "/admin/produtos", label: "Produtos", Icon: Box },
+  { to: "/admin/vitrine", label: "Vitrine da loja", Icon: Sparkles },
   { to: "/admin/sincronizacao", label: "Sincronização", Icon: RefreshCw },
+  { to: "/admin/automacoes", label: "Automações", Icon: Zap },
+  { to: "/admin/pedidos", label: "Pedidos", Icon: ShoppingBag, despacho: true },
   { to: "/admin/financeiro", label: "Financeiro", Icon: Wallet },
+  { to: "/admin/trocas", label: "Trocas e devoluções", Icon: Repeat },
+  { to: "/admin/marketing", label: "Marketing", Icon: Megaphone },
   { to: "/admin/clientes", label: "Clientes", Icon: Users },
-  { to: "/admin/atividades", label: "Atividades", Icon: Activity },
+  { to: "/admin/cupons", label: "Cupons", Icon: Ticket },
+  { to: "/admin/conteudo", label: "Banners e avisos", Icon: Image },
   { to: "/admin/configuracoes", label: "Configurações", Icon: Settings },
+  { to: "/admin/atividades", label: "Atividades", Icon: Activity },
 ];
+
+type Papel = "master" | "dispatch";
 
 export default function AdminApp() {
   const { user, loading } = useAuth();
   const [acesso, setAcesso] = useState<"verificando" | "ok" | "negado" | "erro">("verificando");
+  const [papel, setPapel] = useState<Papel>("master");
 
   useEffect(() => {
     if (!user) return;
     adminApi
       .me()
-      .then(() => setAcesso("ok"))
+      .then((r) => {
+        setPapel(r.role ?? "master");
+        setAcesso("ok");
+      })
       .catch((e) => setAcesso(e instanceof ApiError && e.status === 403 ? "negado" : "erro"));
   }, [user]);
 
@@ -52,7 +71,13 @@ export default function AdminApp() {
   if (acesso !== "ok") return <SemAcesso erro={acesso === "erro"} />;
 
   return (
-    <Moldura>
+    <Moldura papel={papel}>
+      {papel === "dispatch" ? (
+        <Routes>
+          <Route path="pedidos" element={<Pedidos />} />
+          <Route path="*" element={<Navigate to="/admin/pedidos" replace />} />
+        </Routes>
+      ) : (
       <Routes>
         <Route index element={<VisaoGeral />} />
         <Route path="pedidos" element={<Pedidos />} />
@@ -60,19 +85,28 @@ export default function AdminApp() {
         <Route path="sincronizacao" element={<Sincronizacao />} />
         <Route path="financeiro" element={<Financeiro />} />
         <Route path="clientes" element={<Clientes />} />
+        <Route path="trocas" element={<Trocas />} />
+        <Route path="vitrine" element={<Vitrine />} />
+        <Route path="cupons" element={<Cupons />} />
+        <Route path="marketing" element={<Marketing />} />
+        <Route path="conteudo" element={<Conteudo />} />
+        <Route path="avaliacoes" element={<Navigate to="/admin/marketing?aba=avaliacoes" replace />} />
+        <Route path="automacoes" element={<Automacoes />} />
         <Route path="atividades" element={<Atividades />} />
         <Route path="configuracoes" element={<Configuracoes />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
+      )}
     </Moldura>
   );
 }
 
-function Moldura({ children }: { children: ReactNode }) {
+function Moldura({ children, papel }: { children: ReactNode; papel: Papel }) {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const [menuAberto, setMenuAberto] = useState(false);
-  const atual = NAV.find((n) => (n.to === "/admin" ? pathname === "/admin" : pathname.startsWith(n.to))) ?? NAV[0];
+  const nav = papel === "dispatch" ? NAV.filter((n) => n.despacho) : NAV;
+  const atual = nav.find((n) => (n.to === "/admin" ? pathname === "/admin" : pathname.startsWith(n.to))) ?? nav[0];
 
   useEffect(() => setMenuAberto(false), [pathname]);
 
@@ -80,10 +114,10 @@ function Moldura({ children }: { children: ReactNode }) {
     <aside className="flex h-full flex-col gap-[22px] bg-teal-dark px-3.5 py-[22px] text-[#D9ECEA]">
       <div className="grid gap-2 px-2">
         <span className="font-logo text-[24px] leading-none tracking-[0.28em] text-white">MIRAVA</span>
-        <span className="w-fit rounded-full bg-teal px-2.5 py-1 text-[10px] font-bold tracking-[0.18em] text-teal-pale">ADMIN MASTER</span>
+        <span className="w-fit rounded-full bg-teal px-2.5 py-1 text-[10px] font-bold tracking-[0.18em] text-teal-pale">{papel === "dispatch" ? "DESPACHO" : "ADMIN MASTER"}</span>
       </div>
       <nav className="grid gap-1">
-        {NAV.map(({ to, label, Icon }) => (
+        {nav.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}

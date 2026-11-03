@@ -1,16 +1,21 @@
 // Etiqueta + declaração de conteúdo (v5), para imprimir e colar na caixa.
 //
-// O endereço da cliente é o do pedido. O remetente fica em branco para
-// preencher à mão: o endereço de envio da loja ainda não está cadastrado em
-// lugar nenhum do sistema. A declaração lista as peças com o valor pago.
+// O endereço da cliente é o do pedido; o remetente vem de Configurações
+// (em branco para preencher à mão enquanto não for cadastrado). A declaração
+// lista as peças com o valor pago.
 
 import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
-import { SHIP_LABEL, type AdminOrderDetail } from "./api";
+import { useEffect, useState } from "react";
+import { SHIP_LABEL, lojaApi, type AdminOrderDetail, type StoreSettings } from "./api";
 
 export default function Etiqueta({ pedido, fechar }: { pedido: AdminOrderDetail; fechar: () => void }) {
   const a = pedido.address ?? {};
+  const [loja, setLoja] = useState<StoreSettings | null>(null);
+  useEffect(() => {
+    lojaApi.settings().then(setLoja).catch(() => {});
+  }, []);
   // Portal no body: o conteúdo do painel tem animação de entrada, que cria
   // um contexto de empilhamento — sem o portal, o véu não cobriria o topo
   // nem a sidebar.
@@ -47,9 +52,23 @@ export default function Etiqueta({ pedido, fechar }: { pedido: AdminOrderDetail;
           </div>
           <div className="grid gap-1 border-t-2 border-dashed border-text pt-3">
             <strong>REMETENTE</strong>
-            <span>Mirava Semijoias</span>
-            <span className="mt-2 border-b border-text" />
-            <span className="mt-4 border-b border-text" />
+            <span>{loja?.sender_name || loja?.store_name || "Mirava Semijoias"}</span>
+            {loja?.sender_street ? (
+              <>
+                <span>
+                  {loja.sender_street}, {loja.sender_number}
+                  {loja.sender_complement && ` · ${loja.sender_complement}`}
+                </span>
+                <span>
+                  {loja.sender_neighborhood} · {loja.sender_city}/{loja.sender_state} · CEP {loja.sender_zip.replace(/(\d{5})(\d{3})/, "$1-$2")}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="mt-2 border-b border-text" />
+                <span className="mt-4 border-b border-text" />
+              </>
+            )}
           </div>
         </div>
 
@@ -67,15 +86,30 @@ export default function Etiqueta({ pedido, fechar }: { pedido: AdminOrderDetail;
               <span className="text-right">{formatarBRL(it.price_cents * it.quantity)}</span>
             </div>
           ))}
+          {pedido.discount_cents > 0 && (
+            <div className="grid grid-cols-[1fr_100px] gap-2">
+              <span>Desconto</span>
+              <span className="text-right">− {formatarBRL(pedido.discount_cents)}</span>
+            </div>
+          )}
           <div className="grid grid-cols-[1fr_100px] gap-2 border-t border-text pt-1 font-bold">
             <span>Total</span>
-            <span className="text-right">{formatarBRL(pedido.subtotal_cents)}</span>
+            <span className="text-right">{formatarBRL(pedido.subtotal_cents - pedido.discount_cents)}</span>
           </div>
           <p className="m-0 text-[12px]">
             Declaro que não me enquadro no conceito de contribuinte previsto na Lei Complementar nº 87/1996.
           </p>
           <span className="mt-6 border-t border-text pt-1 text-center text-[12px]">Assinatura do remetente</span>
         </div>
+
+        {pedido.gift_wrap && (
+          // Cartão do presente: sai na mesma folha, para recortar e escrever
+          // à mão — a mensagem é da cliente, não vai impressa na caixa.
+          <div className="grid gap-2 rounded-xl border-2 border-dashed border-text p-5 text-[13px] text-text">
+            <strong className="tracking-[0.1em]">PRESENTE · CARTÃO</strong>
+            <span className="text-[15px] leading-relaxed whitespace-pre-line">{pedido.gift_message || "(sem mensagem)"}</span>
+          </div>
+        )}
 
         <button
           type="button"

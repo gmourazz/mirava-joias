@@ -16,7 +16,7 @@ interface User {
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, remember?: boolean) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   /** Relê /auth/eu — usado depois de a cliente editar o próprio perfil. */
@@ -40,12 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, remember = true) {
     const response = await api<{ token: string; name: string; email: string }>(
       "/auth/entrar",
       { method: "POST", body: { email, password } },
     );
-    saveToken(response.token);
+    saveToken(response.token, remember);
     const me = await api<User>("/auth/eu", { authenticated: true });
     setUser(me);
   }

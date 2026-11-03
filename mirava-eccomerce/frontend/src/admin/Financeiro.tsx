@@ -7,9 +7,9 @@
 // calcula proporções para desenhar as barras.
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Target, Wallet } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
-import { CATEGORY_LABEL } from "../catalogo/tipos";
+import { rotuloCategoria } from "../catalogo/categorias";
 import { reportApi, SHIP_LABEL, dataCurta, type FinanceMonth } from "./api";
 import { baixarCSV, reaisCSV } from "./csv";
 
@@ -43,6 +43,9 @@ export default function Financeiro() {
   }, [mes]);
 
   const atual = mes === mesAtual();
+
+  // Venda das peças já sem desconto: é a base das porcentagens.
+  const pecas = dados ? dados.subtotal_cents - dados.discount_cents : 0;
 
   return (
     <>
@@ -81,8 +84,12 @@ export default function Financeiro() {
         <>
           <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,170px),1fr))] gap-3">
             <Kpi label="Faturamento" valor={dados.revenue_cents} nota={`${dados.orders_count} ${dados.orders_count === 1 ? "pedido pago" : "pedidos pagos"} · inclui frete`} />
-            <Kpi label="Custo Use Lilly" valor={-dados.cost_cents} nota={pct(dados.cost_cents, dados.subtotal_cents)} />
-            <Kpi label="Taxas do Mercado Pago" valor={-dados.fees_cents} nota={`${pct(dados.fees_cents, dados.subtotal_cents)} · taxa real de cada pagamento`} />
+            <Kpi label="Custo Use Lilly" valor={-dados.cost_cents} nota={pct(dados.cost_cents, pecas)} />
+            <Kpi label="Taxas do Mercado Pago" valor={-dados.fees_cents} nota={`${pct(dados.fees_cents, pecas)} · taxa real de cada pagamento`} />
+            {dados.discount_cents > 0 && (
+              <Kpi label="Descontos dados" valor={-dados.discount_cents} nota={`cupons e pontos · ${pct(dados.discount_cents, dados.subtotal_cents)} das peças`} />
+            )}
+            {dados.gift_wrap_cents > 0 && <Kpi label="Embrulhos" valor={dados.gift_wrap_cents} nota="cobrados das clientes" />}
             <Kpi label="Embalagem" valor={-dados.packaging_cents} nota={`${formatarBRL(dados.packaging_each_cents)} por pedido`} />
             <Kpi label="Frete dos lotes" valor={-dados.batch_freight_cents} nota="pago à Lilly em lote abaixo da meta" />
             <div className="col-span-full grid gap-1 rounded-[20px] bg-teal p-5 text-white">
@@ -95,13 +102,17 @@ export default function Financeiro() {
             </div>
           </section>
 
-          {dados.subtotal_cents > 0 ? (
+          {pecas > 0 ? (
             <>
               <ParaOndeVai dados={dados} />
               <section className="grid grid-cols-1 gap-[18px] xl:grid-cols-2">
+                <Metas dados={dados} />
+                <Taxas dados={dados} />
+              </section>
+              <section className="grid grid-cols-1 gap-[18px] xl:grid-cols-2">
                 <Barras
                   titulo="Lucro por categoria no mês"
-                  itens={dados.categories.map((c) => ({ ...c, label: CATEGORY_LABEL[c.label as keyof typeof CATEGORY_LABEL] ?? c.label }))}
+                  itens={dados.categories.map((c) => ({ ...c, label: rotuloCategoria(c.label) }))}
                 />
                 <Barras titulo="Peças que mais dão lucro" itens={dados.top_pieces} />
               </section>
@@ -133,7 +144,8 @@ function Kpi({ label, valor, nota }: { label: string; valor: number; nota: strin
 }
 
 function ParaOndeVai({ dados }: { dados: FinanceMonth }) {
-  const base = dados.subtotal_cents;
+  // Base: o que entrou pelas peças (já sem desconto) mais os embrulhos.
+  const base = dados.subtotal_cents - dados.discount_cents + dados.gift_wrap_cents;
   const fatias = [
     { label: "Lucro líquido", v: Math.max(0, dados.net_profit_cents), cor: "#0F6E73" },
     { label: "Custo Lilly", v: dados.cost_cents, cor: "#9FDCD5" },
@@ -203,19 +215,22 @@ function TabelaPedidos({ dados }: { dados: FinanceMonth }) {
             <span className="font-semibold text-teal">#{o.number}</span>
             <span className="truncate">{o.customer_name}</span>
             <span className="text-text-2">{dataCurta(o.paid_at)}</span>
-            <span>{formatarBRL(o.subtotal_cents)}</span>
+            <span>
+              {formatarBRL(o.subtotal_cents - o.discount_cents)}
+              {o.discount_cents > 0 && <span className="block text-[11.5px] text-muted">− {formatarBRL(o.discount_cents)} desc.</span>}
+            </span>
             <span className="text-[#B4443C]">− {formatarBRL(o.cost_cents)}</span>
             <span className="text-[#B4443C]">− {formatarBRL(o.fee_cents)}</span>
             <span className="text-muted">
               {o.shipping_cents === 0 ? "grátis" : formatarBRL(o.shipping_cents)}
               {o.shipping_method && ` · ${SHIP_LABEL[o.shipping_method]}`}
             </span>
-            <span className="font-semibold text-success">{formatarBRL(o.subtotal_cents - o.cost_cents - o.fee_cents)}</span>
+            <span className="font-semibold text-success">{formatarBRL(o.subtotal_cents - o.discount_cents + o.gift_wrap_cents - o.cost_cents - o.fee_cents)}</span>
           </div>
         ))}
       </div>
       <p className="m-0 border-t border-line px-5 py-3 text-[12px] text-muted">
-        Lucro por pedido = peças − atacado − taxa. Embalagem e frete dos lotes entram só no total do mês.
+        Peças já com desconto. Lucro por pedido = peças − atacado − taxa + embrulho. Embalagem e frete dos lotes entram só no total do mês.
       </p>
     </section>
   );
@@ -223,12 +238,14 @@ function TabelaPedidos({ dados }: { dados: FinanceMonth }) {
 
 function exportar(d: FinanceMonth) {
   baixarCSV(`financeiro-${d.month}.csv`, [
-    ["Pedido", "Cliente", "Pago em", "Peças", "Frete", "Total", "Atacado", "Taxa MP"],
+    ["Pedido", "Cliente", "Pago em", "Peças", "Desconto", "Embrulho", "Frete", "Total", "Atacado", "Taxa MP"],
     ...d.orders.map((o) => [
       `#${o.number}`,
       o.customer_name,
       new Date(o.paid_at).toLocaleDateString("pt-BR"),
       reaisCSV(o.subtotal_cents),
+      reaisCSV(o.discount_cents),
+      reaisCSV(o.gift_wrap_cents),
       reaisCSV(o.shipping_cents),
       reaisCSV(o.total_cents),
       reaisCSV(o.cost_cents),
@@ -236,10 +253,76 @@ function exportar(d: FinanceMonth) {
     ]),
     [],
     ["Faturamento", reaisCSV(d.revenue_cents)],
+    ["Descontos", reaisCSV(d.discount_cents)],
+    ["Embrulhos", reaisCSV(d.gift_wrap_cents)],
     ["Custo Lilly", reaisCSV(d.cost_cents)],
     ["Taxas Mercado Pago", reaisCSV(d.fees_cents)],
     ["Embalagem", reaisCSV(d.packaging_cents)],
     ["Frete dos lotes", reaisCSV(d.batch_freight_cents)],
     ["Lucro líquido", reaisCSV(d.net_profit_cents)],
   ]);
+}
+
+// Metas do mês (design v5): definidas em Configurações. Sem meta, mostra o
+// atalho para cadastrar.
+function Metas({ dados }: { dados: FinanceMonth }) {
+  const g = dados.goals;
+  const linhas = [
+    { label: "Faturamento", atual: dados.revenue_cents, meta: g.revenue_cents, fmt: formatarBRL },
+    { label: "Pedidos", atual: dados.orders_count, meta: g.orders, fmt: (n: number) => String(n) },
+    { label: "Lucro líquido", atual: dados.net_profit_cents, meta: g.profit_cents, fmt: formatarBRL },
+  ].filter((l) => l.meta > 0);
+  return (
+    <section className="grid content-start gap-3 rounded-[20px] border border-line bg-white p-[22px]">
+      <strong className="flex items-center gap-2 text-[16px] text-text"><Target size={17} className="text-teal" /> Metas do mês</strong>
+      {linhas.length === 0 ? (
+        <span className="text-[13.5px] text-muted">
+          Nenhuma meta definida. <a href="/admin/configuracoes" className="font-semibold text-teal">Defina em Configurações</a>.
+        </span>
+      ) : (
+        linhas.map((l) => {
+          const pct = Math.min(100, Math.round((l.atual / l.meta) * 100));
+          return (
+            <div key={l.label} className="grid gap-1.5 text-[13.5px]">
+              <span className="flex justify-between">
+                <span className="text-text-2">{l.label}</span>
+                <span><strong className="text-text">{l.fmt(l.atual)}</strong> <span className="text-muted">de {l.fmt(l.meta)}</span></span>
+              </span>
+              <span className="h-2 overflow-hidden rounded-full bg-fog">
+                <span className={`block h-full rounded-full ${pct >= 100 ? "bg-success" : "bg-teal"}`} style={{ width: `${pct}%` }} />
+              </span>
+              <span className="text-[12px] text-muted">{pct >= 100 ? "Meta batida ✦" : `${pct}% da meta`}</span>
+            </div>
+          );
+        })
+      )}
+    </section>
+  );
+}
+
+// Taxas reais do Mercado Pago por forma de pagamento (payments.fee_cents).
+function Taxas({ dados }: { dados: FinanceMonth }) {
+  const nomes = { pix: "Pix", cartao: "Cartão", boleto: "Boleto", outro: "Outras" } as const;
+  const total = dados.fees_by_method.reduce((s, f) => s + f.amount_cents, 0);
+  return (
+    <section className="grid content-start gap-3 rounded-[20px] border border-line bg-white p-[22px]">
+      <span className="grid">
+        <strong className="flex items-center gap-2 text-[16px] text-text"><Wallet size={17} className="text-teal" /> Taxas de pagamento</strong>
+        <span className="text-[12.5px] text-muted">Descontadas automaticamente do lucro de cada pedido.</span>
+      </span>
+      {dados.fees_by_method.length === 0 ? (
+        <span className="text-[13.5px] text-muted">Nenhum pagamento aprovado no mês.</span>
+      ) : (
+        dados.fees_by_method.map((f) => (
+          <div key={f.method} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-t border-[#EEF3F2] pt-2 text-[13.5px]">
+            <span className="text-text">
+              {nomes[f.method]} <span className="text-[12px] text-muted">· {total > 0 ? Math.round((f.amount_cents / total) * 100) : 0}% das vendas</span>
+            </span>
+            <span className="text-muted">{f.amount_cents > 0 ? ((f.fees_cents / f.amount_cents) * 100).toFixed(2).replace(".", ",") : "0"}%</span>
+            <strong className="text-[#B4443C]">− {formatarBRL(f.fees_cents)}</strong>
+          </div>
+        ))
+      )}
+    </section>
+  );
 }

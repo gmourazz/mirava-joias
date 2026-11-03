@@ -41,3 +41,11 @@ export function textoPix(centavos: number): string {
 export function textoPrazo(): string {
   return `até ${LOJA.prazo.maxDiasUteis} dias úteis`;
 }
+
+/** Preço da peça com o ajuste do tamanho, cheio e com promoção — a mesma
+ *  conta do servidor (dominio.PriceOrder): o % incide sobre o cheio. Só para
+ *  exibir; o cobrado vem da prévia do checkout. */
+export function precoDaPeca(p: { listPriceCents: number; promoPct: number }, ajusteCents = 0) {
+  const cheio = p.listPriceCents + ajusteCents;
+  return { cheio, final: cheio - Math.round((cheio * p.promoPct) / 100), promo: p.promoPct > 0 };
+}

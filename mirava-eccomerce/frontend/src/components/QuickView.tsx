@@ -9,7 +9,8 @@ import { Gem, Heart, Minus, Plus, RefreshCw, ShieldCheck, X } from "lucide-react
 import type { Product } from "../catalogo/tipos";
 import { METAL_LABEL } from "../catalogo/tipos";
 import { imageUrl } from "../catalogo/consultas";
-import { formatarBRL, precoPix, temDescontoPix, textoParcelas } from "../lib/dinheiro";
+import { formatarBRL, precoPix, temDescontoPix, textoParcelas, precoDaPeca } from "../lib/dinheiro";
+import PrecoRiscado from "./PrecoRiscado";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 
@@ -29,7 +30,7 @@ export default function QuickView({ product, fechar }: { product: Product; fecha
 
   const fotos = product.images.map((p) => imageUrl(p)).filter((u): u is string => Boolean(u));
   const ajuste = variants.find((v) => v.size === size)?.priceAdjustCents ?? 0;
-  const price = product.priceCents + ajuste;
+  const { cheio, final: price } = precoDaPeca(product, ajuste);
   const precisaEscolher = variants.length > 1 && !size;
   const favorito = isFavorite(product.id);
 
@@ -67,6 +68,7 @@ export default function QuickView({ product, fechar }: { product: Product; fecha
           </div>
           <h3 className="m-0 font-serif text-[34px] leading-[1.08] font-normal text-teal-dark">{product.name}</h3>
           <div className="grid gap-1">
+            <PrecoRiscado cheio={cheio} pct={product.promoPct} className="text-[14px]" />
             <span className="text-[24px] font-bold text-teal">{formatarBRL(price)}</span>
             <span className="text-[13.5px] text-muted">
               {textoParcelas(price)}

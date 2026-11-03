@@ -2,14 +2,15 @@
 // teal com o que a conta oferece, à direita o formulário com o seletor
 // ENTRAR | CRIAR CONTA.
 //
-// Ficam de fora do protótipo o que ainda não existe no backend: "Continuar
-// com Google", "Esqueci minha senha", cupom de boas-vindas e Mirava Club.
-// Prometer na tela de cadastro o que a conta não entrega é o pior lugar para
-// errar.
+// "Continuar com Google" fica de fora: o login é próprio (decisão 15) e o
+// Google entra só quando houver a credencial OAuth. "Esqueci minha senha"
+// manda um link por e-mail (vale 1 hora); o cadastro pode já assinar as
+// novidades com o BEMVINDA10 (decisão 34).
 
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Lock, MapPin, Package, Truck, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Lock, MapPin, Package, Sparkles, Truck, type LucideIcon } from "lucide-react";
+import { forgotPassword, subscribe } from "../lib/extras";
 import { useAuth, ApiError } from "../context/AuthContext";
 import { LOJA } from "../config/loja";
 
@@ -17,11 +18,16 @@ const VANTAGENS: { Icon: LucideIcon; t: string }[] = [
   { Icon: Truck, t: "Acompanhe seus pedidos até a entrega" },
   { Icon: MapPin, t: "Endereços salvos para comprar mais rápido" },
   { Icon: Package, t: "Histórico de tudo o que você encomendou" },
+  { Icon: Sparkles, t: "Pontos no Mirava Club a cada compra" },
 ];
 
 export default function EntrarCadastro() {
   const { login, signup } = useAuth();
-  const [modo, setModo] = useState<"login" | "signup">("login");
+  const [modo, setModo] = useState<"login" | "signup" | "esqueci">("login");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [novidades, setNovidades] = useState(true);
+  const [lembrar, setLembrar] = useState(true);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -33,8 +39,15 @@ export default function EntrarCadastro() {
     setErro(null);
     setEnviando(true);
     try {
-      if (modo === "login") await login(email, senha);
-      else await signup(nome, email, senha);
+      if (modo === "esqueci") {
+        const r = await forgotPassword(email.trim());
+        setAviso(r.nota);
+      } else if (modo === "login") await login(email, senha, lembrar);
+      else {
+        await signup(nome, email, senha);
+        // Novidades com consentimento explícito (caixa marcada pela cliente).
+        if (novidades) await subscribe(email.trim(), whatsapp, "cadastro").catch(() => {});
+      }
     } catch (e) {
       setErro(e instanceof ApiError ? e.message : "Algo deu errado. Tente de novo.");
     } finally {
@@ -91,22 +104,27 @@ export default function EntrarCadastro() {
                 onClick={() => {
                   setModo(m);
                   setErro(null);
+                  setAviso(null);
                 }}
                 className={`cursor-pointer rounded-full border-none py-3 text-[12px] font-bold tracking-[0.14em] uppercase transition-colors ${
                   modo === m ? "bg-white text-teal shadow-[0_4px_14px_rgba(11,74,77,0.08)]" : "bg-transparent text-muted"
                 }`}
               >
-                {m === "login" ? "Entrar" : "Criar conta"}
+                {m === "signup" ? "Criar conta" : "Entrar"}
               </button>
             ))}
           </div>
 
           <div className="grid gap-1.5">
             <h2 className="m-0 font-serif text-[32px] font-normal text-teal-dark">
-              {modo === "login" ? "Que bom te ver de novo" : "Crie sua conta"}
+              {modo === "login" ? "Que bom te ver de novo" : modo === "signup" ? "Crie sua conta" : "Esqueceu a senha?"}
             </h2>
             <p className="m-0 text-[14.5px] text-text-2">
-              {modo === "login" ? "Entre com seu e-mail e senha." : "Leva menos de 1 minuto."}
+              {modo === "login"
+                ? "Entre com seu e-mail e senha."
+                : modo === "signup"
+                  ? "Leva menos de 1 minuto."
+                  : "Digite o e-mail da conta: mandamos um link para você criar uma senha nova."}
             </p>
           </div>
 
@@ -114,15 +132,38 @@ export default function EntrarCadastro() {
             <Campo label="Nome completo" value={nome} onChange={setNome} placeholder="Como podemos te chamar?" autoComplete="name" />
           )}
           <Campo label="E-mail" type="email" value={email} onChange={setEmail} placeholder="voce@email.com" autoComplete="email" />
-          <Campo
-            label="Senha"
-            type="password"
-            value={senha}
-            onChange={setSenha}
-            placeholder="Mínimo de 8 caracteres"
-            minLength={8}
-            autoComplete={modo === "login" ? "current-password" : "new-password"}
-          />
+          {modo !== "esqueci" && (
+            <Campo
+              label="Senha"
+              type="password"
+              value={senha}
+              onChange={setSenha}
+              placeholder="Mínimo de 8 caracteres"
+              minLength={8}
+              autoComplete={modo === "login" ? "current-password" : "new-password"}
+            />
+          )}
+          {modo === "signup" && (
+            <>
+              <Campo label="Celular / WhatsApp (opcional)" type="tel" value={whatsapp} onChange={setWhatsapp} placeholder="(00) 00000-0000" autoComplete="tel" required={false} />
+              <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-snug text-text-2">
+                <input type="checkbox" checked={novidades} onChange={(e) => setNovidades(e.target.checked)} className="mt-0.5 h-4 w-4 accent-teal" />
+                Quero receber novidades e ganhar 10% off na primeira compra
+              </label>
+            </>
+          )}
+          {modo === "login" && (
+            <div className="flex items-center justify-between text-[13px]">
+              <label className="flex cursor-pointer items-center gap-2 text-text-2">
+                <input type="checkbox" checked={lembrar} onChange={(e) => setLembrar(e.target.checked)} className="h-4 w-4 accent-teal" />
+                Lembrar de mim
+              </label>
+              <button type="button" onClick={() => { setModo("esqueci"); setErro(null); }} className="cursor-pointer border-none bg-transparent p-0 font-semibold text-teal">
+                Esqueci minha senha
+              </button>
+            </div>
+          )}
+          {aviso && <p className="m-0 rounded-[14px] bg-mist px-3.5 py-2.5 text-[13.5px] text-teal-dark">{aviso}</p>}
 
           {erro && <p className="m-0 rounded-[14px] bg-[#FDECEC] px-3.5 py-2.5 text-[13.5px] text-[#B4443C]">{erro}</p>}
 
@@ -131,16 +172,21 @@ export default function EntrarCadastro() {
             disabled={enviando}
             className="cursor-pointer rounded-full border-none bg-teal p-4 text-[12.5px] font-bold tracking-[0.14em] text-white uppercase hover:bg-teal-dark disabled:opacity-60"
           >
-            {enviando ? "Enviando…" : modo === "login" ? "Entrar" : "Criar minha conta"}
+            {enviando ? "Enviando…" : modo === "login" ? "Entrar" : modo === "signup" ? "Criar minha conta" : "Mandar o link"}
           </button>
 
-          <p className="m-0 text-center text-[12.5px] leading-relaxed text-muted">
-            Esqueceu a senha? Escreva para{" "}
-            <a href={`mailto:${LOJA.email}`} className="font-semibold text-teal">
-              {LOJA.email}
-            </a>{" "}
-            que a gente ajuda.
-          </p>
+          {modo === "esqueci" ? (
+            <button type="button" onClick={() => { setModo("login"); setAviso(null); }} className="cursor-pointer border-none bg-transparent text-[13px] font-semibold text-teal">
+              ← Voltar para entrar
+            </button>
+          ) : (
+            <p className="m-0 text-center text-[12px] leading-relaxed text-muted">
+              Ao continuar, você concorda com os{" "}
+              <Link to="/politicas/termos" className="font-semibold text-teal">Termos de uso</Link> e a{" "}
+              <Link to="/politicas/privacidade" className="font-semibold text-teal">Política de privacidade</Link>. Dúvidas:{" "}
+              <a href={`mailto:${LOJA.email}`} className="font-semibold text-teal">{LOJA.email}</a>
+            </p>
+          )}
         </form>
       </div>
     </div>
@@ -155,6 +201,7 @@ function Campo({
   placeholder,
   minLength,
   autoComplete,
+  required = true,
 }: {
   label: string;
   value: string;
@@ -163,6 +210,7 @@ function Campo({
   placeholder?: string;
   minLength?: number;
   autoComplete?: string;
+  required?: boolean;
 }) {
   return (
     <label className="grid gap-1.5">
@@ -171,7 +219,7 @@ function Campo({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        required
+        required={required}
         minLength={minLength}
         placeholder={placeholder}
         autoComplete={autoComplete}

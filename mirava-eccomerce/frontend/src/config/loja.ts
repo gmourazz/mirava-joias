@@ -25,12 +25,14 @@ export const LOJA = {
   parcelasSemJuros: 3,
 
   /**
-   * Desconto no Pix, em %. Hoje 0: o checkout (api/internal/web/checkout.go)
-   * ainda não aplica desconto nenhum, e o site não pode prometer o que o
-   * servidor não cobra (decisão de 03/11/2026). Com 0, as telas escondem toda
-   * menção a desconto no Pix. Quando o servidor passar a aplicar, volte para 5.
+   * Desconto no Pix, em % sobre as peças (decisão 33). Só para EXIBIR: quem
+   * aplica é o servidor (dominio.PixDiscountPct), e o total cobrado vem da
+   * prévia do checkout. Se mudar lá, mude aqui.
    */
-  descontoPixPct: 0 as number,
+  descontoPixPct: 5 as number,
+
+  /** Embrulho para presente (decisão 31) — exibição; quem cobra é o servidor. */
+  embrulhoCentavos: 500,
 
   /**
    * Prazo prometido, contado a partir da confirmação do pagamento.
@@ -47,4 +49,5 @@ export const LOJA = {
 
   /** Canal de atendimento. É o único contato publicado no site. */
   email: "miravajoias@gmail.com",
+  instagram: "@miravajoias",
 } as const;

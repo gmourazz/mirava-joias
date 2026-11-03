@@ -40,9 +40,11 @@ export default function PedidoDrawer({ id, fechar, mudou }: { id: string; fechar
   const [confirmar, setConfirmar] = useState<OrderStatus | null>(null);
   const [etiqueta, setEtiqueta] = useState(false);
 
+  const [avisos, setAvisos] = useState<{ kind: string; channel: string; sent_at: string }[]>([]);
   const carregar = () => adminApi.order(id).then(setPedido).catch((e: Error) => setErro(e.message));
   useEffect(() => {
     void carregar();
+    adminApi.notices(id).then(setAvisos).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -130,6 +132,17 @@ export default function PedidoDrawer({ id, fechar, mudou }: { id: string; fechar
                 </Caixa>
               )}
 
+              {pedido.gift_wrap && (
+                <div className="grid gap-1.5 rounded-2xl border-[1.5px] border-teal bg-[#F1F8F7] p-4">
+                  <span className="text-[12px] font-bold tracking-[0.06em] text-teal uppercase">Embrulhar para presente</span>
+                  {pedido.gift_message ? (
+                    <span className="text-[14px] leading-relaxed whitespace-pre-line text-text">“{pedido.gift_message}”</span>
+                  ) : (
+                    <span className="text-[13px] text-muted">Sem mensagem no cartão.</span>
+                  )}
+                </div>
+              )}
+
               {pedido.deadline && (
                 <div className={`grid gap-2 rounded-2xl border-[1.5px] p-4 ${pedido.deadline.late ? "border-[#C4483D]" : pedido.deadline.near ? "border-[#B07A12]" : "border-line"}`}>
                   <span className="text-[12px] font-bold tracking-[0.06em] text-muted uppercase">Prazo de entrega</span>
@@ -171,11 +184,50 @@ export default function PedidoDrawer({ id, fechar, mudou }: { id: string; fechar
                     </div>
                   );
                 })}
+                {(pedido.discount_cents > 0 || pedido.gift_wrap_cents > 0) && (
+                  <div className="grid gap-1 rounded-xl bg-fog px-3.5 py-2.5 text-[13px] text-text-2">
+                    {pedido.discount_cents > 0 && (
+                      <span className="flex justify-between">
+                        <span>
+                          Desconto{" "}
+                          {pedido.coupon_code ? (
+                            <>cupom <strong className="font-mono text-text">{pedido.coupon_code}</strong></>
+                          ) : (
+                            `${pedido.points_used} pontos do Club`
+                          )}
+                        </span>
+                        <span>− {formatarBRL(pedido.discount_cents)}</span>
+                      </span>
+                    )}
+                    {pedido.gift_wrap_cents > 0 && (
+                      <span className="flex justify-between">
+                        <span>Embrulho para presente</span>
+                        <span>{formatarBRL(pedido.gift_wrap_cents)}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-2">
                   <MiniCaixa label="Você paga na Lilly" valor={formatarBRL(pedido.cost_cents)} />
                   <MiniCaixa label="Cliente pagou" valor={formatarBRL(pedido.total_cents)} />
-                  <MiniCaixa label="Seu lucro" valor={formatarBRL(pedido.subtotal_cents - pedido.cost_cents)} verde />
+                  {/* Peças com o desconto já tirado, menos o atacado. Frete e
+                      embrulho entram e saem quase iguais, ficam de fora. */}
+                  <MiniCaixa label="Seu lucro" valor={formatarBRL(pedido.subtotal_cents - pedido.discount_cents - pedido.cost_cents)} verde />
                 </div>
+              </section>
+
+              <section className="grid gap-2">
+                <span className="text-[12px] font-bold tracking-[0.06em] text-muted uppercase">Avisos para a cliente</span>
+                {avisos.length === 0 ? (
+                  <span className="text-[13px] text-muted">Nenhum e-mail registrado para este pedido.</span>
+                ) : (
+                  avisos.map((a, i) => (
+                    <span key={i} className="flex justify-between gap-3 text-[13px]">
+                      <span className="text-text">✉ {AVISO_LABEL[a.kind] ?? a.kind}</span>
+                      <span className="text-muted">{new Date(a.sent_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                    </span>
+                  ))
+                )}
               </section>
 
               <section className="grid gap-2">
@@ -293,3 +345,13 @@ function MiniCaixa({ label, valor, verde = false }: { label: string; valor: stri
     </div>
   );
 }
+
+const AVISO_LABEL: Record<string, string> = {
+  pedido_pago: "Pedido confirmado",
+  pagamento_falhou: "Pagamento não concluído",
+  peca_comprada: "Peça encomendada",
+  pedido_enviado: "Pedido a caminho (rastreio)",
+  pagamento_pendente: "Lembrete de pagamento",
+  pedir_avaliacao: "Pedido de avaliação",
+  troca_atualizada: "Troca andou",
+};

@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Check, CreditCard, Loader2, Lock, Percent, Plus, QrCode, Trash2 } from "lucide-react";
+import { Barcode, Check, CreditCard, Gift, Loader2, Lock, Percent, Plus, QrCode, Sparkles, Ticket, Trash2, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { api, ApiError } from "../lib/api";
@@ -28,8 +28,9 @@ import {
   type ShippingOption,
   type ShippingService,
 } from "../lib/frete";
-import { formatarBRL, temDescontoPix, textoParcelas, textoPix, textoPrazo } from "../lib/dinheiro";
+import { formatarBRL, temDescontoPix, textoParcelas, textoPrazo } from "../lib/dinheiro";
 import { LOJA } from "../config/loja";
+import { checkoutPreview, type CheckoutPreview, type PaymentChoice } from "../lib/extras";
 
 const EMPTY_ADDRESS: NewAddress = {
   label: "Casa",
@@ -55,7 +56,7 @@ interface CheckoutResponse {
 
 export default function Checkout() {
   const { user, loading: loadingUser } = useAuth();
-  const { items, subtotalCents } = useCart();
+  const { items, subtotalCents, giftWrap: embrulhoSacola, setGiftWrap: setEmbrulhoSacola } = useCart();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
@@ -72,6 +73,20 @@ export default function Checkout() {
 
   const [aceitePrazo, setAceitePrazo] = useState(false);
   const [aceiteTrocas, setAceiteTrocas] = useState(false);
+
+  // Descontos e embrulho (decisão 31). Cupom OU pontos, nunca os dois — a
+  // tela já troca um pelo outro, e o servidor recusa se chegarem juntos.
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState("");
+  const [usePoints, setUsePoints] = useState(false);
+  const giftWrap = embrulhoSacola;
+  const setGiftWrap = setEmbrulhoSacola;
+  const [giftMessage, setGiftMessage] = useState("");
+  // Forma de pagamento escolhida aqui (decisão 33). O Mercado Pago abre só
+  // com ela, e o desconto do Pix só vale no Pix.
+  const [payment, setPayment] = useState<PaymentChoice>("pix");
+  const [cpf, setCpf] = useState("");
+  const [preview, setPreview] = useState<CheckoutPreview | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -137,8 +152,51 @@ export default function Checkout() {
   const somenteTeste = items.length > 0 && items.every((i) => i.slug === "peca-de-teste-mirava");
 
   const chosen = shippingOptions.find((o) => o.service === shipping);
-  const shippingCents = somenteTeste ? 0 : (chosen?.cents ?? 0);
-  const totalCents = subtotalCents + shippingCents;
+
+  // Prévia do servidor: subtotal, desconto, frete, embrulho e total saem da
+  // mesma conta que vai ser cobrada. A conta local abaixo só cobre o instante
+  // antes da primeira resposta.
+  const cartKey = items.map((i) => `${i.productId}:${i.size ?? ""}:${i.quantity}`).join("|");
+  useEffect(() => {
+    if (!user || items.length === 0) return;
+    let atual = true;
+    const t = setTimeout(() => {
+      checkoutPreview({
+        items: items.map((i) => ({ product_id: i.productId, size: i.size ?? "", quantity: i.quantity })),
+        address_id: selected ?? undefined,
+        shipping,
+        coupon: coupon || undefined,
+        use_points: usePoints,
+        gift_wrap: giftWrap,
+        payment_choice: payment,
+      })
+        .then((p) => {
+          if (atual) setPreview(p);
+        })
+        .catch(() => {
+          if (atual) setPreview(null);
+        });
+    }, 150);
+    return () => {
+      atual = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cartKey resume `items`
+  }, [user, cartKey, selected, shipping, coupon, usePoints, giftWrap, payment]);
+
+  const shippingCents = preview ? preview.shipping_cents : somenteTeste ? 0 : (chosen?.cents ?? 0);
+  const giftWrapCents = preview ? preview.gift_wrap_cents : giftWrap ? LOJA.embrulhoCentavos : 0;
+  const totalCents = preview ? preview.total_cents : subtotalCents + shippingCents + giftWrapCents;
+  const discountError = preview?.discount_error ?? "";
+  const pointsBalance = preview?.points_balance ?? 0;
+
+  function applyCoupon(e: FormEvent) {
+    e.preventDefault();
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setUsePoints(false);
+    setCoupon(code);
+  }
 
   // Busca o CEP assim que o 8º dígito é digitado — não espera a cliente sair
   // do campo. `buscadoRef` evita repetir a busca pro mesmo CEP (o efeito
@@ -205,6 +263,10 @@ export default function Checkout() {
       setError("Confirme o prazo da encomenda e a política de trocas para finalizar.");
       return;
     }
+    if (discountError) {
+      setError(discountError);
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api<CheckoutResponse>("/checkout", {
@@ -219,6 +281,12 @@ export default function Checkout() {
           address_id: selected,
           shipping,
           phone: onlyDigits(phone),
+          coupon: coupon || undefined,
+          use_points: usePoints,
+          gift_wrap: giftWrap,
+          gift_message: giftWrap ? giftMessage.trim() : undefined,
+          payment_choice: payment,
+          cpf: onlyDigits(cpf) || undefined,
         },
       });
       // O carrinho NÃO é limpo aqui. Se a cliente desistir dentro do Mercado
@@ -259,7 +327,7 @@ export default function Checkout() {
     );
   }
 
-  const podePagar = Boolean(selected) && aceitePrazo && aceiteTrocas && !submitting;
+  const podePagar = Boolean(selected) && aceitePrazo && aceiteTrocas && !discountError && !submitting;
 
   return (
     <div className="min-h-screen bg-snow">
@@ -382,24 +450,64 @@ export default function Checkout() {
             </Cartao>
           )}
 
+          {/* Embrulho para presente */}
+          <div className="rounded-3xl border border-line bg-white p-[22px]">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input type="checkbox" checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)} className="sr-only" />
+              <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border-[1.5px] ${giftWrap ? "border-teal bg-teal text-white" : "border-line-strong bg-white"}`}>
+                {giftWrap && <Check size={13} strokeWidth={3} />}
+              </span>
+              <span className="flex-1">
+                <span className="flex items-center gap-2 text-[15px] font-semibold text-text">
+                  <Gift size={17} strokeWidth={1.7} className="text-teal" /> Embrulhar para presente
+                  <span className="ml-auto text-[14px] font-bold text-text">+ {formatarBRL(LOJA.embrulhoCentavos)}</span>
+                </span>
+                <span className="text-[13px] text-muted">Caixinha com laço e um cartão escrito à mão com a sua mensagem.</span>
+              </span>
+            </label>
+            {giftWrap && (
+              <div className="animate-fade-in mt-3.5">
+                <textarea
+                  value={giftMessage}
+                  onChange={(e) => setGiftMessage(e.target.value.slice(0, 200))}
+                  rows={3}
+                  placeholder="Mensagem do cartão (opcional)"
+                  className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[14px] text-text outline-none focus:border-teal"
+                />
+                <span className="block text-right text-[12px] text-muted">{giftMessage.length}/200</span>
+              </div>
+            )}
+          </div>
+
           {/* 3 · Contato */}
           <Cartao numero={3} titulo="Contato">
             {/* Só telefone: é o que a transportadora pede para a entrega. CPF
                 a gente não pede aqui — é exigência do processamento do
                 pagamento e é pedido na tela de pagamento, não nossa. */}
-            <Campo label="Celular" value={phone} onChange={setPhone} inputMode="tel" placeholder="(00) 00000-0000" />
+            <div className="grid gap-3.5 sm:grid-cols-2">
+              <Campo label="Celular / WhatsApp" value={phone} onChange={setPhone} inputMode="tel" placeholder="(00) 00000-0000" />
+              <Campo label="CPF (opcional)" value={cpf} onChange={setCpf} inputMode="numeric" placeholder="000.000.000-00" />
+            </div>
+            {preview?.club_free_shipping && (
+              <p className="m-0 mt-3 text-[13px] text-teal">Você é nível Encanto do Mirava Club: o envio econômico sai grátis.</p>
+            )}
           </Cartao>
 
           {/* 4 · Pagamento — escolhido na tela do Mercado Pago (Checkout Pro,
               decisão 25): nenhum dado de cartão passa pelo nosso site. */}
           <Cartao numero={4} titulo="Pagamento">
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              <Tile icone={<QrCode size={20} strokeWidth={1.6} />} titulo="Pix" texto={temDescontoPix ? `${LOJA.descontoPixPct}% de desconto` : "aprovação na hora"} />
-              <Tile icone={<CreditCard size={20} strokeWidth={1.6} />} titulo="Cartão de crédito" texto={`até ${LOJA.parcelasSemJuros}x sem juros`} />
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+              <Tile ativo={payment === "pix"} onClick={() => setPayment("pix")} icone={<QrCode size={20} strokeWidth={1.6} />} titulo="Pix" texto={temDescontoPix ? `${LOJA.descontoPixPct}% de desconto · aprovação na hora` : "aprovação na hora"} />
+              <Tile ativo={payment === "card"} onClick={() => setPayment("card")} icone={<CreditCard size={20} strokeWidth={1.6} />} titulo="Cartão de crédito" texto={`até ${LOJA.parcelasSemJuros}x sem juros`} />
+              <Tile ativo={payment === "boleto"} onClick={() => setPayment("boleto")} icone={<Barcode size={20} strokeWidth={1.6} />} titulo="Boleto" texto="a encomenda começa depois da compensação (até 3 dias úteis)" />
             </div>
             <p className="m-0 mt-3 flex items-start gap-2 text-[13.5px] leading-relaxed text-text-2">
               <Lock size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-teal" />
-              Você escolhe a forma de pagamento na próxima tela, segura, do Mercado Pago.
+              {payment === "pix"
+                ? "Na próxima tela, segura, do Mercado Pago, aparecem o QR Code e o código copia e cola."
+                : payment === "card"
+                  ? "Você digita os dados do cartão na próxima tela, segura, do Mercado Pago — nada de cartão passa pelo nosso site."
+                  : "O boleto é gerado na próxima tela, segura, do Mercado Pago. Ele vence em 2 dias úteis."}
             </p>
           </Cartao>
         </div>
@@ -434,12 +542,26 @@ export default function Checkout() {
             <div className="mt-5 flex flex-col gap-2 border-t border-line pt-4 text-[14px] text-text-2">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>{formatarBRL(subtotalCents)}</span>
+                <span>{formatarBRL(preview?.list_subtotal_cents ?? subtotalCents)}</span>
               </div>
+              {/* Cada desconto numa linha, como o servidor calculou (decisões 31-33). */}
+              {preview && preview.list_subtotal_cents > preview.subtotal_cents && (
+                <LinhaDesconto rotulo="Promoção" valor={preview.list_subtotal_cents - preview.subtotal_cents} />
+              )}
+              {preview && preview.kit_discount_cents > 0 && <LinhaDesconto rotulo="Compre junto" valor={preview.kit_discount_cents} />}
+              {preview && preview.coupon_discount_cents > 0 && (
+                <LinhaDesconto
+                  rotulo={preview.coupon_code ? `Cupom ${preview.coupon_code}` : `${preview.points_used} pontos do Club`}
+                  valor={preview.coupon_discount_cents}
+                />
+              )}
+              {preview && preview.pix_discount_cents > 0 && (
+                <LinhaDesconto rotulo={`Desconto Pix (${preview.pix_discount_pct}%)`} valor={preview.pix_discount_cents} />
+              )}
               <div className="flex justify-between">
                 <span>Frete{!somenteTeste && chosen ? ` (${chosen.label})` : ""}</span>
                 <span>
-                  {somenteTeste || chosen?.free ? (
+                  {somenteTeste || (selected && preview && preview.shipping_cents === 0) || chosen?.free ? (
                     <span className="font-semibold text-teal">Grátis</span>
                   ) : !selected ? (
                     <span className="text-muted">escolha o endereço</span>
@@ -448,7 +570,35 @@ export default function Checkout() {
                   )}
                 </span>
               </div>
+              {giftWrapCents > 0 && (
+                <div className="flex justify-between">
+                  <span>Embrulho para presente</span>
+                  <span>{formatarBRL(giftWrapCents)}</span>
+                </div>
+              )}
             </div>
+
+            <Descontos
+              couponInput={couponInput}
+              setCouponInput={setCouponInput}
+              coupon={coupon}
+              onApply={applyCoupon}
+              onRemove={() => {
+                setCoupon("");
+                setCouponInput("");
+              }}
+              usePoints={usePoints}
+              onTogglePoints={(v) => {
+                setUsePoints(v);
+                if (v) {
+                  setCoupon("");
+                  setCouponInput("");
+                }
+              }}
+              pointsBalance={pointsBalance}
+              discountError={discountError}
+              earned={preview?.points_earned ?? 0}
+            />
 
             <div className="mt-3.5 border-t border-line pt-3.5">
               <div className="flex items-baseline justify-between">
@@ -457,7 +607,13 @@ export default function Checkout() {
               </div>
               <div className="mt-1 flex flex-col items-end gap-0.5 text-[12.5px]">
                 <span className="text-muted">{textoParcelas(totalCents)}</span>
-                {temDescontoPix && <span className="font-semibold text-teal">{textoPix(totalCents)}</span>}
+                {/* Com Pix escolhido, o desconto já está numa linha acima; com
+                    cartão ou boleto, só lembra que o Pix tem desconto. */}
+                {temDescontoPix && payment !== "pix" && (
+                  <button type="button" onClick={() => setPayment("pix")} className="cursor-pointer border-none bg-transparent p-0 font-semibold text-teal">
+                    Pague com Pix e ganhe {LOJA.descontoPixPct}% nas peças
+                  </button>
+                )}
               </div>
             </div>
 
@@ -502,6 +658,81 @@ export default function Checkout() {
           </div>
         </aside>
       </div>
+    </div>
+  );
+}
+
+/** Cupom ou pontos do Mirava Club. Só mostra o que o servidor devolveu: o
+ *  desconto e o erro vêm da prévia, não de conta feita aqui. */
+function Descontos(props: {
+  couponInput: string;
+  setCouponInput: (v: string) => void;
+  coupon: string;
+  onApply: (e: FormEvent) => void;
+  onRemove: () => void;
+  usePoints: boolean;
+  onTogglePoints: (v: boolean) => void;
+  pointsBalance: number;
+  discountError: string;
+  earned: number;
+}) {
+  const podeUsarPontos = props.pointsBalance >= 100;
+  return (
+    <div className="mt-4 grid gap-3 border-t border-line pt-4">
+      {props.coupon ? (
+        <div className={`flex items-center gap-2 rounded-[14px] px-3.5 py-2.5 text-[13.5px] ${props.discountError ? "bg-fog" : "bg-[#F1F8F7]"}`}>
+          <Ticket size={16} strokeWidth={1.7} className={props.discountError ? "text-muted" : "text-teal"} />
+          <span className={`flex-1 font-semibold ${props.discountError ? "text-muted line-through" : "text-teal-dark"}`}>Cupom {props.coupon}</span>
+          <button type="button" onClick={props.onRemove} aria-label="Remover cupom" className="cursor-pointer border-none bg-transparent p-0.5 text-muted hover:text-[#B4443C]">
+            <X size={16} />
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={props.onApply} className="flex gap-2">
+          <input
+            value={props.couponInput}
+            onChange={(e) => props.setCouponInput(e.target.value.toUpperCase())}
+            placeholder="Cupom de desconto"
+            className="min-w-0 flex-1 rounded-full border-[1.5px] border-line bg-white px-4 py-2.5 text-[13.5px] uppercase tracking-wide text-text outline-none placeholder:normal-case placeholder:tracking-normal focus:border-teal"
+          />
+          <button type="submit" className="cursor-pointer rounded-full border-[1.5px] border-teal bg-white px-4 text-[13px] font-semibold text-teal hover:bg-teal hover:text-white">
+            Aplicar
+          </button>
+        </form>
+      )}
+
+      {podeUsarPontos && (
+        <label className="flex cursor-pointer items-center gap-2.5 text-[13.5px] text-text-2">
+          <input type="checkbox" checked={props.usePoints} onChange={(e) => props.onTogglePoints(e.target.checked)} className="sr-only" />
+          <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-[1.5px] ${props.usePoints ? "border-teal bg-teal text-white" : "border-line-strong bg-white"}`}>
+            {props.usePoints && <Check size={13} strokeWidth={3} />}
+          </span>
+          <span>
+            Usar meus pontos do <strong className="text-text">Mirava Club</strong>{" "}
+            <span className="text-muted">({props.pointsBalance} pontos)</span>
+          </span>
+        </label>
+      )}
+
+      {props.discountError && (
+        <p className="m-0 rounded-[14px] bg-[#FDF3E6] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#8A5A14]">{props.discountError}</p>
+      )}
+
+      {props.earned > 0 && (
+        <p className="m-0 flex items-center gap-1.5 text-[12.5px] text-muted">
+          <Sparkles size={14} strokeWidth={1.7} className="text-teal" />
+          Esta compra rende <strong className="text-text">{props.earned} pontos</strong> quando for entregue.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function LinhaDesconto({ rotulo, valor }: { rotulo: string; valor: number }) {
+  return (
+    <div className="flex justify-between font-semibold text-teal">
+      <span>{rotulo}</span>
+      <span>− {formatarBRL(valor)}</span>
     </div>
   );
 }
@@ -566,9 +797,14 @@ function Radio({ ativo }: { ativo: boolean }) {
   );
 }
 
-function Tile({ icone, titulo, texto }: { icone: React.ReactNode; titulo: string; texto: string }) {
+function Tile({ icone, titulo, texto, ativo, onClick }: { icone: React.ReactNode; titulo: string; texto: string; ativo: boolean; onClick: () => void }) {
   return (
-    <div className="flex items-center gap-3 rounded-[18px] border border-line p-4">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={ativo}
+      className={`flex cursor-pointer items-center gap-3 rounded-[18px] border-[1.5px] p-4 text-left transition-colors ${ativo ? "border-teal bg-[#F1F8F7]" : "border-line bg-white hover:border-teal"}`}
+    >
       <span className="grid h-10 w-10 place-items-center rounded-full bg-mist text-teal">{icone}</span>
       <span className="grid">
         <span className="text-[14.5px] font-semibold text-text">{titulo}</span>
@@ -577,7 +813,7 @@ function Tile({ icone, titulo, texto }: { icone: React.ReactNode; titulo: string
           {texto}
         </span>
       </span>
-    </div>
+    </button>
   );
 }
 

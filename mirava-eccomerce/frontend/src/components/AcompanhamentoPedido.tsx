@@ -138,10 +138,24 @@ export default function AcompanhamentoPedido({ order }: { order: Order }) {
             <span>Subtotal</span>
             <span>{formatarBRL(order.subtotal_cents)}</span>
           </div>
+          {order.discount_cents > 0 && (
+            <div className="flex justify-between font-semibold text-teal">
+              <span>
+                Desconto {order.coupon_code ? `(cupom ${order.coupon_code})` : order.points_used > 0 ? `(${order.points_used} pontos)` : ""}
+              </span>
+              <span>− {formatarBRL(order.discount_cents)}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span>Frete</span>
             <span>{order.shipping_cents === 0 ? <span className="font-semibold text-teal">Grátis</span> : formatarBRL(order.shipping_cents)}</span>
           </div>
+          {order.gift_wrap_cents > 0 && (
+            <div className="flex justify-between">
+              <span>Embrulho para presente</span>
+              <span>{formatarBRL(order.gift_wrap_cents)}</span>
+            </div>
+          )}
           <div className="mt-1.5 flex items-baseline justify-between border-t border-line pt-3">
             <span className="text-[15px] font-semibold text-text">Total</span>
             <span className="text-[22px] font-bold text-teal">{formatarBRL(order.total_cents)}</span>

@@ -4,6 +4,24 @@ import { ArrowRight, ChevronLeft, ChevronRight, CreditCard, Gem, Percent, Shield
 import { HERO_SLIDES } from "../data/content";
 import { img } from "../lib/images";
 import { LOJA } from "../config/loja";
+import { imageUrl } from "../catalogo/consultas";
+import { banners } from "../lib/extras";
+
+interface Slide {
+  eyebrow: string;
+  title: string;
+  em: string;
+  text: string;
+  cta: { label: string; to: string };
+  cta2: { label: string; to: string } | null;
+  seed: string;
+  foto: string;
+  dark: boolean;
+}
+
+// Os slides de fábrica (data/content.ts) valem até a dona cadastrar banners
+// no painel (Banners e avisos). Banner sem foto usa a arte de fábrica.
+const FABRICA: Slide[] = HERO_SLIDES.map((s) => ({ ...s, foto: img(s.seed) }));
 
 // Hero do design v5: três slides em crossfade, foto ocupando a largura toda
 // e o texto sobre um degradê que some para a direita. A foto ativa dá um zoom
@@ -21,8 +39,34 @@ const SELOS = [
 ];
 
 export default function Hero() {
-  const slides = HERO_SLIDES;
+  const [slides, setSlides] = useState<Slide[]>(FABRICA);
   const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    let atual = true;
+    banners()
+      .then((list) => {
+        if (!atual || list.length === 0) return;
+        setSlides(
+          list.map((b, i) => ({
+            eyebrow: b.eyebrow,
+            title: b.title,
+            em: "",
+            text: b.subtitle,
+            cta: { label: b.cta_label, to: b.cta_url },
+            cta2: null,
+            seed: b.id ?? String(i),
+            foto: imageUrl(b.image ?? undefined) ?? FABRICA[i % FABRICA.length].foto,
+            dark: false,
+          })),
+        );
+        setIndex(0);
+      })
+      .catch(() => {});
+    return () => {
+      atual = false;
+    };
+  }, []);
   const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const restart = useCallback(() => {
@@ -55,7 +99,7 @@ export default function Hero() {
             style={{ opacity: active ? 1 : 0, pointerEvents: active ? "auto" : "none" }}
           >
             <img
-              src={img(s.seed)}
+              src={s.foto}
               alt=""
               className="absolute inset-0 h-full w-full object-cover object-right ease-out"
               style={{ transform: active ? "scale(1.07)" : "scale(1)", transition: "transform 8s ease-out" }}

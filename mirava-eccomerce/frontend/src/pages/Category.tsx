@@ -4,7 +4,8 @@ import { Clock } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import { CatalogLoading, CatalogError } from "../components/EstadosCatalogo";
 import { useProducts } from "../catalogo/hooks";
-import { MENU_CATEGORIES, CATEGORY_LABEL, type Category, type Metal } from "../catalogo/tipos";
+import { MENU_CATEGORIES, type Category, type Metal } from "../catalogo/tipos";
+import { rotuloCategoria, useCategorias } from "../catalogo/categorias";
 import type { MenuKey } from "../data/navegacao";
 import { formatarBRL, textoPrazo } from "../lib/dinheiro";
 import Select from "../components/Select";
@@ -43,9 +44,11 @@ export default function CategoryPage() {
 
   const menu: MenuKey = MENU_KEYS.includes(menuKey as MenuKey) ? (menuKey as MenuKey) : "colecoes";
   const metal: Metal | undefined = menu === "colecoes" ? undefined : menu;
-  const category: Category | undefined = MENU_CATEGORIES.includes(filter as Category)
-    ? (filter as Category)
-    : undefined;
+  const cats = useCategorias();
+  // Qualquer categoria do banco vale na URL (são editáveis no painel); as de
+  // fábrica valem mesmo antes de a lista chegar.
+  const category: Category | undefined =
+    filter !== "todos" && (cats.some((c) => c.slug === filter) || MENU_CATEGORIES.includes(filter)) ? filter : undefined;
 
   const ate = Number(params.get("ate")) || 0;
   const de = Number(params.get("de")) || 0;
@@ -63,7 +66,7 @@ export default function CategoryPage() {
 
   // A API já devolve as peças mais recentes primeiro: "novos" só muda o título.
   const titulo = category
-    ? CATEGORY_LABEL[category]
+    ? rotuloCategoria(category)
     : ordem === "novos" && !metal && !ate
       ? "Lançamentos"
     : !metal && FAIXAS_PRESENTE.includes(ate)
@@ -107,7 +110,7 @@ export default function CategoryPage() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-        {[{ key: "todos", label: "Todas" }, ...MENU_CATEGORIES.map((c) => ({ key: c, label: CATEGORY_LABEL[c] }))].map((t) => {
+        {[{ key: "todos", label: "Todas" }, ...cats.map((c) => ({ key: c.slug, label: c.label }))].map((t) => {
           const ativa = (category ?? "todos") === t.key;
           return (
             <button

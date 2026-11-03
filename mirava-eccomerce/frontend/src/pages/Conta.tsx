@@ -2,21 +2,19 @@
 // conta, menu lateral e o conteúdo da aba ao lado. A aba vai na URL
 // (?aba=pedidos), para o "Meus pedidos" do header cair direto nela.
 //
-// Abas do protótipo que dependem de backend inexistente ficaram de fora:
-// Cupons, Mirava Club e Pagamentos (cartão salvo). Voltam quando houver dado
-// de verdade por trás.
+// Pagamentos (cartão salvo) ficou de fora: o pagamento é no Mercado Pago
+// (decisão 25), nenhum cartão passa por aqui.
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronRight, CreditCard, Gift, Heart, HelpCircle, Home as HomeIcon, LayoutGrid, LogOut, MapPin, Package,
-  Plus, RefreshCw, Trash2, Truck, User, type LucideIcon,
+  Copy, Plus, RefreshCw, Sparkles, Star, Ticket, Trash2, Truck, User, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { api, ApiError } from "../lib/api";
 import { formatarBRL } from "../lib/dinheiro";
 import { LOJA } from "../config/loja";
-import { FAQ } from "../data/content";
 import {
   STAGE_LABEL, formatDate, listOrders, stageOf, supportURL, type Order, type Stage,
 } from "../lib/pedidos";
@@ -26,16 +24,25 @@ import {
 } from "../lib/enderecos";
 import EntrarCadastro from "../components/EntrarCadastro";
 import ProductCard from "../components/ProductCard";
+import { useProducts } from "../catalogo/hooks";
 import { listFavorites } from "../lib/favoritos";
 import { useFavorites } from "../context/FavoritesContext";
 import type { Product } from "../catalogo/tipos";
+import { imageUrl } from "../catalogo/consultas";
+import {
+  RETURN_STAGES, clubStatus, createReturn, createReview, forgotPassword, myCoupons, myReturns, reviewables,
+  type ClubStatus, type MyCoupon, type ReturnRequest, type Reviewable,
+} from "../lib/extras";
 
-type Aba = "geral" | "pedidos" | "favoritos" | "enderecos" | "dados" | "trocas";
+type Aba = "geral" | "pedidos" | "favoritos" | "cupons" | "clube" | "avaliar" | "enderecos" | "dados" | "trocas";
 
 const ABAS: { key: Aba; label: string; Icon: LucideIcon }[] = [
   { key: "geral", label: "Visão geral", Icon: LayoutGrid },
   { key: "pedidos", label: "Meus pedidos", Icon: Package },
   { key: "favoritos", label: "Favoritos", Icon: Heart },
+  { key: "cupons", label: "Meus cupons", Icon: Ticket },
+  { key: "clube", label: "Mirava Club", Icon: Sparkles },
+  { key: "avaliar", label: "Avaliar compras", Icon: Star },
   { key: "enderecos", label: "Endereços", Icon: MapPin },
   { key: "dados", label: "Meus dados", Icon: User },
   { key: "trocas", label: "Trocas e devoluções", Icon: RefreshCw },
@@ -54,11 +61,17 @@ export default function Conta() {
 
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [addresses, setAddresses] = useState<Address[] | null>(null);
+  const [club, setClub] = useState<ClubStatus | null>(null);
+  const [desde, setDesde] = useState("");
 
   useEffect(() => {
     if (!user) return;
     listOrders().then(setOrders).catch(() => setOrders([]));
     listAddresses().then(setAddresses).catch(() => setAddresses([]));
+    clubStatus().then(setClub).catch(() => {});
+    api<{ created_at?: string }>("/auth/eu", { authenticated: true })
+      .then((me) => setDesde(me.created_at?.slice(0, 4) ?? ""))
+      .catch(() => {});
   }, [user]);
 
   useEffect(() => {
@@ -110,11 +123,20 @@ export default function Conta() {
             </span>
             <div className="grid gap-1">
               <span className="font-serif text-[clamp(26px,3vw,34px)] leading-none">Olá, {user.name.split(" ")[0] || "cliente"}</span>
-              <span className="text-[14px] text-[#BFE3DF]">{user.email}</span>
+              <span className="text-[14px] text-[#BFE3DF]">
+                {user.email}
+                {desde && ` · cliente desde ${desde}`}
+              </span>
+              {club && (
+                <button type="button" onClick={() => irPara("clube")} className="mt-1 flex w-fit cursor-pointer items-center gap-2 rounded-full border-none bg-white/12 px-3 py-1 text-[11px] font-bold tracking-[0.14em] text-white">
+                  <Sparkles size={12} /> NÍVEL {NIVEL[club.level].toUpperCase()} · {club.balance} PONTOS
+                </button>
+              )}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5">
             <Numero label="PEDIDOS" valor={orders?.length} onClick={() => irPara("pedidos")} />
+            <Numero label="PONTOS" valor={club?.balance} onClick={() => irPara("clube")} />
             <Numero label="ENDEREÇOS" valor={addresses?.length} onClick={() => irPara("enderecos")} />
           </div>
         </div>
@@ -160,7 +182,10 @@ export default function Conta() {
             {aba === "favoritos" && <Favoritos />}
             {aba === "enderecos" && <Enderecos addresses={addresses} setAddresses={setAddresses} />}
             {aba === "dados" && <MeusDados />}
-            {aba === "trocas" && <Trocas />}
+            {aba === "cupons" && <MeusCupons />}
+            {aba === "clube" && <Clube />}
+            {aba === "avaliar" && <Avaliar />}
+            {aba === "trocas" && <Trocas orders={orders} />}
           </main>
         </div>
       </div>
@@ -236,7 +261,27 @@ function VisaoGeral({ orders, irPara }: { orders: Order[] | null; irPara: (a: Ab
       {andamento && <CartaoPedido order={andamento} />}
 
       {orders && orders.length === 0 && <SemPedidos />}
+
+      <EscolhidasPraVoce />
     </>
+  );
+}
+
+/** "Escolhidas pra você" (v5): as mais vendidas da loja, sem as que ela já
+ *  favoritou — sugestão honesta, sem fingir personalização que não existe. */
+function EscolhidasPraVoce() {
+  const { data } = useProducts({ bestSellers: true, limit: 12 });
+  const { isFavorite } = useFavorites();
+  const pecas = data.filter((p) => p.available && !isFavorite(p.id)).slice(0, 4);
+  if (pecas.length === 0) return null;
+  return (
+    <Cartao titulo="Escolhidas pra você">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {pecas.map((p) => (
+          <ProductCard key={p.id} product={p} />
+        ))}
+      </div>
+    </Cartao>
   );
 }
 
@@ -516,15 +561,20 @@ function MeusDados() {
   const [nome, setNome] = useState(user?.name ?? "");
   const [telefone, setTelefone] = useState("");
   const [cpf, setCpf] = useState("");
+  const [nascimento, setNascimento] = useState("");
+  const [novidades, setNovidades] = useState(true);
+  const [linkSenha, setLinkSenha] = useState<string | null>(null);
   const [estado, setEstado] = useState<"idle" | "salvando" | "ok">("idle");
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    api<{ name: string; phone?: string; cpf?: string }>("/auth/eu", { authenticated: true })
+    api<{ name: string; phone?: string; cpf?: string; birth_date?: string; accepts_email?: boolean }>("/auth/eu", { authenticated: true })
       .then((me) => {
         setNome(me.name ?? "");
         setTelefone(me.phone ?? "");
         setCpf(me.cpf ?? "");
+        setNascimento(me.birth_date ?? "");
+        setNovidades(me.accepts_email ?? true);
       })
       .catch(() => {});
   }, []);
@@ -534,7 +584,7 @@ function MeusDados() {
     setErro(null);
     setEstado("salvando");
     try {
-      await api("/auth/perfil", { method: "PUT", authenticated: true, body: { name: nome, phone: onlyDigits(telefone), cpf: onlyDigits(cpf) } });
+      await api("/auth/perfil", { method: "PUT", authenticated: true, body: { name: nome, phone: onlyDigits(telefone), cpf: onlyDigits(cpf), birth_date: nascimento, accepts_email: novidades } });
       await refresh();
       setEstado("ok");
     } catch (e) {
@@ -550,6 +600,19 @@ function MeusDados() {
         <Campo label="E-mail" value={user?.email ?? ""} onChange={() => {}} disabled />
         <Campo label="Celular" value={telefone} onChange={setTelefone} inputMode="tel" />
         <Campo label="CPF" value={cpf} onChange={setCpf} inputMode="numeric" />
+        <label className="grid min-w-0 gap-1.5">
+          <span className="text-[12.5px] font-semibold text-text-2">Data de nascimento</span>
+          <input
+            type="date"
+            value={nascimento}
+            onChange={(e) => setNascimento(e.target.value)}
+            className="w-full min-w-0 rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-[12px] text-[14.5px] text-text outline-none focus:border-teal"
+          />
+        </label>
+        <label className="flex cursor-pointer items-center gap-2.5 self-end pb-3 text-[14px] text-text-2">
+          <input type="checkbox" checked={novidades} onChange={(e) => setNovidades(e.target.checked)} className="h-4 w-4 accent-teal" />
+          Quero receber novidades e cupons por e-mail
+        </label>
         <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
           <button type="submit" disabled={estado === "salvando"} className="cursor-pointer rounded-full border-none bg-teal px-6 py-3.5 text-[14px] font-semibold text-white hover:bg-teal-dark disabled:opacity-50">
             {estado === "salvando" ? "Salvando…" : "Salvar alterações"}
@@ -557,9 +620,20 @@ function MeusDados() {
           {estado === "ok" && <span className="text-[13.5px] font-semibold text-success">Dados atualizados ✓</span>}
         </div>
         {erro && <p className="m-0 rounded-[14px] bg-[#FDECEC] px-3.5 py-2.5 text-[13.5px] text-[#B4443C] sm:col-span-2">{erro}</p>}
-        <p className="m-0 text-[12.5px] text-muted sm:col-span-2">
-          Para trocar o e-mail ou a senha, escreva para {LOJA.email}.
-        </p>
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4 sm:col-span-2">
+          <span className="text-[14px] font-semibold text-text">Senha</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (user?.email) void forgotPassword(user.email).then((r) => setLinkSenha(r.nota)).catch(() => setLinkSenha("Não consegui mandar o link agora."));
+            }}
+            className="cursor-pointer rounded-full border-[1.5px] border-line bg-white px-4 py-2 text-[13px] font-semibold text-teal hover:border-teal"
+          >
+            Mandar link para trocar a senha
+          </button>
+          {linkSenha && <span className="text-[13px] text-text-2">{linkSenha}</span>}
+        </div>
+        <p className="m-0 text-[12.5px] text-muted sm:col-span-2">Para trocar o e-mail da conta, escreva para {LOJA.email}.</p>
       </form>
     </Cartao>
   );
@@ -567,32 +641,372 @@ function MeusDados() {
 
 // ─── Trocas ─────────────────────────────────────────────────────────────────
 
-function Trocas() {
-  const politica = FAQ.find((f) => f.q.startsWith("Posso trocar"))?.a;
-  const passos = [
-    { t: "Fale com a gente", d: "Envie por e-mail o número do pedido e fotos da peça." },
-    { t: "Envie a peça", d: "Mandamos as orientações de postagem para você." },
-    { t: "Receba a solução", d: "Vale-troca ou reembolso, conforme o caso." },
-  ];
+const TEXTAREA =
+  "w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[14px] text-text outline-none focus:border-teal";
+
+const MS_DIA = 86_400_000;
+
+function Trocas({ orders }: { orders: Order[] | null }) {
+  const [list, setList] = useState<ReturnRequest[] | null>(null);
+  const [orderId, setOrderId] = useState("");
+  const [kind, setKind] = useState<"troca" | "reembolso">("troca");
+  const [reason, setReason] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const recarregar = () => myReturns().then(setList).catch(() => setList([]));
+  useEffect(() => {
+    void recarregar();
+  }, []);
+
+  // Só pedidos entregues há até 7 dias e sem troca aberta. O servidor confere
+  // de novo — aqui é só para não oferecer o que vai ser recusado.
+  const abertas = new Set((list ?? []).filter((r) => r.stage !== "done" && r.stage !== "rejected").map((r) => r.order_id));
+  const elegiveis = (orders ?? []).filter(
+    (o) => o.status === "delivered" && o.delivered_at && Date.now() - new Date(o.delivered_at).getTime() <= 7 * MS_DIA && !abertas.has(o.id),
+  );
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSending(true);
+    try {
+      await createReturn(orderId, kind, reason.trim());
+      setOrderId("");
+      setReason("");
+      await recarregar();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não consegui registrar o pedido de troca");
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
-    <Cartao titulo="Trocas e devoluções">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {passos.map((p, i) => (
-          <div key={p.t} className="grid content-start gap-2 rounded-[22px] bg-fog p-5">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-teal font-serif text-[16px] text-white">{i + 1}</span>
-            <span className="text-[15px] font-semibold text-text">{p.t}</span>
-            <span className="text-[13.5px] leading-relaxed text-muted">{p.d}</span>
+    <>
+      {list && list.length > 0 && (
+        <Cartao titulo="Minhas solicitações">
+          <div className="grid gap-3">
+            {list.map((r) => (
+              <EtapasTroca key={r.id} r={r} />
+            ))}
           </div>
+        </Cartao>
+      )}
+
+      <Cartao titulo="Pedir troca ou devolução">
+        <p className="m-0 mb-4 text-[14px] leading-[1.7] text-text-2">
+          Você tem 7 dias corridos depois de receber a peça para pedir troca ou devolução, como manda o Código de Defesa
+          do Consumidor. Depois que a gente aprovar, mandamos as orientações de postagem por e-mail.
+        </p>
+        {elegiveis.length === 0 ? (
+          <p className="m-0 rounded-[18px] bg-fog px-4 py-3.5 text-[14px] text-muted">
+            Nenhum pedido entregue nos últimos 7 dias. Precisa de ajuda com outro pedido?{" "}
+            <a href={`mailto:${LOJA.email}?subject=${encodeURIComponent("Troca ou devolução")}`} className="font-semibold text-teal underline">
+              Fale com a gente
+            </a>
+            .
+          </p>
+        ) : (
+          <form onSubmit={enviar} className="grid gap-3.5">
+            <label className="grid gap-1.5">
+              <span className="text-[12.5px] font-semibold text-text-2">Pedido</span>
+              <select
+                required
+                value={orderId}
+                onChange={(e) => setOrderId(e.target.value)}
+                className="rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-[13px] text-[14.5px] text-text outline-none focus:border-teal"
+              >
+                <option value="">Escolha o pedido</option>
+                {elegiveis.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    #{o.number} · {o.items.map((i) => i.name).join(", ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(["troca", "reembolso"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setKind(k)}
+                  className={`cursor-pointer rounded-full border-[1.5px] px-5 py-2.5 text-[13.5px] font-semibold ${
+                    kind === k ? "border-teal bg-teal text-white" : "border-line bg-white text-text hover:border-teal"
+                  }`}
+                >
+                  {k === "troca" ? "Quero trocar" : "Quero devolver"}
+                </button>
+              ))}
+            </div>
+            <label className="grid gap-1.5">
+              <span className="text-[12.5px] font-semibold text-text-2">O que aconteceu?</span>
+              <textarea required minLength={5} maxLength={1000} rows={4} value={reason} onChange={(e) => setReason(e.target.value)} className={TEXTAREA} />
+            </label>
+            {error && <span className="text-[13px] text-[#B4443C]">{error}</span>}
+            <button
+              type="submit"
+              disabled={sending}
+              className="w-fit cursor-pointer rounded-full border-none bg-teal px-6 py-3.5 text-[14px] font-semibold text-white hover:bg-teal-dark disabled:opacity-60"
+            >
+              {sending ? "Enviando…" : "Enviar solicitação"}
+            </button>
+          </form>
+        )}
+      </Cartao>
+    </>
+  );
+}
+
+function EtapasTroca({ r }: { r: ReturnRequest }) {
+  const recusada = r.stage === "rejected";
+  const atual = RETURN_STAGES.findIndex((s) => s.key === r.stage);
+  return (
+    <div className="rounded-[22px] border border-line p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[15px] font-semibold text-text">
+          Pedido #{r.order_number} · {r.kind === "troca" ? "Troca" : "Devolução"}
+        </span>
+        <span className="text-[12.5px] text-muted">{formatDate(r.created_at)}</span>
+      </div>
+      {r.items_summary && <p className="m-0 mt-1 text-[13px] text-muted">{r.items_summary}</p>}
+      {recusada ? (
+        <p className="m-0 mt-3 rounded-[14px] bg-[#FDECEC] px-3.5 py-2.5 text-[13px] text-[#B4443C]">Solicitação não aprovada.</p>
+      ) : (
+        <ol className="m-0 mt-4 grid list-none grid-cols-4 gap-1.5 p-0">
+          {RETURN_STAGES.map((s, i) => (
+            <li key={s.key} className="grid gap-1.5">
+              <span className={`h-1.5 rounded-full ${i <= atual ? "bg-teal" : "bg-line"}`} />
+              <span className={`text-[11.5px] leading-tight ${i === atual ? "font-semibold text-teal" : "text-muted"}`}>{s.label}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {r.admin_note && <p className="m-0 mt-3 text-[13.5px] leading-relaxed text-text-2">{r.admin_note}</p>}
+    </div>
+  );
+}
+
+// ─── Meus cupons ─────────────────────────────────────────────────────────────
+
+function MeusCupons() {
+  const [list, setList] = useState<MyCoupon[] | null>(null);
+  const [copiado, setCopiado] = useState<string | null>(null);
+  useEffect(() => {
+    myCoupons().then(setList).catch(() => setList([]));
+  }, []);
+  return (
+    <Cartao titulo="Meus cupons">
+      {list === null ? (
+        <p className="m-0 text-[14px] text-muted">Carregando…</p>
+      ) : list.length === 0 ? (
+        <p className="m-0 rounded-[18px] bg-fog px-4 py-3.5 text-[14px] text-muted">Nenhum cupom disponível agora. Os cupons novos aparecem aqui.</p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {list.map((c) => (
+            <div key={c.code} className={`grid gap-2 rounded-[22px] border-[1.5px] border-dashed p-5 ${c.usable ? "border-teal bg-[#F1F8F7]" : "border-line bg-fog opacity-70"}`}>
+              <span className="font-serif text-[26px] leading-none text-teal-dark">
+                {c.kind === "percent" ? `${c.value}% off` : `${formatarBRL(c.value)} off`}
+              </span>
+              <span className="text-[13px] text-text-2">
+                {c.description ?? "Nas peças da compra."}
+                {c.min_subtotal_cents > 0 && ` Mínimo de ${formatarBRL(c.min_subtotal_cents)} em peças.`}
+                {c.ends_at && ` Vale até ${new Date(c.ends_at).toLocaleDateString("pt-BR")}.`}
+              </span>
+              {c.usable ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(c.code);
+                    setCopiado(c.code);
+                  }}
+                  className="flex w-fit cursor-pointer items-center gap-2 rounded-full border-none bg-white px-4 py-2 font-mono text-[14px] font-bold tracking-[0.1em] text-teal-dark"
+                >
+                  {c.code} <Copy size={14} /> {copiado === c.code && <span className="font-sans text-[12px] font-semibold tracking-normal text-teal">copiado</span>}
+                </button>
+              ) : (
+                <span className="text-[12.5px] font-semibold text-muted">{c.reason}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="m-0 mt-4 text-[12.5px] text-muted">Um cupom por pedido; cupom e pontos do Mirava Club não somam no mesmo pedido.</p>
+    </Cartao>
+  );
+}
+
+// ─── Mirava Club ────────────────────────────────────────────────────────────
+
+const NIVEL: Record<ClubStatus["level"], string> = { brilho: "Brilho", encanto: "Encanto", joia_rara: "Joia Rara" };
+
+function Clube() {
+  const [club, setClub] = useState<ClubStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    clubStatus()
+      .then(setClub)
+      .catch((e) => setError(e instanceof ApiError ? e.message : "Não consegui carregar seus pontos"));
+  }, []);
+
+  if (error) return <Cartao titulo="Mirava Club"><p className="m-0 text-[14px] text-[#B4443C]">{error}</p></Cartao>;
+  if (!club) return <Cartao titulo="Mirava Club"><p className="m-0 text-[14px] text-muted">Carregando…</p></Cartao>;
+
+  const progresso = club.next_level_at > 0 ? Math.min(100, (club.earned / club.next_level_at) * 100) : 100;
+  return (
+    <>
+      <section className="rounded-3xl bg-teal-dark p-7 text-white">
+        <span className="text-[11px] font-semibold tracking-[0.18em] text-teal-pale">MIRAVA CLUB · NÍVEL {NIVEL[club.level].toUpperCase()}</span>
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span className="font-serif text-[48px] leading-none">{club.balance}</span>
+            <span className="ml-2 text-[14px] text-teal-pale">pontos</span>
+          </div>
+          <span className="text-[14px] text-teal-pale">
+            valem <strong className="text-white">{formatarBRL(club.balance_value)}</strong> de desconto
+          </span>
+        </div>
+        {club.next_level_at > 0 && (
+          <div className="mt-5">
+            <div className="h-2 overflow-hidden rounded-full bg-white/15">
+              <div className="h-full rounded-full bg-white" style={{ width: `${progresso}%` }} />
+            </div>
+            <span className="mt-2 block text-[12.5px] text-teal-pale">
+              Faltam {club.next_level_at - club.earned} pontos para o próximo nível
+            </span>
+          </div>
+        )}
+      </section>
+
+      <Cartao titulo="Como funciona">
+        <ul className="m-0 grid gap-2.5 pl-5 text-[14px] leading-[1.7] text-text-2">
+          <li>Cada R$ 1 em peças vira 1 ponto, creditado quando o pedido é entregue.</li>
+          <li>
+            Cada {club.points_per_block} pontos valem {formatarBRL(club.cents_per_block)} de desconto nas peças — é só marcar
+            "usar meus pontos" no checkout.
+          </li>
+          <li>Pontos e cupom não se somam no mesmo pedido, e o desconto vai até 30% do valor das peças.</li>
+          <li>Se um pedido em que você usou pontos for cancelado, os pontos voltam para você.</li>
+        </ul>
+      </Cartao>
+
+      <Cartao titulo="Extrato">
+        {club.statement.length === 0 ? (
+          <p className="m-0 text-[14px] text-muted">Seus pontos aparecem aqui depois da primeira compra entregue.</p>
+        ) : (
+          <div className="grid divide-y divide-line">
+            {club.statement.map((l) => (
+              <div key={l.order_id} className="flex items-center justify-between gap-3 py-3 text-[14px]">
+                <span className="text-text">
+                  Pedido #{l.order_number}
+                  <span className="ml-2 text-[12.5px] text-muted">{formatDate(l.date)}</span>
+                </span>
+                <span className="flex gap-3">
+                  {l.earned > 0 && <span className="font-semibold text-teal">+{l.earned}</span>}
+                  {l.used > 0 && <span className="font-semibold text-text-2">−{l.used}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Cartao>
+    </>
+  );
+}
+
+// ─── Avaliar compras ────────────────────────────────────────────────────────
+
+function Avaliar() {
+  const [list, setList] = useState<Reviewable[] | null>(null);
+  const [enviadas, setEnviadas] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    reviewables().then(setList).catch(() => setList([]));
+  }, []);
+
+  const pendentes = (list ?? []).filter((r) => !enviadas.has(r.product_id));
+  return (
+    <Cartao titulo="Avaliar compras">
+      <p className="m-0 mb-5 text-[14px] leading-[1.7] text-text-2">
+        Conte como ficou a peça. A avaliação aparece na página do produto depois que a gente der uma olhada, só com o
+        seu primeiro nome e a inicial do sobrenome.
+      </p>
+      {list === null ? (
+        <p className="m-0 text-[14px] text-muted">Carregando…</p>
+      ) : pendentes.length === 0 ? (
+        <p className="m-0 rounded-[18px] bg-fog px-4 py-3.5 text-[14px] text-muted">
+          {enviadas.size > 0 ? "Obrigada! Recebemos sua avaliação." : "Nenhuma peça para avaliar agora. Elas aparecem aqui quando o pedido é entregue."}
+        </p>
+      ) : (
+        <div className="grid gap-3">
+          {pendentes.map((r) => (
+            <FormAvaliacao key={r.product_id} r={r} onDone={() => setEnviadas((s) => new Set(s).add(r.product_id))} />
+          ))}
+        </div>
+      )}
+    </Cartao>
+  );
+}
+
+function FormAvaliacao({ r, onDone }: { r: Reviewable; onDone: () => void }) {
+  const [rating, setRating] = useState(0);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const img = imageUrl(r.image ?? undefined);
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault();
+    if (rating === 0) {
+      setError("Escolha de 1 a 5 estrelas.");
+      return;
+    }
+    setError(null);
+    setSending(true);
+    try {
+      await createReview(r.product_id, rating, text.trim());
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não consegui enviar a avaliação");
+      setSending(false);
+    }
+  }
+
+  return (
+    <form onSubmit={enviar} className="grid gap-3 rounded-[22px] border border-line p-5">
+      <div className="flex items-center gap-3">
+        {img ? <img src={img} alt="" className="h-14 w-14 rounded-[14px] bg-mist-3 object-cover" /> : <span className="h-14 w-14 rounded-[14px] bg-mist-3" />}
+        <span className="min-w-0 flex-1">
+          <Link to={`/produto/${r.slug}`} className="block truncate text-[15px] font-semibold text-text hover:text-teal">
+            {r.name}
+          </Link>
+          <span className="text-[12.5px] text-muted">Pedido #{r.order_number}</span>
+        </span>
+      </div>
+      <div className="flex gap-1" role="radiogroup" aria-label="Nota">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            role="radio"
+            aria-checked={rating === n}
+            aria-label={`${n} estrela${n > 1 ? "s" : ""}`}
+            onClick={() => setRating(n)}
+            className="cursor-pointer border-none bg-transparent p-0.5 text-teal"
+          >
+            <Star size={24} strokeWidth={1.5} fill={n <= rating ? "currentColor" : "none"} />
+          </button>
         ))}
       </div>
-      {politica && <p className="m-0 mt-5 text-[14px] leading-[1.7] text-text-2">{politica}</p>}
-      <a
-        href={`mailto:${LOJA.email}?subject=${encodeURIComponent("Troca ou devolução")}`}
-        className="mt-5 inline-flex rounded-full bg-teal px-6 py-3.5 text-[14px] font-semibold text-white hover:bg-teal-dark hover:text-white"
+      <textarea rows={3} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Como ficou? (opcional)" className={TEXTAREA} />
+      {error && <span className="text-[13px] text-[#B4443C]">{error}</span>}
+      <button
+        type="submit"
+        disabled={sending}
+        className="w-fit cursor-pointer rounded-full border-none bg-teal px-6 py-3 text-[14px] font-semibold text-white hover:bg-teal-dark disabled:opacity-60"
       >
-        Solicitar troca por e-mail
-      </a>
-    </Cartao>
+        {sending ? "Enviando…" : "Enviar avaliação"}
+      </button>
+    </form>
   );
 }
 

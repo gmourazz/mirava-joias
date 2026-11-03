@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useAuth } from "./AuthContext";
+import { saveCart } from "../lib/extras";
 
 // Sacola de verdade: item, quantidade e total.
 //
@@ -59,6 +61,9 @@ interface CartContextValue {
   clearCart: () => void;
   subtotalCents: number;
   itemCount: number;
+  /** Embrulho para presente marcado na sacola (o checkout começa com ele). */
+  giftWrap: boolean;
+  setGiftWrap: (v: boolean) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -66,6 +71,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [items, setItems] = useState<CartItem[]>(loadItems);
+  const [giftWrap, setGiftWrap] = useState(false);
 
   useEffect(() => {
     try {
@@ -75,6 +81,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
       // é chato, quebrar a loja é pior.
     }
   }, [items]);
+
+  // Com a cliente logada, a sacola também vai para o servidor — é o que
+  // permite o e-mail de carrinho abandonado. Só identificador, tamanho e
+  // quantidade; preço nunca sai do navegador. Espera a cliente parar de
+  // mexer para não mandar uma chamada por clique.
+  const { user } = useAuth();
+  useEffect(() => {
+    if (!user) return;
+    const t = setTimeout(() => {
+      saveCart(items.map((i) => ({ product_id: i.productId, size: i.size ?? "", quantity: i.quantity }))).catch(() => {
+        // Lembrete de carrinho é conveniência: falhar aqui não atrapalha a compra.
+      });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [items, user]);
 
   // Adicionar a mesma peça/tamanho de novo soma quantidade, não duplica linha.
   const addItem = (item: Omit<CartItem, "key" | "quantity">, quantity = 1) => {
@@ -123,6 +144,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         subtotalCents,
         itemCount,
+        giftWrap,
+        setGiftWrap,
       }}
     >
       {children}

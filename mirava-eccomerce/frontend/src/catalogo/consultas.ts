@@ -12,6 +12,8 @@ export interface ProductRow {
   name: string;
   description: string | null;
   price_cents: number;
+  list_price_cents?: number;
+  promo_pct?: number;
   category: Category;
   metal: Metal;
   images: string[] | null;
@@ -55,6 +57,8 @@ function toProduct(row: ProductRow): Product {
     name: row.name,
     description: row.description,
     priceCents: row.price_cents,
+    listPriceCents: row.list_price_cents ?? row.price_cents,
+    promoPct: row.promo_pct ?? 0,
     category: row.category,
     metal: row.metal,
     images: row.images ?? [],

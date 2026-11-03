@@ -4,7 +4,8 @@
 // Nada de regra de negócio aqui: prazo, etapa e ações possíveis vêm prontos
 // da API (calculados em api/internal/dominio/admin.go).
 
-import { api } from "../lib/api";
+import { api, BASE_URL, currentToken } from "../lib/api";
+import type { ReturnRequest } from "../lib/extras";
 
 export type OrderStatus =
   | "awaiting_payment" | "paid" | "in_batch" | "purchased_from_supplier"
@@ -58,6 +59,12 @@ export interface AdminOrderDetail extends AdminOrder {
   }[];
   events: { from_status: string | null; to_status: string; origin: string; detail: string | null; created_at: string }[];
   actions: OrderStatus[];
+  discount_cents: number;
+  coupon_code: string | null;
+  points_used: number;
+  gift_wrap: boolean;
+  gift_wrap_cents: number;
+  gift_message: string | null;
 }
 
 export interface Batch {
@@ -92,12 +99,16 @@ export interface Summary {
   last_sync_at: string | null;
   last_sync_status: string | null;
   sales: { day: string; total_cents: number }[];
+  stock_alerts: { id: string; name: string; sku: string | null; waiting: number }[];
+  top_sellers: { id: string; name: string; units: number; revenue_cents: number }[];
+  next_sync_at: string | null;
 }
 
 const auth = { authenticated: true } as const;
 
 export const adminApi = {
-  me: () => api<{ ok: boolean }>("/admin/eu", auth),
+  me: () => api<{ ok: boolean; role: "master" | "dispatch" }>("/admin/eu", auth),
+  notices: (id: string) => api<{ kind: string; channel: string; sent_at: string }[]>(`/admin/pedidos/${id}/avisos`, auth),
   summary: () => api<Summary>("/admin/resumo", auth),
   orders: () => api<AdminOrder[]>("/admin/pedidos", auth),
   order: (id: string) => api<AdminOrderDetail>(`/admin/pedidos/${id}`, auth),
@@ -151,7 +162,9 @@ export interface AdminProduct {
   metal: "prata" | "ouro";
   price_cents: number;
   cost_cents: number;
-  markup_pct: number;
+  /** Markup da peça; nulo = herda da categoria ou o padrão (decisão 21). */
+  markup_pct: number | null;
+  effective_markup_pct: number;
   auto_price: boolean;
   suggested_price_cents: number | null;
   suggestion_reason: string | null;
@@ -163,6 +176,15 @@ export interface AdminProduct {
   supplier_retail_cents: number | null;
   units_sold: number;
   updated_at: string;
+  images: string[];
+  seo_title: string | null;
+  seo_description: string | null;
+  keep_own_photos: boolean;
+  available: boolean;
+  manual: boolean;
+  promo_pct: number;
+  showcase: string[];
+  last_sale_days: number | null;
 }
 
 export interface ProductPage {
@@ -174,9 +196,12 @@ export interface ProductPage {
 export const productApi = {
   list: (params: URLSearchParams) => api<ProductPage>(`/admin/produtos?${params}`, auth),
   get: (id: string) => api<AdminProduct>(`/admin/produtos/${id}`, auth),
-  update: (id: string, body: Partial<Pick<AdminProduct, "name" | "description" | "published" | "featured">>) =>
-    api<{ ok: boolean }>(`/admin/produtos/${id}`, { ...auth, method: "PUT", body }),
-  markup: (id: string, markupPct: number) =>
+  update: (
+    id: string,
+    body: Partial<Pick<AdminProduct, "name" | "description" | "published" | "featured" | "category" | "metal" | "seo_title" | "seo_description" | "images" | "keep_own_photos">>,
+  ) => api<{ ok: boolean }>(`/admin/produtos/${id}`, { ...auth, method: "PUT", body }),
+  /** markupPct nulo = a peça volta a herdar (categoria ou padrão). */
+  markup: (id: string, markupPct: number | null) =>
     api<{ ok: boolean }>(`/admin/produtos/${id}/markup`, { ...auth, method: "POST", body: { markup_pct: markupPct } }),
   suggestion: (id: string, accept: boolean) =>
     api<{ ok: boolean }>(`/admin/produtos/${id}/sugestao`, { ...auth, method: "POST", body: { accept } }),
@@ -194,6 +219,8 @@ export interface FinanceMonth {
   orders_count: number;
   revenue_cents: number;
   subtotal_cents: number;
+  discount_cents: number;
+  gift_wrap_cents: number;
   shipping_cents: number;
   cost_cents: number;
   fees_cents: number;
@@ -206,9 +233,12 @@ export interface FinanceMonth {
   orders: {
     id: string; number: number; customer_name: string; paid_at: string; shipping_method: "economico" | "sedex" | null;
     subtotal_cents: number; shipping_cents: number; total_cents: number; cost_cents: number; fee_cents: number;
+    discount_cents: number; gift_wrap_cents: number;
   }[];
   categories: FinanceGroup[];
   top_pieces: FinanceGroup[];
+  fees_by_method: { method: "pix" | "cartao" | "boleto" | "outro"; orders: number; amount_cents: number; fees_cents: number }[];
+  goals: { revenue_cents: number; orders: number; profit_cents: number };
 }
 
 export interface SyncRun {
@@ -257,6 +287,8 @@ export interface Customer {
   last_order_at: string | null;
   favorites: number;
   is_admin: boolean;
+  level: "brilho" | "encanto" | "joia_rara";
+  tags: string[];
 }
 
 export interface Activity {
@@ -294,7 +326,10 @@ export const extraApi = {
   customerOrders: (id: string) => api<AdminOrder[]>(`/admin/clientes/${id}/pedidos`, auth),
   activities: (origem: string) => api<Activity[]>(`/admin/atividades?origem=${origem}`, auth),
   config: () => api<StoreConfig>("/admin/configuracoes", auth),
-  bulkProducts: (body: { ids: string[]; published?: boolean; featured?: boolean; markup_pct?: number }) =>
+  bulkProducts: (body: {
+    ids: string[]; published?: boolean; featured?: boolean; markup_pct?: number;
+    inherit_markup?: boolean; promo_pct?: number; promo_days?: number;
+  }) =>
     api<{ updated: number; failed: number }>("/admin/produtos/lote", { ...auth, method: "POST", body }),
 };
 
@@ -311,3 +346,286 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   refunded: "Estornado",
   out_of_stock: "Sem estoque na Lilly",
 };
+
+// ---------------------------------------------------------------------------
+// Cupons, avaliações, avise-me, trocas, vitrine, avisos e automações
+// (decisão 31). O painel só lê e manda; validação e teto ficam no Go.
+// ---------------------------------------------------------------------------
+
+export interface AdminCoupon {
+  code: string;
+  kind: "percent" | "fixed";
+  value: number;
+  min_subtotal_cents: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  max_uses: number;
+  active: boolean;
+  description: string | null;
+  uses: number;
+  discounted_cents: number;
+  created_at: string;
+}
+
+export interface NewCoupon {
+  code: string;
+  kind: "percent" | "fixed";
+  value: number;
+  min_subtotal_cents: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  max_uses: number;
+  description: string;
+}
+
+export interface AdminReview {
+  id: string;
+  product_name: string;
+  product_slug: string;
+  product_image: string | null;
+  customer: string;
+  email: string;
+  rating: number;
+  text: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+}
+
+export interface AdminStockAlert {
+  product_id: string;
+  name: string;
+  slug: string;
+  image: string | null;
+  waiting: number;
+  notified: number;
+  available: boolean;
+}
+
+export interface AdminAnnouncement {
+  id?: string;
+  text: string;
+  position: number;
+  active: boolean;
+}
+
+export interface AutomationStatus {
+  key: "payment_reminder" | "abandoned_cart" | "review_request" | "stock_alert" | "return_update";
+  enabled: boolean;
+  sent: number;
+  pending: number;
+}
+
+export const growthApi = {
+  coupons: () => api<AdminCoupon[]>("/admin/cupons", auth),
+  createCoupon: (c: NewCoupon) => api<{ ok: boolean; code: string }>("/admin/cupons", { ...auth, method: "POST", body: c }),
+  toggleCoupon: (code: string, active: boolean) =>
+    api<{ ok: boolean }>(`/admin/cupons/${encodeURIComponent(code)}`, { ...auth, method: "PUT", body: { active } }),
+
+  reviews: (status: string) => api<AdminReview[]>(`/admin/avaliacoes?status=${status}`, auth),
+  decideReview: (id: string, status: "approved" | "rejected") =>
+    api<{ ok: boolean }>(`/admin/avaliacoes/${id}`, { ...auth, method: "PUT", body: { status } }),
+  stockAlerts: () => api<AdminStockAlert[]>("/admin/avise-me", auth),
+
+  returns: () => api<ReturnRequest[]>("/admin/trocas", auth),
+  advanceReturn: (id: string, from: string, to: string, note: string) =>
+    api<{ ok: boolean }>(`/admin/trocas/${id}`, { ...auth, method: "PUT", body: { from, to, note } }),
+
+  setShowcase: (slot: string, productIds: string[]) =>
+    api<{ ok: boolean }>(`/admin/vitrine/${slot}`, { ...auth, method: "PUT", body: { product_ids: productIds } }),
+  announcements: () => api<AdminAnnouncement[]>("/admin/avisos", auth),
+  setAnnouncements: (items: AdminAnnouncement[]) =>
+    api<{ ok: boolean }>("/admin/avisos", { ...auth, method: "PUT", body: { items } }),
+
+  automations: () => api<{ items: AutomationStatus[]; email_ready: boolean }>("/admin/automacoes", auth),
+  setAutomation: (key: string, enabled: boolean) =>
+    api<{ ok: boolean }>(`/admin/automacoes/${key}`, { ...auth, method: "PUT", body: { enabled } }),
+};
+
+// ---------------------------------------------------------------------------
+// Design v5 completo (decisões 21, 27 e 32 a 35): configurações, categorias,
+// promoções, kits, banners, galeria, uploads, produto manual, fila da Lilly,
+// clientes, sacolas, textos das automações e equipe.
+// ---------------------------------------------------------------------------
+
+export interface StoreSettings {
+  default_markup_pct: number;
+  round_to_90: boolean;
+  min_margin_pct: number;
+  out_of_stock_action: "show" | "hide";
+  sync_every_hours: 3 | 6 | 12 | 24;
+  auto_import: boolean;
+  sync_images: boolean;
+  sync_descriptions: boolean;
+  store_name: string;
+  store_email: string;
+  store_instagram: string;
+  sender_name: string;
+  sender_street: string;
+  sender_number: string;
+  sender_complement: string;
+  sender_neighborhood: string;
+  sender_city: string;
+  sender_state: string;
+  sender_zip: string;
+  goal_revenue_cents: number;
+  goal_orders: number;
+  goal_profit_cents: number;
+}
+
+export interface AdminCategory {
+  slug: string;
+  label: string;
+  position: number;
+  markup_pct: number | null;
+  count: number;
+}
+
+export interface Promotion {
+  id?: string;
+  name: string;
+  pct: number;
+  scope: "all" | "category" | "products";
+  category: string | null;
+  product_ids: string[];
+  starts_at: string;
+  ends_at: string;
+  products?: number;
+}
+
+export interface AdminKit {
+  id: string;
+  product_a: string;
+  product_b: string;
+  name_a: string;
+  name_b: string;
+  price_a_cents: number;
+  price_b_cents: number;
+  pct: number;
+  active: boolean;
+}
+
+export interface BannerData {
+  id?: string;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  cta_label: string;
+  cta_url: string;
+  image: string | null;
+  active: boolean;
+}
+
+export interface GalleryItem {
+  id?: string;
+  image: string;
+  link: string | null;
+  caption: string | null;
+}
+
+export interface QueueItem {
+  id: string;
+  sku: string;
+  name: string;
+  url: string;
+  cost_cents: number;
+  retail_cents: number | null;
+  image: string | null;
+  category: string;
+  price_cents: number;
+}
+
+export interface AdminCart {
+  user_id: string;
+  name: string;
+  email: string;
+  items: number;
+  total_cents: number;
+  updated_at: string;
+  notified_at: string | null;
+  recovered: boolean;
+}
+
+export interface TeamMember {
+  user_id: string;
+  name: string;
+  email: string;
+  role: "master" | "dispatch";
+}
+
+export type AutomationKey = AutomationStatus["key"];
+
+export const lojaApi = {
+  settings: () => api<StoreSettings>("/admin/loja", auth),
+  saveSettings: (s: StoreSettings) => api<{ ok: boolean }>("/admin/loja", { ...auth, method: "PUT", body: s }),
+  recalculate: () => api<{ ok: boolean; updated: number }>("/admin/precos/recalcular", { ...auth, method: "POST" }),
+
+  categories: () => api<AdminCategory[]>("/admin/categorias", auth),
+  createCategory: (slug: string, label: string) =>
+    api<{ ok: boolean }>("/admin/categorias", { ...auth, method: "POST", body: { slug, label } }),
+  updateCategory: (slug: string, label: string, position: number, markupPct: number | null) =>
+    api<{ ok: boolean }>(`/admin/categorias/${slug}`, { ...auth, method: "PUT", body: { label, position, markup_pct: markupPct } }),
+  deleteCategory: (slug: string) => api<{ ok: boolean }>(`/admin/categorias/${slug}`, { ...auth, method: "DELETE" }),
+  mappings: () => api<{ keyword: string; category: string }[]>("/admin/mapeamento", auth),
+  setMappings: (items: { keyword: string; category: string }[]) =>
+    api<{ ok: boolean }>("/admin/mapeamento", { ...auth, method: "PUT", body: { items } }),
+
+  promotions: () => api<Promotion[]>("/admin/promocoes", auth),
+  createPromotion: (p: Promotion) => api<{ ok: boolean }>("/admin/promocoes", { ...auth, method: "POST", body: p }),
+  deletePromotion: (id: string) => api<{ ok: boolean }>(`/admin/promocoes/${id}`, { ...auth, method: "DELETE" }),
+  kits: () => api<AdminKit[]>("/admin/kits", auth),
+  createKit: (a: string, b: string, pct: number) =>
+    api<{ ok: boolean }>("/admin/kits", { ...auth, method: "POST", body: { product_a: a, product_b: b, pct } }),
+  toggleKit: (id: string, active: boolean) => api<{ ok: boolean }>(`/admin/kits/${id}`, { ...auth, method: "PUT", body: { active } }),
+  deleteKit: (id: string) => api<{ ok: boolean }>(`/admin/kits/${id}`, { ...auth, method: "DELETE" }),
+
+  banners: () => api<BannerData[]>("/admin/banners", auth),
+  setBanners: (items: BannerData[]) => api<{ ok: boolean }>("/admin/banners", { ...auth, method: "PUT", body: { items } }),
+  gallery: () => api<GalleryItem[]>("/galeria"),
+  setGallery: (items: GalleryItem[]) => api<{ ok: boolean }>("/admin/galeria", { ...auth, method: "PUT", body: { items } }),
+
+  createProduct: (p: {
+    name: string; description: string; category: string; metal: "prata" | "ouro";
+    cost_cents: number; markup_pct: number | null; images: string[]; published: boolean;
+  }) => api<{ ok: boolean; id: string }>("/admin/produtos", { ...auth, method: "POST", body: p }),
+
+  queue: () => api<QueueItem[]>("/admin/fila-lilly", auth),
+  importQueued: (id: string) => api<{ ok: boolean }>(`/admin/fila-lilly/${id}/importar`, { ...auth, method: "POST" }),
+  ignoreQueued: (id: string) => api<{ ok: boolean }>(`/admin/fila-lilly/${id}/ignorar`, { ...auth, method: "POST" }),
+  importAll: () => api<{ ok: boolean; queued: number }>("/admin/fila-lilly/importar-tudo", { ...auth, method: "POST" }),
+  syncNow: () => api<{ ok: boolean; nota?: string }>("/admin/sincronizar", { ...auth, method: "POST" }),
+  testConnection: () => api<{ ok: boolean; urls?: number; error?: string }>("/admin/sincronizacao/teste", auth),
+
+  customerNotes: (id: string) => api<{ tags: string[]; notes: string }>(`/admin/clientes/${id}/notas`, auth),
+  saveCustomerNotes: (id: string, tags: string[], notes: string) =>
+    api<{ ok: boolean }>(`/admin/clientes/${id}/notas`, { ...auth, method: "PUT", body: { tags, notes } }),
+  sendCoupon: (id: string, code: string) => api<{ ok: boolean }>(`/admin/clientes/${id}/cupom`, { ...auth, method: "POST", body: { code } }),
+
+  carts: () => api<AdminCart[]>("/admin/carrinhos", auth),
+  remindCart: (userId: string) => api<{ ok: boolean }>(`/admin/carrinhos/${userId}/lembrar`, { ...auth, method: "POST" }),
+  notifyStock: (productId: string) => api<{ ok: boolean; sent: number }>(`/admin/avise-me/${productId}/avisar`, { ...auth, method: "POST" }),
+  subscribers: () => api<{ email: string; whatsapp: string | null; source: string; created_at: string }[]>("/admin/novidades", auth),
+
+  automationTexts: () => api<Record<string, { subject: string; body: string }>>("/admin/automacoes/textos", auth),
+  setAutomationText: (key: string, subject: string, body: string) =>
+    api<{ ok: boolean }>(`/admin/automacoes/${key}/texto`, { ...auth, method: "PUT", body: { subject, body } }),
+  testAutomation: (key: string) => api<{ ok: boolean; to: string }>(`/admin/automacoes/${key}/teste`, { ...auth, method: "POST" }),
+
+  team: () => api<TeamMember[]>("/admin/equipe", auth),
+  addTeam: (email: string) => api<{ ok: boolean }>("/admin/equipe", { ...auth, method: "POST", body: { email } }),
+  removeTeam: (id: string) => api<{ ok: boolean }>(`/admin/equipe/${id}`, { ...auth, method: "DELETE" }),
+};
+
+/** Envia uma foto (decisão 35). Devolve o caminho público (/images/uploads/...). */
+export async function uploadImage(file: File, pasta: "produtos" | "banners" | "galeria"): Promise<string> {
+  const token = currentToken();
+  const form = new FormData();
+  form.append("arquivo", file);
+  const res = await fetch(`${BASE_URL}/admin/upload?pasta=${pasta}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? "Não consegui enviar a foto");
+  return data.path as string;
+}

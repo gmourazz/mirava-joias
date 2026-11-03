@@ -3,14 +3,21 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Clock, Gem, Heart, Minus, Plus, RefreshCw, ShieldCheck } from "lucide-react";
 import { useProduct } from "../catalogo/hooks";
 import { imageUrl } from "../catalogo/consultas";
-import { CATEGORY_LABEL, METAL_LABEL } from "../catalogo/tipos";
-import { formatarBRL, precoPix, temDescontoPix, textoParcelas, textoPrazo } from "../lib/dinheiro";
+import { METAL_LABEL } from "../catalogo/tipos";
+import { rotuloCategoria } from "../catalogo/categorias";
+import { formatarBRL, precoPix, temDescontoPix, textoParcelas, textoPrazo, precoDaPeca } from "../lib/dinheiro";
+import PrecoRiscado from "../components/PrecoRiscado";
 import { formatZip, lookupZip, onlyDigits } from "../lib/enderecos";
 import { quoteShipping, shippingPrazo, type ShippingOption } from "../lib/frete";
 import { FAQ } from "../data/content";
 import ProductCard from "../components/ProductCard";
 import { CatalogError } from "../components/EstadosCatalogo";
 import Reveal from "../components/Reveal";
+import AviseMe from "../components/AviseMe";
+import AvaliacoesProduto from "../components/AvaliacoesProduto";
+import CompreJunto from "../components/CompreJunto";
+import GuiaTamanhos from "../components/GuiaTamanhos";
+import { productExtras, type ProductExtras } from "../lib/extras";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 
@@ -37,6 +44,20 @@ export default function ProdutoPage() {
   const [size, setSize] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [aberto, setAberto] = useState(0);
+  const [guia, setGuia] = useState(false);
+  const [extras, setExtras] = useState<ProductExtras | null>(null);
+
+  useEffect(() => {
+    if (!slug) return;
+    let atual = true;
+    setExtras(null);
+    productExtras(slug)
+      .then((e) => atual && setExtras(e))
+      .catch(() => {});
+    return () => {
+      atual = false;
+    };
+  }, [slug]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -78,7 +99,7 @@ export default function ProdutoPage() {
   const variants = product.variants.filter((v) => v.available);
   const needsSize = variants.length > 1 && !size;
   const adjust = variants.find((v) => v.size === size)?.priceAdjustCents ?? 0;
-  const price = product.priceCents + adjust;
+  const { cheio, final: price } = precoDaPeca(product, adjust);
   const fotos = product.images.map((p) => imageUrl(p)).filter((u): u is string => Boolean(u));
   const cover = fotos[activeImage] ?? null;
   const podeComprar = product.available && !needsSize;
@@ -102,7 +123,7 @@ export default function ProdutoPage() {
         <Link to="/" className="text-[#5E7473] hover:text-teal">Início</Link>
         <span className="mx-2">/</span>
         <Link to={`/categoria/colecoes/${product.category}`} className="text-[#5E7473] hover:text-teal">
-          {CATEGORY_LABEL[product.category]}
+          {rotuloCategoria(product.category)}
         </Link>
         <span className="mx-2">/</span>
         <span className="font-semibold text-teal">{product.name}</span>
@@ -137,8 +158,16 @@ export default function ProdutoPage() {
         </div>
 
         <div className="grid content-start gap-5">
-          <span className="w-fit rounded-full bg-mist px-3.5 py-1.5 text-[12px] font-semibold text-teal">
-            {METAL_LABEL[product.metal]}
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="w-fit rounded-full bg-mist px-3.5 py-1.5 text-[12px] font-semibold text-teal">
+              {METAL_LABEL[product.metal]}
+            </span>
+            {/* Só com venda real nos últimos 7 dias (decisão 28). */}
+            {extras && extras.soldWeek > 0 && (
+              <span className="text-[13px] text-text-2">
+                <strong className="text-text">{extras.soldWeek}</strong> {extras.soldWeek === 1 ? "pessoa comprou" : "pessoas compraram"} esta semana
+              </span>
+            )}
           </span>
           <div className="flex items-start justify-between gap-3">
             <h1 className="m-0 font-serif text-[clamp(32px,3.4vw,44px)] leading-[1.08] font-normal text-teal-dark">{product.name}</h1>
@@ -153,6 +182,7 @@ export default function ProdutoPage() {
           </div>
 
           <div className="grid gap-1">
+            <PrecoRiscado cheio={cheio} pct={product.promoPct} className="text-[15px]" />
             <span className="text-[30px] font-bold text-teal [font-variant-numeric:tabular-nums]">{formatarBRL(price)}</span>
             <span className="text-[14px] text-muted">
               {textoParcelas(price)}
@@ -160,17 +190,20 @@ export default function ProdutoPage() {
             </span>
           </div>
 
-          {!product.available && (
-            <div className="rounded-[18px] bg-mist px-4 py-3 text-[14px] text-text-2">
-              Esta peça está indisponível no momento. Escreve pra gente por e-mail que avisamos quando voltar.
-            </div>
-          )}
+          {!product.available && <AviseMe productId={product.id} />}
 
           {variants.length > 0 && (
             <div className="grid gap-2.5">
               {/* O rótulo vem da Lilly: "Tamanho" num anel, "Letras" num colar
                   de letra. Fixar "Tamanho" mostraria "Tamanho: A". */}
-              <span className="text-[13px] font-semibold text-text-2">{product.variantLabel ?? "Tamanho"}</span>
+              <span className="flex items-center justify-between gap-3">
+                <span className="text-[13px] font-semibold text-text-2">{product.variantLabel ?? "Tamanho"}</span>
+                {(product.category === "aneis" || product.category === "colares" || product.category === "pulseiras") && (
+                  <button type="button" onClick={() => setGuia(true)} className="cursor-pointer border-none bg-transparent p-0 text-[13px] font-semibold text-teal">
+                    Guia de tamanhos
+                  </button>
+                )}
+              </span>
               <div className="flex flex-wrap gap-2">
                 {variants.map((v) => (
                   <button
@@ -226,7 +259,10 @@ export default function ProdutoPage() {
             </div>
           )}
 
+          {extras?.kit && <CompreJunto product={product} partner={extras.kit.partner} pct={extras.kit.pct} />}
+
           <CaixaEncomenda subtotalCents={price * qty} />
+          {guia && <GuiaTamanhos fechar={() => setGuia(false)} />}
 
           <div className="flex flex-wrap gap-2">
             <Chip icon={<Gem size={14} strokeWidth={1.8} />}>Feita sob encomenda</Chip>
@@ -259,6 +295,8 @@ export default function ProdutoPage() {
           </div>
         </div>
       </div>
+
+      <AvaliacoesProduto slug={product.slug} />
 
       {related.length > 0 && (
         <Reveal>

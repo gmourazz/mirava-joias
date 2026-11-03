@@ -34,6 +34,12 @@ export interface Order {
   created_at: string;
   paid_at: string | null;
   shipped_at: string | null;
+  delivered_at: string | null;
+  discount_cents: number;
+  gift_wrap_cents: number;
+  gift_message: string | null;
+  coupon_code: string | null;
+  points_used: number;
   items: OrderItem[];
 }
 

@@ -8,7 +8,7 @@ import {
   AlertTriangle, Bell, Check, Clock, CreditCard, RefreshCw, ShoppingCart, Sparkles, Truck, type LucideIcon,
 } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
-import { adminApi, STAGE_PILL, dataCurta, type AdminOrder, type Summary } from "./api";
+import { adminApi, lojaApi, STAGE_PILL, dataCurta, type AdminOrder, type Summary } from "./api";
 
 type Prioridade = "urgente" | "hoje" | "semana" | "quando";
 
@@ -30,6 +30,7 @@ interface Pendencia {
 }
 
 export default function VisaoGeral() {
+  const [sincronizando, setSincronizando] = useState<string | null>(null);
   const [resumo, setResumo] = useState<Summary | null>(null);
   const [pedidos, setPedidos] = useState<AdminOrder[]>([]);
   const [erro, setErro] = useState<string | null>(null);
@@ -181,6 +182,12 @@ export default function VisaoGeral() {
           <span className="text-[13px] text-[#BFE3DF]">
             Última leitura: {resumo.last_sync_at ? new Date(resumo.last_sync_at).toLocaleString("pt-BR") : "nunca"}
             {resumo.last_sync_status && ` · ${resumo.last_sync_status}`}
+            {resumo.next_sync_at && (
+              <>
+                <br />
+                Próxima automática: {new Date(resumo.next_sync_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </>
+            )}
           </span>
           <div className="grid grid-cols-2 gap-2.5">
             <MiniStat label="Peças publicadas" valor={resumo.published} />
@@ -188,7 +195,60 @@ export default function VisaoGeral() {
             <MiniStat label="Alertas de preço" valor={resumo.price_alerts} />
             <MiniStat label="Sem estoque (pedidos)" valor={st.out_of_stock ?? 0} />
           </div>
-          <Link to="/admin/sincronizacao" className="text-[12.5px] font-semibold text-white underline hover:text-white">Ver histórico da sincronização →</Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={sincronizando !== null}
+              onClick={() => {
+                setSincronizando("Sincronizando…");
+                void lojaApi.syncNow().then(() => setSincronizando("Sincronização iniciada ✓")).catch((e: Error) => setSincronizando(e.message));
+              }}
+              className="cursor-pointer rounded-full border-none bg-white px-4 py-2 text-[12.5px] font-semibold text-teal-dark disabled:opacity-80"
+            >
+              {sincronizando ?? "Sincronizar agora"}
+            </button>
+            <Link to="/admin/sincronizacao" className="text-[12.5px] font-semibold text-white underline hover:text-white">Regras e histórico →</Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-[18px] xl:grid-cols-2">
+        <div className="rounded-[20px] border border-line bg-white p-[22px]">
+          <div className="mb-3 flex items-center justify-between">
+            <strong className="text-[16px] text-text">Alertas de estoque</strong>
+            <Link to="/admin/marketing?aba=aviseme" className="text-[13px] font-semibold text-teal">Avise-me →</Link>
+          </div>
+          {resumo.stock_alerts.length === 0 ? (
+            <p className="m-0 py-4 text-center text-[13.5px] text-muted">Nenhuma peça no ar esgotada na Lilly.</p>
+          ) : (
+            resumo.stock_alerts.map((a) => (
+              <Link key={a.id} to={`/admin/produtos?abrir=${a.id}`} className="flex items-center gap-3 border-t border-[#EEF3F2] py-2.5 text-[13.5px] text-text first:border-t-0 hover:text-text">
+                <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                <span className="font-mono text-[12px] text-muted">{a.sku ?? ""}</span>
+                <span className="rounded-full bg-[#FFF4E0] px-2.5 py-1 text-[11.5px] font-semibold text-[#9A6B12]">
+                  esgotada{a.waiting > 0 && ` · ${a.waiting} esperando`}
+                </span>
+              </Link>
+            ))
+          )}
+        </div>
+        <div className="rounded-[20px] border border-line bg-white p-[22px]">
+          <div className="mb-3 flex items-center justify-between">
+            <strong className="text-[16px] text-text">Mais vendidos do mês</strong>
+            <Link to="/admin/produtos" className="text-[13px] font-semibold text-teal">Ver produtos →</Link>
+          </div>
+          {resumo.top_sellers.length === 0 ? (
+            <p className="m-0 py-4 text-center text-[13.5px] text-muted">Nenhuma venda paga este mês ainda.</p>
+          ) : (
+            resumo.top_sellers.map((t, i) => (
+              <div key={t.id + t.name} className="flex items-center gap-3 border-t border-[#EEF3F2] py-2.5 text-[13.5px] first:border-t-0">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-mist text-[12px] font-bold text-teal">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-text">{t.name}</span>
+                <span className="text-muted">{t.units} un.</span>
+                <strong className="text-text">{formatarBRL(t.revenue_cents)}</strong>
+              </div>
+            ))
+          )}
         </div>
       </section>
 

@@ -3,22 +3,24 @@
 // publicar e de destaque na home. O catálogo tem milhares de peças, então a
 // paginação e os filtros rodam no servidor (GET /admin/produtos).
 //
-// Preço não se edita aqui: muda pelo markup no editor (calculado no Go) ou
-// aceitando a sugestão do disjuntor.
+// Preço não se edita aqui: muda pelo markup (da peça, da categoria ou o
+// padrão — decisão 21, calculado no Go) ou aceitando a sugestão do disjuntor.
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Download, Pencil, Plus, Search, Tag } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
 import { imageUrl } from "../catalogo/consultas";
-import { CATEGORY_LABEL, MENU_CATEGORIES } from "../catalogo/tipos";
+import { rotuloCategoria } from "../catalogo/categorias";
 import { ApiError } from "../lib/api";
 import Select from "../components/Select";
-import { extraApi, productApi, type AdminProduct, type ProductPage } from "./api";
+import { extraApi, lojaApi, productApi, type AdminCategory, type AdminProduct, type ProductPage } from "./api";
 import ProdutoDrawer from "./ProdutoDrawer";
 import Toggle from "./Toggle";
-
-const CATEGORIAS = [...MENU_CATEGORIES, "conjuntos", "outros"] as const;
+import PainelPreco from "./PainelPreco";
+import CategoriasModal from "./CategoriasModal";
+import NovoProduto from "./NovoProduto";
 
 export default function Produtos() {
   const [params, setParams] = useSearchParams();
@@ -28,6 +30,13 @@ export default function Produtos() {
   const [selecao, setSelecao] = useState<Set<string>>(new Set());
   const [massa, setMassa] = useState<string | null>(null);
   const [markupMassa, setMarkupMassa] = useState("");
+  const [cats, setCats] = useState<AdminCategory[]>([]);
+  const [modal, setModal] = useState<"categorias" | "novo" | null>(null);
+
+  const carregarCats = useCallback(() => {
+    lojaApi.categories().then(setCats).catch(() => {});
+  }, []);
+  useEffect(carregarCats, [carregarCats]);
 
   const categoria = params.get("categoria") ?? "";
   const abrir = params.get("abrir");
@@ -69,7 +78,7 @@ export default function Produtos() {
 
   const totalPaginas = pagina ? Math.max(1, Math.ceil(pagina.total / pagina.per_page)) : 1;
 
-  async function emMassa(b: { published?: boolean; featured?: boolean; markup_pct?: number }) {
+  async function emMassa(b: { published?: boolean; featured?: boolean; markup_pct?: number; inherit_markup?: boolean; promo_pct?: number; promo_days?: number }) {
     setMassa(null);
     setErro(null);
     try {
@@ -83,24 +92,45 @@ export default function Produtos() {
     }
   }
 
+  // "+10% lucro / −10% lucro" (v5): soma 10 pontos ao markup que vale hoje
+  // em cada peça selecionada. Cada uma passa pela mesma regra do editor.
+  async function ajustarLucro(delta: number) {
+    setMassa(null);
+    setErro(null);
+    const pecas = (pagina?.items ?? []).filter((p) => selecao.has(p.id));
+    let ok = 0;
+    for (const p of pecas) {
+      const novo = Math.min(500, Math.max(20, Math.round(p.effective_markup_pct) + delta));
+      try {
+        await productApi.markup(p.id, novo);
+        ok++;
+      } catch {
+        // segue para a próxima; o total mostra quantas foram
+      }
+    }
+    setMassa(`Markup ajustado em ${ok} de ${pecas.length} peças.`);
+    setSelecao(new Set());
+    carregar();
+  }
+
   return (
     <>
-      <section className="grid gap-4 rounded-[20px] bg-teal-dark p-[22px] text-white md:grid-cols-[auto_1fr] md:items-center">
-        <div className="flex flex-wrap items-center gap-2.5 text-[14px]">
-          <Bloco titulo="Atacado Lilly" valor="custo" />
-          <span className="text-[20px] text-teal-pale">+</span>
-          <Bloco titulo="Seu lucro" valor="markup %" />
-          <span className="text-[20px] text-teal-pale">=</span>
-          <Bloco titulo="Preço na loja" valor="o que a cliente paga" destaque />
-        </div>
-        <p className="m-0 text-[13.5px] leading-relaxed text-[#BFE3DF]">
-          <strong className="text-white">Como o seu preço é calculado:</strong> custo de atacado × (1 + markup). Padrão de 200% — uma peça de R$ 23 sai a
-          R$ 69. Mude o markup de cada peça no editor; quando a Lilly mexe no custo mais de 30%, o preço não muda sozinho e vira alerta aqui.
-        </p>
-      </section>
+      <PainelPreco cats={cats} mudou={() => { carregarCats(); carregar(); }} />
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button type="button" onClick={() => setModal("categorias")} className={botaoClaro}>
+          <Tag size={15} /> Categorias
+        </button>
+        <Link to="/admin/sincronizacao#fila" className={botaoClaro}>
+          <Download size={15} /> Importar da Lilly
+        </Link>
+        <button type="button" onClick={() => setModal("novo")} className="flex cursor-pointer items-center gap-1.5 rounded-full border-none bg-teal px-4 py-2.5 text-[13.5px] font-semibold text-white hover:bg-teal-dark">
+          <Plus size={15} /> Novo produto
+        </button>
+      </div>
 
       <div className="flex gap-2 overflow-x-auto border-b border-line pb-0 [scrollbar-width:none]">
-        {[{ key: "", label: "Todas" }, ...CATEGORIAS.map((c) => ({ key: c, label: CATEGORY_LABEL[c] }))].map((c) => {
+        {[{ key: "", label: "Todas", n: 0 }, ...cats.map((c) => ({ key: c.slug, label: c.label, n: c.count }))].map((c) => {
           const ativa = categoria === c.key;
           return (
             <button
@@ -112,6 +142,7 @@ export default function Produtos() {
               }`}
             >
               {c.label}
+              {c.n > 0 && <span className="ml-1.5 text-[12px] font-normal text-muted">{c.n}</span>}
             </button>
           );
         })}
@@ -137,6 +168,39 @@ export default function Produtos() {
             { value: "despublicados", label: "Despublicadas" },
             { value: "alerta", label: "Com alerta de preço" },
             { value: "destaque", label: "Na home (destaque)" },
+            { value: "margem", label: "Lucro abaixo do mínimo" },
+          ]}
+        />
+        <Select
+          value={params.get("preco") ?? ""}
+          active={Boolean(params.get("preco"))}
+          onChange={(v) => setParam({ preco: v })}
+          options={[
+            { value: "", label: "Preço: todos" },
+            { value: "ate60", label: "Até R$ 60" },
+            { value: "60a100", label: "R$ 60–100" },
+            { value: "acima100", label: "+ R$ 100" },
+          ]}
+        />
+        <Select
+          value={params.get("vitrine") ?? ""}
+          active={Boolean(params.get("vitrine"))}
+          onChange={(v) => setParam({ vitrine: v })}
+          options={[
+            { value: "", label: "Vitrine: todas" },
+            { value: "capa", label: "Na capa" },
+            { value: "home", label: "Na home" },
+            { value: "fora", label: "Fora da vitrine" },
+          ]}
+        />
+        <Select
+          value={params.get("vendas") ?? ""}
+          active={Boolean(params.get("vendas"))}
+          onChange={(v) => setParam({ vendas: v })}
+          options={[
+            { value: "", label: "Vendas: todas" },
+            { value: "promocao", label: "Em promoção" },
+            { value: "parados", label: "Paradas 30d+" },
           ]}
         />
         <Select
@@ -158,11 +222,19 @@ export default function Produtos() {
           <strong className="mr-2">
             {selecao.size} {selecao.size === 1 ? "selecionada" : "selecionadas"}
           </strong>
+          <button type="button" onClick={() => void ajustarLucro(10)} className="cursor-pointer rounded-full border-none bg-white/12 px-3.5 py-2 font-semibold text-white hover:bg-white/20">
+            +10% lucro
+          </button>
+          <button type="button" onClick={() => void ajustarLucro(-10)} className="cursor-pointer rounded-full border-none bg-white/12 px-3.5 py-2 font-semibold text-white hover:bg-white/20">
+            −10% lucro
+          </button>
           {[
-            { t: "Publicar", b: { published: true } },
-            { t: "Despublicar", b: { published: false } },
+            { t: "Ativar", b: { published: true } },
+            { t: "Desativar", b: { published: false } },
             { t: "Colocar na home", b: { featured: true } },
             { t: "Tirar da home", b: { featured: false } },
+            { t: "Promoção 15% por 7 dias", b: { promo_pct: 15, promo_days: 7 } },
+            { t: "Aplicar markup padrão", b: { inherit_markup: true } },
           ].map((a) => (
             <button key={a.t} type="button" onClick={() => void emMassa(a.b)} className="cursor-pointer rounded-full border-none bg-white/12 px-3.5 py-2 font-semibold text-white hover:bg-white/20">
               {a.t}
@@ -270,18 +342,24 @@ export default function Produtos() {
       )}
 
       {abrir && <ProdutoDrawer id={abrir} fechar={() => setParam({ abrir: "" })} mudou={carregar} />}
+      {modal === "categorias" && <CategoriasModal fechar={() => setModal(null)} mudou={() => { carregarCats(); carregar(); }} />}
+      {modal === "novo" && (
+        <NovoProduto
+          cats={cats}
+          fechar={() => setModal(null)}
+          criado={(id) => {
+            setModal(null);
+            carregar();
+            setParam({ abrir: id });
+          }}
+        />
+      )}
     </>
   );
 }
 
-function Bloco({ titulo, valor, destaque = false }: { titulo: string; valor: string; destaque?: boolean }) {
-  return (
-    <span className={`grid rounded-xl px-3.5 py-2 ${destaque ? "bg-teal" : "bg-white/8"}`}>
-      <strong className="text-[13.5px]">{titulo}</strong>
-      <span className="text-[11.5px] text-teal-pale">{valor}</span>
-    </span>
-  );
-}
+const botaoClaro =
+  "flex cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] border-line bg-white px-4 py-2.5 text-[13.5px] font-semibold text-teal hover:border-teal hover:text-teal";
 
 function Linha({ p, abrir, mudou, marcada, marcar }: { p: AdminProduct; abrir: () => void; mudou: () => void; marcada: boolean; marcar: (v: boolean) => void }) {
   const [salvando, setSalvando] = useState(false);
@@ -311,7 +389,14 @@ function Linha({ p, abrir, mudou, marcada, marcar }: { p: AdminProduct; abrir: (
         <span className="grid min-w-0">
           <span className="truncate font-medium text-text">{p.name}</span>
           <span className="text-[12px] text-muted">
-            {CATEGORY_LABEL[p.category as keyof typeof CATEGORY_LABEL] ?? p.category} · {p.units_sold} vendidas
+            {rotuloCategoria(p.category)} · {p.units_sold} vendidas
+            {p.last_sale_days !== null && p.last_sale_days >= 30 && ` · parado ${p.last_sale_days}d`}
+          </span>
+          <span className="flex flex-wrap gap-1">
+            {p.promo_pct > 0 && <Selo cor="teal">−{p.promo_pct}%</Selo>}
+            {!p.available && <Selo cor="alerta">esgotada na Lilly</Selo>}
+            {p.showcase.length > 0 && <Selo>home</Selo>}
+            {p.manual && <Selo>manual</Selo>}
           </span>
           {falhou && <span className="text-[12px] text-[#B4443C]">{falhou}</span>}
         </span>
@@ -328,7 +413,9 @@ function Linha({ p, abrir, mudou, marcada, marcar }: { p: AdminProduct; abrir: (
       <span className="font-semibold">{formatarBRL(p.price_cents)}</span>
       <span className="grid">
         <span className="font-semibold text-success">{formatarBRL(lucro)}</span>
-        <span className="text-[12px] text-muted">{margem}% · markup {Math.round(p.markup_pct)}%</span>
+        <span className="text-[12px] text-muted">
+          {margem}% · markup {Math.round(p.effective_markup_pct)}%{p.markup_pct === null ? "" : " (da peça)"}
+        </span>
       </span>
       <span>
         {p.suggested_price_cents !== null ? (
@@ -350,4 +437,9 @@ function Linha({ p, abrir, mudou, marcada, marcar }: { p: AdminProduct; abrir: (
       </span>
     </div>
   );
+}
+
+function Selo({ children, cor }: { children: React.ReactNode; cor?: "teal" | "alerta" }) {
+  const c = cor === "teal" ? "bg-teal text-white" : cor === "alerta" ? "bg-[#FFF4E0] text-[#9A6B12]" : "bg-mist text-teal";
+  return <span className={`rounded-full px-2 py-px text-[10.5px] font-bold ${c}`}>{children}</span>;
 }

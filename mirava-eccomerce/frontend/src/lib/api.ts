@@ -13,16 +13,20 @@ if (!BASE_URL) {
 
 const TOKEN_KEY = "mirava.token";
 
-export function saveToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+/** "Lembrar de mim" desmarcado: a sessão fica só nesta aba (sessionStorage)
+ *  e some quando o navegador fecha. */
+export function saveToken(token: string, remember = true) {
+  clearToken();
+  (remember ? localStorage : sessionStorage).setItem(TOKEN_KEY, token);
 }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
 }
 
 export function currentToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
 }
 
 export class ApiError extends Error {

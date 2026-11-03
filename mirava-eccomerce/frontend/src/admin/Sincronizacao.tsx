@@ -1,25 +1,28 @@
-// Sincronização com a Use Lilly (v5): estado do espelho do catálogo, regras
-// em vigor (vindas do domínio), histórico das leituras e as falhas da última
-// rodada com problema.
-//
-// Sem botão "sincronizar agora" por enquanto: a leitura lê ~2 mil páginas do
-// site da Lilly com pausa entre elas e roda pelo agendador (POST
-// /tarefas/sincronizar). Disparar pelo navegador pede uma fila de tarefas
-// para não rodar duas ao mesmo tempo — fica para a próxima fase.
+// Sincronização com a Use Lilly (v5): alertas de preço, conexão (testar e
+// sincronizar agora — a trava no servidor impede duas leituras juntas),
+// regras editáveis, fila "novos na Lilly", mapeamento de categorias, estado
+// do espelho, histórico das leituras e as falhas da última rodada.
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Clock, ExternalLink, XCircle } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
-import { reportApi, type SyncData, type SyncRun } from "./api";
+import { lojaApi, reportApi, type StoreSettings, type SyncData, type SyncRun } from "./api";
+import { AlertasPreco, ConexaoERegras, Mapeamento, NovosNaLilly } from "./SincronizacaoExtras";
 
 export default function Sincronizacao() {
   const [dados, setDados] = useState<SyncData | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [st, setSt] = useState<StoreSettings | null>(null);
 
   useEffect(() => {
     reportApi.sync().then(setDados).catch((e: Error) => setErro(e.message));
+    lojaApi.settings().then(setSt).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (dados && window.location.hash === "#fila") document.getElementById("fila")?.scrollIntoView({ behavior: "smooth" });
+  }, [dados]);
 
   if (erro) return <p className="m-0 rounded-[20px] bg-[#FDECEC] p-4 text-[#B4443C]">{erro}</p>;
   if (!dados) return <p className="m-0 text-muted">Carregando…</p>;
@@ -29,6 +32,7 @@ export default function Sincronizacao() {
 
   return (
     <>
+      {st && <AlertasPreco st={st} />}
       <section className="flex flex-wrap items-center gap-5 rounded-[20px] border border-line bg-white p-[22px]">
         <span className="grid h-[60px] w-[60px] place-items-center rounded-2xl bg-teal-dark font-logo text-[13px] tracking-[0.18em] text-white">LILLY</span>
         <div className="grid flex-1 gap-1">
@@ -50,14 +54,26 @@ export default function Sincronizacao() {
         <Stat label="Alertas de preço" valor={o.price_alerts} nota="travados pelo disjuntor" to="/admin/produtos?status=alerta" alerta={o.price_alerts > 0} />
       </section>
 
+      {st && (
+        <ConexaoERegras
+          st={st}
+          salvar={async (n) => {
+            await lojaApi.saveSettings(n);
+            setSt(n);
+          }}
+        />
+      )}
+      <NovosNaLilly />
+      <Mapeamento />
+
       <section className="grid gap-3 rounded-[20px] border border-line bg-white p-[22px]">
-        <strong className="text-[16px] text-text">Regras em vigor</strong>
+        <strong className="text-[16px] text-text">Regras fixas</strong>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <Regra titulo="Disjuntor de preço" texto={`Se o preço calculado variar mais de ${Math.round(rules.variation_limit_pct)}%, não muda sozinho: vira alerta para você aceitar ou recusar.`} />
-          <Regra titulo="Peça nova" texto="Entra no catálogo despublicada. Você revisa nome, descrição e preço antes de publicar." />
+          <Regra titulo="Peça nova" texto={st?.auto_import ? "Entra na loja sozinha, com o markup da categoria ou o padrão. Desligue a importação automática para revisar antes." : "Fica na fila “Novos na Use Lilly” até você importar ou ignorar."} />
           <Regra titulo="Lote de compra" texto={`Fecha em ${formatarBRL(rules.batch_goal_cents)} de atacado ou quando o pedido mais antigo faz ${rules.batch_days_cap} dias úteis.`} />
         </div>
-        <span className="text-[12.5px] text-muted">A leitura roda sozinha pelo agendador, uma vez a cada 6 horas, com pausa entre as páginas para não sobrecarregar o site da Lilly.</span>
+        <span className="text-[12.5px] text-muted">A leitura roda sozinha pelo agendador na frequência escolhida acima, com pausa entre as páginas para não sobrecarregar o site da Lilly.</span>
       </section>
 
       <section className="overflow-x-auto rounded-[20px] border border-line bg-white">

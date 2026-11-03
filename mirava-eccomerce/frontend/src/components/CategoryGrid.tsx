@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CATEGORY_LABEL, MENU_CATEGORIES } from "../catalogo/tipos";
+import { useCategorias } from "../catalogo/categorias";
 import { listProducts, imageUrl } from "../catalogo/consultas";
 import { img } from "../lib/images";
 import SectionHeading from "./SectionHeading";
@@ -23,11 +23,13 @@ const ARTE: Record<string, string> = {
 
 export default function CategoryGrid() {
   const [fotos, setFotos] = useState<Record<string, string | null>>({});
+  const cats = useCategorias().filter((c) => c.slug !== "outros");
+  const slugs = cats.map((c) => c.slug).join(",");
 
   useEffect(() => {
     let ativo = true;
     void Promise.all(
-      MENU_CATEGORIES.map(async (c) => {
+      slugs.split(",").filter(Boolean).map(async (c) => {
         try {
           const pecas = await listProducts({ category: c, limit: 8 });
           return [c, imageUrl(pecas.find((p) => imageUrl(p.images[0]))?.images[0])] as const;
@@ -39,13 +41,13 @@ export default function CategoryGrid() {
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [slugs]);
 
   return (
     <section className="mx-auto max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-[72px]">
       <SectionHeading eyebrow="Explore" title="Encontre a sua joia" align="center" />
       <div className="grid auto-cols-[minmax(112px,1fr)] grid-flow-col gap-[18px] overflow-x-auto pb-2 [scrollbar-width:none]">
-        {MENU_CATEGORIES.map((c) => {
+        {cats.map(({ slug: c, label }) => {
           const foto = fotos[c] ?? ARTE[c];
           return (
             <Link key={c} to={`/categoria/colecoes/${c}`} className="group flex flex-col items-center gap-3 text-text hover:text-teal">
@@ -54,7 +56,7 @@ export default function CategoryGrid() {
                   {foto && <img src={foto} alt="" loading="lazy" className="h-full w-full object-cover" />}
                 </span>
               </span>
-              <span className="text-[11.5px] font-semibold tracking-[0.16em] uppercase">{CATEGORY_LABEL[c]}</span>
+              <span className="text-[11.5px] font-semibold tracking-[0.16em] uppercase">{label}</span>
             </Link>
           );
         })}

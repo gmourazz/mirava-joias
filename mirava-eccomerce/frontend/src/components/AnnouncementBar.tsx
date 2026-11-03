@@ -2,12 +2,24 @@
 // avisos separados por ✦. A lista vai duas vezes e o trilho anda -50%, então
 // o loop nunca "pula". Pausa no hover. Não é sticky: quem gruda no topo é o
 // header.
+//
+// Os textos vêm do painel (Vitrine → avisos do topo). Enquanto a API não
+// responde, ou se não houver aviso ativo, ficam os de data/content.ts.
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ANNOUNCEMENTS } from "../data/content";
+import { announcements } from "../lib/extras";
 
 export default function AnnouncementBar() {
-  const track = [...ANNOUNCEMENTS, ...ANNOUNCEMENTS, ...ANNOUNCEMENTS, ...ANNOUNCEMENTS];
+  const [avisos, setAvisos] = useState<{ text: string }[]>([...ANNOUNCEMENTS]);
+  useEffect(() => {
+    announcements()
+      .then((list) => {
+        if (list && list.length > 0) setAvisos(list);
+      })
+      .catch(() => {});
+  }, []);
+  const track = [...avisos, ...avisos, ...avisos, ...avisos];
 
   return (
     <div className="esteira flex h-[38px] items-center overflow-hidden bg-teal text-[13px] font-medium text-white">

@@ -11,12 +11,15 @@ import PresentesSection from "../components/PresentesSection";
 import AjudaSection from "../components/AjudaSection";
 import Faq from "../components/Faq";
 import Reveal from "../components/Reveal";
+import QuemUsaAma from "../components/QuemUsaAma";
+import GaleriaInstagram from "../components/GaleriaInstagram";
+import { NovidadesSecao } from "../components/Novidades";
 
 // Home do design v5 (mirava-novo-design/Mirava Site v5.dc.html), na mesma
-// ordem do protótipo. Ficam de fora as seções que dependem de algo que ainda
-// não existe: avaliações de clientes e a grade do Instagram (decisão 28) e a
-// newsletter, que prometia cupom sem haver cadastro nem cupom no backend.
-// O FAQ aqui mostra só as primeiras perguntas e leva à página completa.
+// ordem do protótipo. Avaliações e Instagram só aparecem com dado real
+// (avaliação aprovada, foto enviada pelo painel — decisão 28); a seção de
+// novidades dá o BEMVINDA10 (decisão 34). O FAQ aqui mostra só as primeiras
+// perguntas e leva à página completa.
 export default function Home() {
   const { hash } = useLocation();
 
@@ -37,8 +40,11 @@ export default function Home() {
       <Reveal><BerloquesSection /></Reveal>
       <Reveal><CompraSegura /></Reveal>
       <Reveal><PresentesSection /></Reveal>
+      <Reveal><QuemUsaAma /></Reveal>
+      <Reveal><GaleriaInstagram /></Reveal>
       <Reveal><AjudaSection /></Reveal>
       <Faq />
+      <Reveal><NovidadesSecao /></Reveal>
     </div>
   );
 }

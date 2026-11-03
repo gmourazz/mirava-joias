@@ -6,6 +6,7 @@ import { useProducts } from "../catalogo/hooks";
 import { imageUrl } from "../catalogo/consultas";
 import { img } from "../lib/images";
 import { freeShippingAbove } from "../lib/frete";
+import { LOJA } from "../config/loja";
 import { formatarBRL, temDescontoPix, textoParcelas, textoPix } from "../lib/dinheiro";
 
 // Sacola do design v5: painel flutuante com cantos arredondados, barra de
@@ -15,7 +16,7 @@ import { formatarBRL, temDescontoPix, textoParcelas, textoPix } from "../lib/din
 // checkout, pela API.
 
 export default function CartDrawer() {
-  const { cartOpen, closeCart, items, addItem, removeItem, updateQuantity, subtotalCents, itemCount } = useCart();
+  const { cartOpen, closeCart, items, addItem, removeItem, updateQuantity, subtotalCents, itemCount, giftWrap, setGiftWrap } = useCart();
   const navigate = useNavigate();
 
   // O limite do frete grátis vem da API, não de constante daqui: é o mesmo
@@ -205,6 +206,10 @@ export default function CartDrawer() {
               <span className="text-muted">{textoParcelas(subtotalCents)}</span>
               {temDescontoPix && <span className="font-semibold text-teal">{textoPix(subtotalCents)}</span>}
             </div>
+            <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-[13.5px] text-text-2">
+              <input type="checkbox" checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)} className="h-4 w-4 accent-teal" />
+              Embrulhar para presente com cartão (+ {formatarBRL(LOJA.embrulhoCentavos)})
+            </label>
             <p className="m-0 mt-2 text-[12px] text-muted">Frete calculado pelo CEP na finalização.</p>
 
             <button
