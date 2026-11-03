@@ -158,8 +158,9 @@ React 19 + TypeScript + Vite + Tailwind v4 + lucide-react + react-router-dom.
 - **Rotas** em `src/App.tsx`. Hoje: `/`, `/categoria/:menuKey/:filter`
   (preço e ordem em `?ate=`, `?de=`, `?ordem=`), `/produto/:slug`, `/busca`,
   `/checkout`, `/pedido/:id`, `/rastreio` (acompanhar sem login: número +
-  e-mail), `/conta` (aba em `?aba=`, inclui favoritos), `/perguntas-frequentes`,
-  `/politicas/:aba` e o painel `/admin/*` (`src/admin/`; `/gestao` redireciona
+  e-mail), `/conta` (aba em `?aba=`: pedidos, favoritos, clube, avaliar,
+  cupons, trocas…), `/redefinir-senha` (link do "esqueci minha senha"),
+  `/perguntas-frequentes`, `/politicas/:aba` e o painel `/admin/*` (`src/admin/`; `/gestao` redireciona
   para lá). Checkout, conta e painel não têm a moldura da loja (faixa, header,
   rodapé) — lista `SEM_MOLDURA` no `App.tsx`.
 - **API**: `src/lib/api.ts` é o único cliente HTTP — todo dado vem da API Go
@@ -173,6 +174,17 @@ React 19 + TypeScript + Vite + Tailwind v4 + lucide-react + react-router-dom.
 - **Carrinho**: `src/context/CartContext.tsx` guarda itens, quantidade e
   subtotal em localStorage (só para exibir — o preço cobrado é recalculado no
   servidor).
+- **Descontos, Club, avaliações, trocas, vitrine e avisos** (decisão 31):
+  chamadas da loja em `src/lib/extras.ts`, do painel em `growthApi`
+  (`src/admin/api.ts`). O checkout mostra o total que `POST /checkout/previa`
+  devolve — nunca calcula desconto no front. Cupom e pontos não somam; teto de
+  30% das peças; embrulho R$5,00. Regras em `api/internal/dominio/descontos.go`.
+- **Promoção, kit, Pix e markup em camadas** (decisões 21, 32-34): a conta do
+  pedido inteiro é `dominio.PriceOrder` (`preco_pedido.go`); o catálogo devolve
+  `price_cents` já com a promoção e `list_price_cents`/`promo_pct` para o preço
+  riscado. Categorias vêm de `GET /categorias` (`src/catalogo/categorias.ts`) —
+  editáveis no painel, não são mais lista fixa. Fotos do painel vão por
+  `uploadImage` (`src/admin/api.ts`) para `/images/uploads/` (decisão 35).
 - **Políticas**: textos em `src/data/politicas.ts`. Privacidade e Termos são
   rascunhos sem revisão jurídica (`revisado: false`, mostram aviso de versão
   preliminar).

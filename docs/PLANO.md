@@ -847,18 +847,18 @@ Regras que o admin respeita, mesmo onde o protótipo diverge: máquina de estado
 - [x] Drawer do pedido: itens com custo congelado, cliente, endereço, prazo, linha do tempo vinda de `order_events`.
 - [x] Ações de transição pela API (`POST /admin/pedidos/{id}/transicao`), validadas pela máquina de estados no Go **e** no SQL: recebi da Lilly, entregue, cancelar, estornar, sem estoque — com confirmação nas que encerram o pedido. Despacho com rastreio no formato dos Correios (`POST /admin/pedidos/{id}/despachar`).
 - [x] "Lista de compras Lilly" por lote: peças agrupadas por SKU, total no atacado, **barra até R$300 e idade do pedido mais antigo** (decisão 23), copiar lista, exportar CSV, "já comprei tudo" (`PurchaseBatch`) e "recebi as peças" (`ReceiveBatch`).
-- [ ] Agenda de despachos dos próximos 10 dias úteis.
+- [x] Agenda de despachos dos próximos 10 dias úteis (feita no fechamento do design v5).
 - [x] Etiqueta + declaração de conteúdo para imprimir (endereço real do pedido; remetente em branco até o endereço da loja ser cadastrado).
 
 **Entrega:** o sábado de despacho acontece inteiro pelo painel.
 
 ### Fase C — Catálogo · 4 a 6 dias
 
-- [x] Tabela de produtos paginada no servidor, com busca por nome/SKU, abas de categoria e filtros (status, banho), publicar e destaque na home direto na linha. *(Falta: seleção em massa.)*
+- [x] Tabela de produtos paginada no servidor, com busca por nome/SKU, abas de categoria e filtros (status, banho), publicar e destaque na home direto na linha. Seleção em massa feita no fechamento do design v5.
 - [x] Editor do produto: nome, descrição e markup da peça — o preço sai de `dominio.PriceFromMarkup`, com teste, igual à conta do SQL. *(Falta: foto própria, SEO e checklist antes de publicar.)*
 - [ ] Markup por categoria e padrão global (precisa de tabela; hoje o markup é por peça).
 - [x] Alertas de preço do disjuntor: aceitar ou recusar o `suggested_price_cents` no editor. *(Falta: fila "novos na Lilly".)*
-- [ ] Vitrine da loja: escolher e ordenar as peças da capa, das queridinhas, de lançamentos e de presentes (precisa de tabela de vitrine; hoje só existe `featured`).
+- [x] Vitrine da loja: queridinhas, lançamentos e presentes escolhidos e ordenados no painel (tabela `showcase_items`, bloco 3). A capa continua com `featured`.
 
 **Entrega:** a dona publica peça nova e ajusta preço sem abrir o banco.
 
@@ -876,20 +876,52 @@ Feito sem regra nova de negócio:
 - [x] Loja: "Espiar peça" (janela rápida no card), selo "Novo" e aba/rota Lançamentos (peça cadastrada há até 30 dias, `dominio.IsNewProduct`), favoritos na conta (tabela `favorites`, coração no card, na página da peça e no header) e "Acompanhar pedido" sem login em `/rastreio` — exige número **e** e-mail da compra, para o número sequencial não expor pedido alheio.
 - [x] Admin: agenda de despachos dos próximos 10 dias úteis (`dominio.ShipBy`, com o transporte da modalidade até o estado), sino de notificações e busca no topo, seleção em massa em Produtos (publicar, home, markup), Clientes, Atividades (de `order_events`) e Configurações (só leitura).
 
-Fica para decisão (precisa de regra nova, parte mexe com dinheiro): cupons, promoções, kits e "compre junto", Mirava Club, cartão salvo, embrulho para presente, vitrine por espaço, banners editáveis, trocas com etapas, avaliações, avise-me, carrinho abandonado, automações por e-mail e guia de tamanhos (falta a medida da Lilly).
+### Bloco 3 — descontos, Club e marketing (03/11/2026, decisão 31)
+
+- [x] **Cupons** (% ou valor fixo, mínimo, validade, limite de usos; um por pedido; nunca sobre o frete) — tela Cupons no painel, campo no checkout.
+- [x] **Mirava Club**: 1 ponto por R$1 em peças, creditado na entrega; 100 pontos = R$5; níveis Brilho/Encanto/Joia Rara; aba na conta e opção "usar meus pontos" no checkout. Cupom e pontos não somam; teto de 30% das peças em qualquer desconto.
+- [x] **Embrulho para presente** (R$5,00 + mensagem de até 200 caracteres) — aparece no drawer do pedido e sai na folha da etiqueta como cartão.
+- [x] Checkout com prévia do servidor (`POST /checkout/previa`): a tela nunca calcula desconto. No Mercado Pago, pedido com desconto vira uma linha só de peças.
+- [x] **Avaliações reais**: só quem recebeu a peça avalia; aparecem na página do produto depois de aprovadas no painel.
+- [x] **Avise-me** em peça indisponível, com lista no painel.
+- [x] **Trocas com etapas** (solicitada → aguardando envio → recebida → concluída, ou recusada), pedidas pela conta em até 7 dias da entrega.
+- [x] **Vitrine e avisos editáveis**: queridinhas, lançamentos e presentes escolhidos e ordenados no painel; faixa do topo editável. Espaço vazio volta para a regra automática.
+- [x] **Automações por e-mail**: lembrete de pagamento, carrinho abandonado (a sacola da cliente logada é salva no servidor), pedir avaliação, avise-me e andamento da troca — liga/desliga no painel.
+- [x] Financeiro passa a descontar cupons/pontos e somar embrulhos (`dominio.MonthlyFinance`, com teste).
+- [ ] Ligar o Resend e criar o job do Cloud Scheduler de `/tarefas/automacoes` (ver `api/README.md`).
+- [ ] Aplicar `db/alter-design-v5.sql` no banco que já tem dados.
+
+### Design v5 completo (03/11/2026, decisões 21, 27 e 32 a 35)
+
+- [x] **Promoções programadas** (site todo, categoria ou peças; preço riscado) e **kits "compre junto"** — promoção e kit não somam; tudo junto com cupom, pontos e Pix nunca passa de 30% do preço cheio (`dominio.PriceOrder`, com teste).
+- [x] **Pix com 5%** escolhido no checkout (Pix, cartão ou boleto); o Mercado Pago abre só com a forma escolhida (`mercadopago.ExcludedPaymentTypes`, com teste).
+- [x] **BEMVINDA10** (primeira compra, uma vez por cliente) no pop-up, na home e no cadastro; **Encanto** do Club com PAC grátis.
+- [x] **Markup em camadas** (peça > categoria > padrão) e **arredondar para ,90**, em Go e SQL iguais (`EffectiveMarkup`, `RoundTo90`, com teste); calculadora e "lucro por categoria" em Produtos; "salvar e recalcular preços".
+- [x] **Categorias editáveis** (renomear, ordenar, criar, excluir vazia) — o menu da loja segue a ordem do painel.
+- [x] **Produto**: novo produto manual, foto própria (upload), "manter minhas fotos", onde aparece na loja, SEO com prévia do Google, checklist antes de publicar, filtros de preço/vitrine/vendas, promoção rápida e ±10% de lucro em massa.
+- [x] **Sincronização**: alertas de preço (disjuntor e lucro mínimo), testar conexão, sincronizar agora, frequência, esgotados (mostrar/ocultar), importar sozinho ou fila "novos na Lilly", fotos e textos protegidos, mapeamento de categorias.
+- [x] **Automações**: texto editável com variáveis, prévia e "enviar teste".
+- [x] **Marketing**: sacolas abandonadas (lembrete manual e taxa de recuperação), promoções, kits, avise-me com "avisar clientes", calendário de datas (com lembrete .ics) e cadastros de novidades (CSV).
+- [x] **Banners da home e galeria do Instagram** com foto enviada pelo painel; faixa de avisos.
+- [x] **Clientes**: nível do Club, etiquetas, anotações, filtros e "enviar cupom".
+- [x] **Configurações**: dados da loja, remetente da etiqueta, metas do mês, calcular frete por CEP e equipe (papel de despacho).
+- [x] **Financeiro**: metas do mês e taxas por forma de pagamento. **Visão geral**: alertas de estoque, mais vendidos e próxima sincronização. **Pedido**: avisos enviados à cliente.
+- [x] **Loja**: preço riscado, "N pessoas compraram esta semana" (venda real), compre junto, guia de tamanhos, % que recomendam e compra verificada, "Quem usa, ama", Instagram, novidades, esqueci minha senha, lembrar de mim, Meus cupons, aniversário e preferências, nível e pontos na conta, "escolhidas pra você", embrulho já na sacola.
+- [ ] Aplicar `db/alter-design-v5.sql` no banco que já tem dados (agora inclui a seção 09).
+- [ ] Ligar o Resend; trocar o job de sincronização para `/tarefas/sincronizar-se-devido` (a cada hora) e criar o de `/tarefas/automacoes` (ver `api/README.md`).
+- [ ] Se for para o Cloud Run: volume para `UPLOADS_DIR` (fotos enviadas pelo painel).
+
+Ficou de fora de propósito (decisões registradas): formulário de cartão e cartão salvo (decisão 25 — pagamento no Mercado Pago), "Continuar com Google" (precisa da credencial OAuth), WhatsApp como canal (decisão 30 — atendimento por e-mail), avaliações/fotos/números inventados do protótipo (decisão 28) e a tela de QR do Pix no nosso site (o Checkout Pro mostra). O custo real do embrulho ainda não é registrado (o financeiro conta os R$5 inteiros como lucro).
 
 ### Fase E — Crescimento · depois do lançamento, cada item é backend novo
 
 Fica para quando a loja estiver vendendo, porque cada item precisa de tabela e regra nova:
 
-- Clientes (lista, etiquetas, anotações)
-- Cupons e promoções agendadas (com regra no checkout, em centavos e com teste)
+- Etiquetas e anotações de cliente
+- Promoções agendadas
 - Kits e combos
-- Automações de WhatsApp/e-mail (depende de decidir o canal — hoje a loja só atende por e-mail)
-- Carrinho abandonado, avise-me, avaliações
-- Trocas e devoluções com etapas
-- Banners e avisos editáveis (CMS da faixa e da capa)
-- Atividades (auditoria) e papel de despacho
+- Automações por WhatsApp (o e-mail já está feito no bloco 3)
+- Papel de despacho
 
 ### Antes de começar a Fase B, decidir
 
