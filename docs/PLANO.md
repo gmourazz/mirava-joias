@@ -823,6 +823,80 @@ Isso te protege sem prometer o que você não pode cumprir. **Vale passar num ad
 
 ---
 
+## 15. Painel admin do design v5 — fases
+
+**Data:** 03/11/2026 · **Referência:** `mirava-novo-design/Mirava Admin.dc.html` (decisão 19 da arquitetura)
+
+O protótipo tem 14 seções. Nem todas valem o mesmo: algumas são a operação do dia a dia (sem elas a loja não roda), outras são crescimento (cupom, automação, avaliação) e precisam de backend que ainda não existe. A ordem abaixo segue o princípio do resto do plano: **cada fase termina em algo que a dona usa**, e o que mexe com dinheiro vem com teste primeiro.
+
+O que o banco já tem e o admin vai aproveitar: `admins`, `batches` (lote, com status), `orders` + `order_events`, `products` com `published`, `featured` e `suggested_price_cents` (o disjuntor), `supplier_products` (espelho da Lilly), `price_rules`, `syncs` e `sync_failures`.
+
+Regras que o admin respeita, mesmo onde o protótipo diverge: máquina de estados completa (decisão 26), lote de R$300 ou 5 dias úteis (decisão 23), markup padrão 200% com sobrescrita por categoria e produto (decisão 21), disjuntor de 30% junto com os alertas de lucro mínimo (decisão 24), só papel master por enquanto (decisão 27). Dinheiro sempre em centavos — o protótipo calcula em float.
+
+### Fase A — Fundação · 2 a 3 dias
+
+- [x] Login de admin de verdade: a mesma sessão da cliente + checagem na tabela `admins` num middleware Go (`requireAdmin`). Sai o `CRON_SECRET` do navegador (`/gestao` removida).
+- [x] Rotas `/admin/*` no front, sem a moldura da loja: sidebar teal-escura com o selo MASTER e topbar. (Busca e sino do protótipo ficam para depois.)
+- [x] Visão geral: card "Precisa da sua atenção" (atrasados, perto do prazo, comprar na Lilly, prontos para despachar, sem estoque, aguardando pagamento, alertas de preço, despublicadas), KPIs do mês, vendas de 7/14 dias, estado da sincronização e pedidos recentes, tudo a partir do banco (`GET /admin/resumo`).
+
+**Entrega:** a dona entra em `/admin` com o próprio login e vê o que precisa fazer hoje.
+
+### Fase B — Pedidos e lote · 4 a 6 dias · ⚠️ a fase que mexe com a operação
+
+- [x] Lista de pedidos com as etapas do design (comprar na Lilly → na Lilly → para despachar → despachados → entregues), filtros (etapa, envio, prazo) e barra de prazo de 20 dias úteis calculada no domínio (`dominio.DeadlineFor`). Exporta CSV.
+- [x] Drawer do pedido: itens com custo congelado, cliente, endereço, prazo, linha do tempo vinda de `order_events`.
+- [x] Ações de transição pela API (`POST /admin/pedidos/{id}/transicao`), validadas pela máquina de estados no Go **e** no SQL: recebi da Lilly, entregue, cancelar, estornar, sem estoque — com confirmação nas que encerram o pedido. Despacho com rastreio no formato dos Correios (`POST /admin/pedidos/{id}/despachar`).
+- [x] "Lista de compras Lilly" por lote: peças agrupadas por SKU, total no atacado, **barra até R$300 e idade do pedido mais antigo** (decisão 23), copiar lista, exportar CSV, "já comprei tudo" (`PurchaseBatch`) e "recebi as peças" (`ReceiveBatch`).
+- [ ] Agenda de despachos dos próximos 10 dias úteis.
+- [x] Etiqueta + declaração de conteúdo para imprimir (endereço real do pedido; remetente em branco até o endereço da loja ser cadastrado).
+
+**Entrega:** o sábado de despacho acontece inteiro pelo painel.
+
+### Fase C — Catálogo · 4 a 6 dias
+
+- [x] Tabela de produtos paginada no servidor, com busca por nome/SKU, abas de categoria e filtros (status, banho), publicar e destaque na home direto na linha. *(Falta: seleção em massa.)*
+- [x] Editor do produto: nome, descrição e markup da peça — o preço sai de `dominio.PriceFromMarkup`, com teste, igual à conta do SQL. *(Falta: foto própria, SEO e checklist antes de publicar.)*
+- [ ] Markup por categoria e padrão global (precisa de tabela; hoje o markup é por peça).
+- [x] Alertas de preço do disjuntor: aceitar ou recusar o `suggested_price_cents` no editor. *(Falta: fila "novos na Lilly".)*
+- [ ] Vitrine da loja: escolher e ordenar as peças da capa, das queridinhas, de lançamentos e de presentes (precisa de tabela de vitrine; hoje só existe `featured`).
+
+**Entrega:** a dona publica peça nova e ajusta preço sem abrir o banco.
+
+### Fase D — Sincronização e financeiro · 3 a 4 dias
+
+- [x] Tela de sincronização: espelho da Lilly, regras em vigor, histórico (`syncs`, com leituras interrompidas marcadas) e falhas (`sync_failures`). *(Falta: botão "rodar agora", que precisa de fila para não rodar duas leituras juntas.)*
+- [x] Financeiro do mês: faturamento, custo Lilly, taxas reais do Mercado Pago (de `payments`), embalagem, frete dos lotes e lucro líquido (`dominio.MonthlyFinance`, com teste); lucro por categoria, peças que mais dão lucro, pedidos do mês e CSV. *(Falta: metas do mês.)*
+- [x] **Corrigido:** as 11 leituras de 13 a 16/08/2026 ficaram "running" porque o código gravava o status em português ("sucesso"/"parcial") depois da renomeação para inglês; o CHECK do banco recusava e o erro era ignorado. Agora os status moram no domínio (`dominio.SyncOutcome`), um teste confere contra o `schema.sql`, o erro do `FinishSync` vai para o log, o progresso é gravado a cada 50 páginas e só roda uma leitura por vez.
+- [ ] **Decidir antes de produção:** como a sincronização roda no Cloud Run (ver aviso no `api/README.md` — CPU só fica ligada durante a requisição).
+
+### Fechamento do design v5 (03/11/2026)
+
+Feito sem regra nova de negócio:
+
+- [x] Loja: "Espiar peça" (janela rápida no card), selo "Novo" e aba/rota Lançamentos (peça cadastrada há até 30 dias, `dominio.IsNewProduct`), favoritos na conta (tabela `favorites`, coração no card, na página da peça e no header) e "Acompanhar pedido" sem login em `/rastreio` — exige número **e** e-mail da compra, para o número sequencial não expor pedido alheio.
+- [x] Admin: agenda de despachos dos próximos 10 dias úteis (`dominio.ShipBy`, com o transporte da modalidade até o estado), sino de notificações e busca no topo, seleção em massa em Produtos (publicar, home, markup), Clientes, Atividades (de `order_events`) e Configurações (só leitura).
+
+Fica para decisão (precisa de regra nova, parte mexe com dinheiro): cupons, promoções, kits e "compre junto", Mirava Club, cartão salvo, embrulho para presente, vitrine por espaço, banners editáveis, trocas com etapas, avaliações, avise-me, carrinho abandonado, automações por e-mail e guia de tamanhos (falta a medida da Lilly).
+
+### Fase E — Crescimento · depois do lançamento, cada item é backend novo
+
+Fica para quando a loja estiver vendendo, porque cada item precisa de tabela e regra nova:
+
+- Clientes (lista, etiquetas, anotações)
+- Cupons e promoções agendadas (com regra no checkout, em centavos e com teste)
+- Kits e combos
+- Automações de WhatsApp/e-mail (depende de decidir o canal — hoje a loja só atende por e-mail)
+- Carrinho abandonado, avise-me, avaliações
+- Trocas e devoluções com etapas
+- Banners e avisos editáveis (CMS da faixa e da capa)
+- Atividades (auditoria) e papel de despacho
+
+### Antes de começar a Fase B, decidir
+
+- **Desconto do Pix:** o site anuncia 5% off, mas o checkout cobra o valor cheio (`discount` é sempre zero em `api/internal/web/checkout.go`). O financeiro do admin precisa saber qual é a regra de verdade.
+
+---
+
 ## Fontes
 
 - [Taxas Mercado Pago 2026](https://www.calculadoradetaxas.com.br/mercado-pago/taxas) · [Custo de Pix e QR Code](https://www.mercadopago.com.br/blog/quanto-custa-receber-pagamentos-via-pix-e-codigo-qr)

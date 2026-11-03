@@ -68,7 +68,9 @@ a peça é comprada na fornecedora depois, chega até a dona, que reembala e env
 - **Compra em lote:** pedidos pagos acumulam até R$300 (frete grátis atacado,
   Sudeste) ou até o pedido mais antigo fazer 5 dias úteis — o que vier primeiro.
   Despacho semanal, aos **sábados de manhã** (agência dos Correios).
-  Prazo prometido: 10 a 20 dias úteis.
+  Prazo prometido: até 20 dias úteis após o pagamento (decisão 22).
+- **Frete grátis para a cliente:** PAC acima de R$300; SEDEX sempre pago
+  (decisão 20). Regra independente do lote, apesar do mesmo valor.
 - **Conta obrigatória** para comprar (e-mail/senha, login próprio — ver seção
   auth abaixo). Mas `orders.user_id` é anulável e a regra vive em configuração
   (`frontend/src/config/loja.ts`) — é uma decisão reversível, não espalhe a
@@ -153,8 +155,13 @@ npm run lint      # oxlint
 
 React 19 + TypeScript + Vite + Tailwind v4 + lucide-react + react-router-dom.
 
-- **Rotas** em `src/App.tsx`. Hoje: `/`, `/categoria/:menuKey/:filter`,
-  `/produto/:slug`, `/conta`.
+- **Rotas** em `src/App.tsx`. Hoje: `/`, `/categoria/:menuKey/:filter`
+  (preço e ordem em `?ate=`, `?de=`, `?ordem=`), `/produto/:slug`, `/busca`,
+  `/checkout`, `/pedido/:id`, `/rastreio` (acompanhar sem login: número +
+  e-mail), `/conta` (aba em `?aba=`, inclui favoritos), `/perguntas-frequentes`,
+  `/politicas/:aba` e o painel `/admin/*` (`src/admin/`; `/gestao` redireciona
+  para lá). Checkout, conta e painel não têm a moldura da loja (faixa, header,
+  rodapé) — lista `SEM_MOLDURA` no `App.tsx`.
 - **API**: `src/lib/api.ts` é o único cliente HTTP — todo dado vem da API Go
   (`VITE_API_URL`), nunca de `supabase-js` (removido) nem de banco direto.
 - **Catálogo**: `src/catalogo/` (consultas, hooks, tipos) fala com a API Go.
@@ -163,16 +170,25 @@ React 19 + TypeScript + Vite + Tailwind v4 + lucide-react + react-router-dom.
 - **Imagens** via `src/lib/images.ts`, que mapeia seeds para arquivos em
   `src/assets/images/`. Para adicionar, ponha o arquivo lá, importe e registre
   no `POOL` — não inline base64 em componente.
-- **Carrinho**: `src/context/CartContext.tsx` hoje só abre e fecha o drawer.
-  Não existe item, quantidade nem total. É o próximo trabalho grande do front.
+- **Carrinho**: `src/context/CartContext.tsx` guarda itens, quantidade e
+  subtotal em localStorage (só para exibir — o preço cobrado é recalculado no
+  servidor).
+- **Políticas**: textos em `src/data/politicas.ts`. Privacidade e Termos são
+  rascunhos sem revisão jurídica (`revisado: false`, mostram aviso de versão
+  preliminar).
 - **Estilo**: Tailwind v4 sem `tailwind.config.js` — os tokens estão em
-  `src/index.css` sob `@theme`. Prefira os nomes do tema (`bg-wine`,
-  `font-serif`) a hex cru. Os valores arbitrários (`text-[13.5px]`,
+  `src/index.css` sob `@theme`. Prefira os nomes do tema (`bg-teal`,
+  `text-teal-dark`, `font-serif`) a hex cru; `wine`/`ink`/`blush` são nomes
+  antigos remapeados para o teal e saem conforme as telas são refeitas. Os valores arbitrários (`text-[13.5px]`,
   `px-[30px]`) são fidelidade proposital ao design original, não sujeira.
 - **Scroll-reveal**: use o componente `Reveal.tsx`, não animação CSS solta.
 - **Ícones**: lucide-react. A biblioteca não tem ícones de marca — `AtSign` é
   o substituto do Instagram. Não reintroduza SVG customizado para isso.
 
-**Paleta e tipografia** seguem a identidade da marca: rosa véu `#FFE5F0`,
-rosa forte `#D46A9F` (CTA), vinho `#8E3B6B` (texto). Fontes Marcellus,
-Italiana e Montserrat.
+**Paleta e tipografia** (decisão 19 da arquitetura, substitui a 18): o
+design de referência é `mirava-novo-design/Mirava Site v5.dc.html` (loja) e
+`Mirava Admin.dc.html` (painel) — os outros arquivos da pasta são rascunhos.
+Primária teal `#0F6E73`, escuro `#0B4A4D`, texto `#1A2B2C`, bordas `#E6EEED`.
+Títulos em DM Serif Display, texto em DM Sans, Bodoni Moda só no logotipo.
+Conteúdo fictício do protótipo (avaliações, prova social, fotos de clientes)
+não entra sem dado real (decisão 28).
