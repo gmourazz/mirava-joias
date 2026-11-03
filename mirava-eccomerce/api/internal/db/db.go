@@ -90,19 +90,22 @@ func unmarshalReviews(raw []byte, out *[]Review) error {
 }
 
 type CatalogProduct struct {
-	ID          string   `json:"id"`
-	Slug        string   `json:"slug"`
-	Name        string   `json:"name"`
-	Description *string  `json:"description"`
-	PriceCents  int      `json:"price_cents"`
-	Category    string   `json:"category"`
-	Metal       string   `json:"metal"`
-	Images      []string `json:"images"`
-	Featured    bool     `json:"featured"`
-	Rating      *float64 `json:"rating"`
-	RatingCount int      `json:"rating_count"`
-	Reviews     []Review `json:"reviews"`
-	Available   bool     `json:"available"`
+	ID          string  `json:"id"`
+	Slug        string  `json:"slug"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	PriceCents  int     `json:"price_cents"` // já com a promoção ativa
+	// Preço cheio e % da promoção (decisão 32): a loja mostra o cheio riscado.
+	ListPriceCents int      `json:"list_price_cents"`
+	PromoPct       int      `json:"promo_pct"`
+	Category       string   `json:"category"`
+	Metal          string   `json:"metal"`
+	Images         []string `json:"images"`
+	Featured       bool     `json:"featured"`
+	Rating         *float64 `json:"rating"`
+	RatingCount    int      `json:"rating_count"`
+	Reviews        []Review `json:"reviews"`
+	Available      bool     `json:"available"`
 	// Como chamar o grupo de opção desta peça: "Tamanho" num anel, "Letras"
 	// num colar de letra. Vazio quando a peça não tem escolha nenhuma.
 	VariantLabel *string          `json:"variant_label"`
@@ -112,6 +115,11 @@ type CatalogProduct struct {
 	IsNew     bool      `json:"is_new"`
 	CreatedAt time.Time `json:"-"`
 }
+
+// promoPriceSQL: preço com a promoção, preço cheio e o %, nesta ordem. A
+// conta é a mesma de dominio.PriceOrder (round do percentual sobre o cheio).
+const promoPriceSQL = `p.price_cents - round(p.price_cents * public.promo_pct(p.id, p.category) / 100.0)::int,
+		       p.price_cents, public.promo_pct(p.id, p.category)`
 
 type ProductFilter struct {
 	Category string
@@ -133,7 +141,7 @@ func (d *DB) ListProducts(ctx context.Context, f ProductFilter) ([]CatalogProduc
 	}
 
 	sql := `
-		select p.id::text, p.slug, p.name, p.description, p.price_cents,
+		select p.id::text, p.slug, p.name, p.description, ` + promoPriceSQL + `,
 		       p.category, p.metal, p.images, p.featured,
 		       coalesce(sp.available, true),
 		       p.rating::float8, coalesce(p.rating_count, 0), coalesce(p.reviews, '[]'::jsonb),
@@ -178,7 +186,7 @@ func (d *DB) ListProducts(ctx context.Context, f ProductFilter) ([]CatalogProduc
 	for rows.Next() {
 		var p CatalogProduct
 		var reviewsRaw []byte
-		if err := rows.Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.PriceCents,
+		if err := rows.Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.PriceCents, &p.ListPriceCents, &p.PromoPct,
 			&p.Category, &p.Metal, &p.Images, &p.Featured, &p.Available,
 			&p.Rating, &p.RatingCount, &reviewsRaw, &p.VariantLabel, &p.CreatedAt); err != nil {
 			return nil, err
@@ -210,7 +218,7 @@ func (d *DB) ProductBySlug(ctx context.Context, slug string) (*CatalogProduct, e
 	var p CatalogProduct
 	var reviewsRaw []byte
 	err := d.pool.QueryRow(ctx, `
-		select p.id::text, p.slug, p.name, p.description, p.price_cents,
+		select p.id::text, p.slug, p.name, p.description, `+promoPriceSQL+`,
 		       p.category, p.metal, p.images, p.featured,
 		       coalesce(sp.available, true),
 		       p.rating::float8, coalesce(p.rating_count, 0), coalesce(p.reviews, '[]'::jsonb),
@@ -218,7 +226,7 @@ func (d *DB) ProductBySlug(ctx context.Context, slug string) (*CatalogProduct, e
 		from products p
 		left join supplier_products sp on sp.id = p.supplier_product_id
 		where p.slug = $1 and p.published = true`, slug).
-		Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.PriceCents,
+		Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.PriceCents, &p.ListPriceCents, &p.PromoPct,
 			&p.Category, &p.Metal, &p.Images, &p.Featured, &p.Available,
 			&p.Rating, &p.RatingCount, &reviewsRaw, &p.VariantLabel, &p.CreatedAt)
 	p.IsNew = dominio.IsNewProduct(p.CreatedAt, time.Now())
@@ -322,6 +330,9 @@ type CheckoutProduct struct {
 	Cost      dominio.Cents
 	SKU       string
 	Available bool
+	Category  string
+	// Maior promoção ativa agora (public.promo_pct). 0 = sem promoção.
+	PromoPct int
 }
 
 // ProductsForCheckout busca preço REAL no banco.
@@ -331,7 +342,8 @@ type CheckoutProduct struct {
 func (d *DB) ProductsForCheckout(ctx context.Context, ids []string) (map[string]CheckoutProduct, error) {
 	rows, err := d.pool.Query(ctx, `
 		select p.id::text, p.slug, p.name, p.price_cents, p.cost_cents,
-		       coalesce(sp.sku, ''), coalesce(sp.available, true)
+		       coalesce(sp.sku, ''), coalesce(sp.available, true),
+		       p.category, public.promo_pct(p.id, p.category)
 		from products p
 		left join supplier_products sp on sp.id = p.supplier_product_id
 		where p.id = any($1::uuid[]) and p.published = true`, ids)
@@ -343,7 +355,7 @@ func (d *DB) ProductsForCheckout(ctx context.Context, ids []string) (map[string]
 	out := map[string]CheckoutProduct{}
 	for rows.Next() {
 		var p CheckoutProduct
-		if err := rows.Scan(&p.ID, &p.Slug, &p.Name, &p.Price, &p.Cost, &p.SKU, &p.Available); err != nil {
+		if err := rows.Scan(&p.ID, &p.Slug, &p.Name, &p.Price, &p.Cost, &p.SKU, &p.Available, &p.Category, &p.PromoPct); err != nil {
 			return nil, err
 		}
 		out[p.ID] = p
@@ -453,13 +465,19 @@ type Profile struct {
 	Name  string `json:"name"`
 	Phone string `json:"phone"`
 	CPF   string `json:"cpf"`
+	// Design v5 (Meus dados): aniversário (AAAA-MM-DD) e se quer novidades.
+	// Ponteiro: nulo = não mexe (telas antigas mandam só nome/telefone).
+	BirthDate    *string `json:"birth_date"`
+	AcceptsEmail *bool   `json:"accepts_email"`
+	CreatedAt    string  `json:"created_at"`
 }
 
 func (d *DB) GetProfile(ctx context.Context, userID string) (Profile, error) {
 	var p Profile
 	err := d.pool.QueryRow(ctx, `
-		select name, coalesce(phone,''), coalesce(cpf,'')
-		from profiles where id = $1`, userID).Scan(&p.Name, &p.Phone, &p.CPF)
+		select name, coalesce(phone,''), coalesce(cpf,''), coalesce(to_char(birth_date, 'YYYY-MM-DD'), ''),
+		       accepts_email, to_char(created_at, 'YYYY-MM-DD')
+		from profiles where id = $1`, userID).Scan(&p.Name, &p.Phone, &p.CPF, &p.BirthDate, &p.AcceptsEmail, &p.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, nil
 	}
@@ -470,8 +488,10 @@ func (d *DB) GetProfile(ctx context.Context, userID string) (Profile, error) {
 // cliente logada (id vem do token, nunca do corpo da requisição).
 func (d *DB) UpdateProfile(ctx context.Context, userID string, p Profile) error {
 	_, err := d.pool.Exec(ctx, `
-		update profiles set name = $2, phone = nullif($3,''), cpf = nullif($4,'')
-		where id = $1`, userID, p.Name, p.Phone, p.CPF)
+		update profiles set name = $2, phone = nullif($3,''), cpf = nullif($4,''),
+			birth_date = case when $5::text is null then birth_date else nullif($5,'')::date end,
+			accepts_email = coalesce($6, accepts_email)
+		where id = $1`, userID, p.Name, p.Phone, p.CPF, p.BirthDate, p.AcceptsEmail)
 	return err
 }
 
@@ -539,7 +559,8 @@ type OrderItem struct {
 	SKU       string
 	Size      string
 	Quantity  int
-	Price     dominio.Cents
+	Price     dominio.Cents // com a promoção
+	ListPrice dominio.Cents // preço cheio (decisão 32)
 	Cost      dominio.Cents
 }
 
@@ -560,7 +581,31 @@ type NewOrder struct {
 	ShippingMethod string
 	Engraving      string
 	Items          []OrderItem
+
+	// Descontos e embrulho (decisão 31). O valor já vem calculado pelo
+	// domínio; aqui o banco só reconfere, com trava, o que pode ter mudado
+	// entre a conta e a gravação (saldo de pontos, usos do cupom).
+	CouponCode    string
+	PointsUsed    int
+	PointsEarned  int
+	GiftWrap      bool
+	GiftMessage   string
+	GiftWrapCents dominio.Cents
+
+	// Partes do desconto (decisões 32-33) e a forma escolhida.
+	KitDiscount   dominio.Cents
+	PixDiscount   dominio.Cents
+	PaymentChoice string
+	// Regras do cupom por cliente (decisão 34), reconferidas sob trava.
+	CouponFirstOrderOnly  bool
+	CouponOncePerCustomer bool
 }
+
+var (
+	ErrPointsUnavailable = errors.New("saldo de pontos insuficiente")
+	ErrCouponExhausted   = errors.New("cupom esgotado")
+	ErrCouponNotForYou   = errors.New("cupom não vale para esta cliente")
+)
 
 // CreateOrder grava pedido e itens numa transação: pedido sem item é um
 // estado inválido que dá muito trabalho para limpar depois.
@@ -571,18 +616,65 @@ func (d *DB) CreateOrder(ctx context.Context, o NewOrder) (id string, number int
 	}
 	defer tx.Rollback(ctx)
 
+	// Pontos: trava por cliente e reconfere o saldo dentro da transação —
+	// dois checkouts ao mesmo tempo não gastam os mesmos pontos.
+	if o.PointsUsed > 0 || o.CouponFirstOrderOnly || o.CouponOncePerCustomer {
+		if _, err = tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext($1))`, o.UserID); err != nil {
+			return "", 0, err
+		}
+	}
+	// Cupom de primeira compra / uso único: reconfere sob a mesma trava.
+	if o.CouponFirstOrderOnly || o.CouponOncePerCustomer {
+		prior, used, err := customerCouponContext(ctx, tx, o.UserID, o.CouponCode)
+		if err != nil {
+			return "", 0, err
+		}
+		if (o.CouponFirstOrderOnly && prior > 0) || (o.CouponOncePerCustomer && used) {
+			return "", 0, ErrCouponNotForYou
+		}
+	}
+	if o.PointsUsed > 0 {
+		var balance int
+		if err = tx.QueryRow(ctx, pointsBalanceSQL, o.UserID).Scan(&balance, new(int)); err != nil {
+			return "", 0, err
+		}
+		if balance < o.PointsUsed {
+			return "", 0, ErrPointsUnavailable
+		}
+	}
+	// Cupom com limite de usos: trava a linha do cupom e reconta.
+	if o.CouponCode != "" {
+		var maxUses, uses int
+		if err = tx.QueryRow(ctx, `select max_uses from coupons where code = $1 for update`, o.CouponCode).Scan(&maxUses); err != nil {
+			return "", 0, err
+		}
+		if maxUses > 0 {
+			if err = tx.QueryRow(ctx, couponUsesSQL, o.CouponCode).Scan(&uses); err != nil {
+				return "", 0, err
+			}
+			if uses >= maxUses {
+				return "", 0, ErrCouponExhausted
+			}
+		}
+	}
+
 	err = tx.QueryRow(ctx, `
 		insert into orders (user_id, status, customer_name, customer_email,
 			customer_phone, customer_cpf, address, subtotal_cents,
 			shipping_cents, discount_cents, total_cents, engraving,
-			shipping_method)
+			shipping_method, coupon_code, points_used, points_earned,
+			gift_wrap, gift_message, gift_wrap_cents,
+			kit_discount_cents, pix_discount_cents, payment_choice)
 		values ($1,'awaiting_payment',$2,$3,
 			nullif($4,''), nullif($5,''), $6, $7, $8, $9, $10, nullif($11,''),
-			nullif($12,''))
+			nullif($12,''), nullif($13,''), $14, $15, $16, nullif($17,''), $18,
+			$19, $20, nullif($21,''))
 		returning id::text, number`,
 		o.UserID, o.Name, o.Email, o.Phone, o.CPF, o.Address,
 		o.Subtotal, o.Shipping, o.Discount, o.Total, o.Engraving,
-		o.ShippingMethod,
+		o.ShippingMethod, o.CouponCode, o.PointsUsed, o.PointsEarned,
+		o.GiftWrap, o.GiftMessage, o.GiftWrapCents,
+		o.KitDiscount, o.PixDiscount, o.PaymentChoice,
 	).Scan(&id, &number)
 	if err != nil {
 		return "", 0, err
@@ -592,9 +684,9 @@ func (d *DB) CreateOrder(ctx context.Context, o NewOrder) (id string, number int
 		if _, err = tx.Exec(ctx, `
 			insert into order_items (order_id, product_id, name_snapshot,
 				supplier_sku, size, quantity,
-				unit_price_cents, unit_cost_cents)
-			values ($1,$2,$3,nullif($4,''),nullif($5,''),$6,$7,$8)`,
-			id, i.ProductID, i.Name, i.SKU, i.Size, i.Quantity, i.Price, i.Cost,
+				unit_price_cents, unit_cost_cents, list_price_cents)
+			values ($1,$2,$3,nullif($4,''),nullif($5,''),$6,$7,$8,nullif($9,0))`,
+			id, i.ProductID, i.Name, i.SKU, i.Size, i.Quantity, i.Price, i.Cost, i.ListPrice,
 		); err != nil {
 			return "", 0, err
 		}
@@ -735,10 +827,32 @@ func (d *DB) UpsertMirror(ctx context.Context, e MirrorProduct) (created bool, i
 // ApplyCost, com o disjuntor. Produto novo nasce publicado direto (decisão da
 // dona: peça é a mesma da Lilly, não precisa de revisão manual antes de ir
 // ao ar) — markup de 200% aplicado na criação.
+//
+// O que a dona escolheu no painel vale mais que a Lilly (design v5):
+//   - keep_own_text / "sincronizar descrições" desligado: nome e descrição ficam
+//   - keep_own_photos / "sincronizar fotos" desligado: fotos ficam
+//   - category_locked: categoria fica
+//   - "importar automaticamente" desligado: peça nova NÃO entra; fica na fila
+//     "novos na Lilly" (supplier_products sem produto) esperando a dona
+//   - "quando esgotar: ocultar": some da loja e volta quando a Lilly repor
+//
+// O markup nasce nulo (herda categoria/padrão, decisão 21) e o preço inicial
+// sai de public.price_from_cost — a mesma conta do Go.
 func (d *DB) EnsureProduct(ctx context.Context, mirrorID string, p EnsureProductInput) (id string, created bool, err error) {
 	reviews, err := json.Marshal(p.Reviews)
 	if err != nil {
 		return "", false, fmt.Errorf("avaliações: %w", err)
+	}
+
+	if !p.Settings.AutoImport && !p.ForceCreate {
+		var exists bool
+		if err := d.pool.QueryRow(ctx, `select exists (select 1 from products where supplier_product_id = $1)`,
+			mirrorID).Scan(&exists); err != nil {
+			return "", false, err
+		}
+		if !exists {
+			return "", false, nil // fica na fila "novos na Lilly"
+		}
 	}
 
 	err = d.pool.QueryRow(ctx, `
@@ -747,14 +861,16 @@ func (d *DB) EnsureProduct(ctx context.Context, mirrorID string, p EnsureProduct
 			rating, rating_count, reviews, variant_label)
 		values ($1,
 			public.generate_slug($2 || ' ' || $3),
-			$2, nullif($4,''), $5, $6, $7, $8, $9, true, true, 200.00,
+			$2, nullif($4,''),
+			public.price_from_cost($6, public.effective_markup($5::numeric, $7)), $6, $7, $8, $9,
+			$14, true, null,
 			nullif($10,0)::numeric, nullif($11,0), $12, nullif($13,''))
 		on conflict (supplier_product_id) do update set
-			name = excluded.name,
-			description = excluded.description,
-			category = excluded.category,
+			name        = case when products.keep_own_text or not $15 then products.name else excluded.name end,
+			description = case when products.keep_own_text or not $15 then products.description else excluded.description end,
+			category    = case when products.category_locked then products.category else excluded.category end,
 			metal = excluded.metal,
-			images = excluded.images,
+			images      = case when products.keep_own_photos or not $16 then products.images else excluded.images end,
 			cost_cents = excluded.cost_cents,
 			rating = excluded.rating,
 			rating_count = excluded.rating_count,
@@ -762,11 +878,28 @@ func (d *DB) EnsureProduct(ctx context.Context, mirrorID string, p EnsureProduct
 			variant_label = excluded.variant_label
 		returning id::text, (xmax = 0) as inserted`,
 		mirrorID, p.Name, p.SKU, p.Description,
-		int64(p.Cost)*3, int64(p.Cost), p.Category, p.Metal, p.Images,
+		nil, int64(p.Cost), p.Category, p.Metal, p.Images,
 		p.Rating, p.RatingCount, reviews, p.VariantLabel,
+		p.Available || p.Settings.OutOfStockAction != "hide",
+		p.Settings.SyncDescriptions, p.Settings.SyncImages,
 	).Scan(&id, &created)
 	if err != nil {
 		return "", false, err
+	}
+
+	// Esgotou na Lilly: com "ocultar", sai da loja; voltou, volta — mas só o
+	// que a própria sincronização escondeu (o que a dona despublicou fica).
+	if p.Settings.OutOfStockAction == "hide" && !created {
+		if !p.Available {
+			_, err = d.pool.Exec(ctx, `update products set published = false, hidden_by_sync = true
+				where id = $1 and published`, id)
+		} else {
+			_, err = d.pool.Exec(ctx, `update products set published = true, hidden_by_sync = false
+				where id = $1 and hidden_by_sync`, id)
+		}
+		if err != nil {
+			return "", false, err
+		}
 	}
 
 	return id, created, d.syncVariants(ctx, id, p.Variants)
@@ -807,6 +940,9 @@ func (d *DB) syncVariants(ctx context.Context, productID string, sizes []string)
 }
 
 type EnsureProductInput struct {
+	Settings               StoreSettings
+	Available              bool
+	ForceCreate            bool // importação manual pela fila "novos na Lilly"
 	SKU, Name, Description string
 	Cost                   dominio.Cents
 	Category, Metal        string
@@ -1079,6 +1215,13 @@ type CustomerOrder struct {
 	PaidAt         *time.Time          `json:"paid_at"`
 	ShippedAt      *time.Time          `json:"shipped_at"`
 	Items          []CustomerOrderItem `json:"items"`
+
+	Discount    dominio.Cents `json:"discount_cents"`
+	GiftWrap    dominio.Cents `json:"gift_wrap_cents"`
+	GiftMessage *string       `json:"gift_message"`
+	CouponCode  *string       `json:"coupon_code"`
+	PointsUsed  int           `json:"points_used"`
+	DeliveredAt *time.Time    `json:"delivered_at"`
 }
 
 // OrdersForUser lista os pedidos da cliente, do mais recente para o mais
@@ -1088,7 +1231,8 @@ func (d *DB) OrdersForUser(ctx context.Context, userID string) ([]CustomerOrder,
 	rows, err := d.pool.Query(ctx, `
 		select id::text, number, status, subtotal_cents, shipping_cents,
 		       total_cents, shipping_method, tracking_code,
-		       created_at, paid_at, shipped_at
+		       created_at, paid_at, shipped_at,
+		       discount_cents, gift_wrap_cents, gift_message, coupon_code, points_used, delivered_at
 		from orders
 		where user_id = $1
 		order by created_at desc
@@ -1103,7 +1247,8 @@ func (d *DB) OrdersForUser(ctx context.Context, userID string) ([]CustomerOrder,
 		var o CustomerOrder
 		if err := rows.Scan(&o.ID, &o.Number, &o.Status, &o.Subtotal, &o.Shipping,
 			&o.Total, &o.ShippingMethod, &o.TrackingCode,
-			&o.CreatedAt, &o.PaidAt, &o.ShippedAt); err != nil {
+			&o.CreatedAt, &o.PaidAt, &o.ShippedAt,
+			&o.Discount, &o.GiftWrap, &o.GiftMessage, &o.CouponCode, &o.PointsUsed, &o.DeliveredAt); err != nil {
 			return nil, err
 		}
 		o.Items = []CustomerOrderItem{}
@@ -1120,12 +1265,14 @@ func (d *DB) OrderForUser(ctx context.Context, userID, orderID string) (*Custome
 	err := d.pool.QueryRow(ctx, `
 		select id::text, number, status, subtotal_cents, shipping_cents,
 		       total_cents, shipping_method, tracking_code,
-		       created_at, paid_at, shipped_at
+		       created_at, paid_at, shipped_at,
+		       discount_cents, gift_wrap_cents, gift_message, coupon_code, points_used, delivered_at
 		from orders
 		where id = $1 and user_id = $2`, orderID, userID).
 		Scan(&o.ID, &o.Number, &o.Status, &o.Subtotal, &o.Shipping,
 			&o.Total, &o.ShippingMethod, &o.TrackingCode,
-			&o.CreatedAt, &o.PaidAt, &o.ShippedAt)
+			&o.CreatedAt, &o.PaidAt, &o.ShippedAt,
+			&o.Discount, &o.GiftWrap, &o.GiftMessage, &o.CouponCode, &o.PointsUsed, &o.DeliveredAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

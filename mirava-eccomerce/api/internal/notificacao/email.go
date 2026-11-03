@@ -25,9 +25,9 @@ import (
 const resendAPI = "https://api.resend.com/emails"
 
 type Email struct {
-	apiKey     string
-	remetente  string
-	http       *http.Client
+	apiKey    string
+	remetente string
+	http      *http.Client
 }
 
 // NovoEmail devolve nil quando não há chave configurada.
@@ -89,10 +89,10 @@ func (e *Email) Enviar(ctx context.Context, ev Evento, p Pedido) error {
 // Gmail remove folha de estilo externa.
 func corpoHTML(ev Evento, p Pedido, texto string) string {
 	var b strings.Builder
-	b.WriteString(`<div style="font-family:Georgia,serif;background:#fff7fb;padding:32px 16px">`)
+	b.WriteString(`<div style="font-family:Georgia,serif;background:#F4F8F8;padding:32px 16px">`)
 	b.WriteString(`<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px">`)
-	b.WriteString(`<p style="margin:0 0 4px;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:3px;color:#b49aa6;text-transform:uppercase">Mirava</p>`)
-	b.WriteString(`<h1 style="margin:0 0 20px;font-size:22px;font-weight:normal;color:#8e3b6b">` +
+	b.WriteString(`<p style="margin:0 0 4px;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:3px;color:#2A8C88;text-transform:uppercase">Mirava</p>`)
+	b.WriteString(`<h1 style="margin:0 0 20px;font-size:22px;font-weight:normal;color:#0B4A4D">` +
 		html.EscapeString(tituloHTML(ev)) + `</h1>`)
 
 	// O texto puro já está pronto e revisado; aqui ele só é escapado e
@@ -103,15 +103,19 @@ func corpoHTML(ev Evento, p Pedido, texto string) string {
 		if par == "" {
 			continue
 		}
-		b.WriteString(`<p style="margin:0 0 14px;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.65;color:#6e5a64">` +
+		b.WriteString(`<p style="margin:0 0 14px;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.65;color:#3E5556">` +
 			strings.ReplaceAll(html.EscapeString(par), "\n", "<br>") + `</p>`)
 	}
 
-	if p.URLPedido != "" {
-		b.WriteString(`<p style="margin:24px 0 0"><a href="` + html.EscapeString(p.URLPedido) +
-			`" style="display:inline-block;background:#d46a9f;color:#ffffff;text-decoration:none;` +
-			`padding:13px 28px;border-radius:999px;font-family:Georgia,serif;font-size:13px;` +
-			`letter-spacing:2px;text-transform:uppercase">Acompanhar pedido</a></p>`)
+	link, rotulo := p.URLPedido, "Acompanhar pedido"
+	if p.URLAcao != "" {
+		link, rotulo = p.URLAcao, p.TextoAcao
+	}
+	if link != "" {
+		b.WriteString(`<p style="margin:24px 0 0"><a href="` + html.EscapeString(link) +
+			`" style="display:inline-block;background:#0F6E73;color:#ffffff;text-decoration:none;` +
+			`padding:13px 28px;border-radius:999px;font-family:Helvetica,Arial,sans-serif;font-size:13px;` +
+			`font-weight:bold;letter-spacing:1px">` + html.EscapeString(rotulo) + `</a></p>`)
 	}
 
 	b.WriteString(`</div></div>`)
@@ -128,6 +132,24 @@ func tituloHTML(ev Evento) string {
 		return "Sua peça já foi encomendada"
 	case PedidoEnviado:
 		return "Seu pedido está a caminho"
+	case PagamentoPendente:
+		return "Seu pedido está te esperando"
+	case CarrinhoAbandonado:
+		return "Suas peças ainda estão na sacola"
+	case PedirAvaliacao:
+		return "O que achou da sua peça?"
+	case VoltouAoEstoque:
+		return "A peça que você queria voltou"
+	case TrocaAtualizada:
+		return "Sua troca andou"
+	case RecuperarSenha:
+		return "Crie uma senha nova"
+	case CupomEnviado:
+		return "Um presente pra você"
+	case BoasVindas:
+		return "Bem-vinda à Mirava"
+	case TesteAutomacao:
+		return "E-mail de teste"
 	}
 	return "Novidade no seu pedido"
 }

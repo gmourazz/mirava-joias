@@ -139,5 +139,7 @@ func (s *Servidor) me(w http.ResponseWriter, r *http.Request) {
 	responder(w, http.StatusOK, mapa{
 		"id": user.ID, "email": user.Email, "name": profile.Name,
 		"phone": profile.Phone, "cpf": profile.CPF,
+		"birth_date": profile.BirthDate, "accepts_email": profile.AcceptsEmail,
+		"created_at": profile.CreatedAt,
 	})
 }

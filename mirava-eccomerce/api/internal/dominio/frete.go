@@ -100,13 +100,19 @@ var rates = map[region]rate{
 // UF desconhecida cai no Norte, a faixa mais cara: se o dado vier estranho, é
 // melhor cobrar a mais e devolver a diferença do que despachar no prejuízo.
 func ShippingOptions(uf string, subtotal Cents) []ShippingOption {
+	return ShippingOptionsFor(uf, subtotal, false)
+}
+
+// ShippingOptionsFor é o cardápio com o benefício do Mirava Club: no nível
+// Encanto (clubFree) o econômico sai grátis em qualquer valor (decisão 34).
+func ShippingOptionsFor(uf string, subtotal Cents, clubFree bool) []ShippingOption {
 	r, ok := ufRegion[strings.ToUpper(strings.TrimSpace(uf))]
 	if !ok {
 		r = regionNorth
 	}
 	t := rates[r]
 
-	free := subtotal >= FreeShippingAbove
+	free := subtotal >= FreeShippingAbove || clubFree
 	economic := t.economic
 	if free {
 		economic = 0
@@ -154,10 +160,15 @@ func NormalizeShippingService(s ShippingService) ShippingService {
 // É esta função que o checkout usa. Serviço desconhecido vira econômico em vez
 // de erro: um valor a mais no corpo da requisição não pode virar frete grátis.
 func ShippingCost(uf string, subtotal Cents, service ShippingService) Cents {
-	for _, o := range ShippingOptions(uf, subtotal) {
+	return ShippingCostFor(uf, subtotal, service, false)
+}
+
+func ShippingCostFor(uf string, subtotal Cents, service ShippingService, clubFree bool) Cents {
+	opts := ShippingOptionsFor(uf, subtotal, clubFree)
+	for _, o := range opts {
 		if o.Service == service {
 			return o.Cents
 		}
 	}
-	return ShippingOptions(uf, subtotal)[0].Cents
+	return opts[0].Cents
 }

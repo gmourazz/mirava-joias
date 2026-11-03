@@ -613,6 +613,27 @@ func GuessCategory(name string) string {
 	return "outros"
 }
 
+// CategoryKeyword é uma linha do mapeamento editável (tabela category_mappings).
+type CategoryKeyword struct {
+	Keyword  string
+	Category string
+}
+
+// GuessCategoryWith usa o mapeamento da dona, na ordem dela. Sem mapeamento
+// (lista vazia), cai na regra embutida de GuessCategory.
+func GuessCategoryWith(name string, mappings []CategoryKeyword) string {
+	if len(mappings) == 0 {
+		return GuessCategory(name)
+	}
+	lower := strings.ToLower(name)
+	for _, m := range mappings {
+		if m.Keyword != "" && strings.Contains(lower, m.Keyword) {
+			return m.Category
+		}
+	}
+	return "outros"
+}
+
 // GuessMetal infere o metal a partir do nome da peça.
 // Prata é o padrão: é o material mais comum no catálogo da Lilly.
 func GuessMetal(name string) string {

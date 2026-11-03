@@ -25,13 +25,23 @@ func (s *Servidor) shippingQuote(w http.ResponseWriter, r *http.Request) {
 
 	// Sem UF ainda (a cliente abriu o carrinho e não escolheu endereço), devolve
 	// só a regra — é o que a barrinha de "faltam X para o frete grátis" precisa.
+	// Com sessão, o nível Encanto do Club entra na conta (PAC grátis,
+	// decisão 34). Sem sessão, é a tabela comum.
+	clubFree := false
+	if u, err := s.auth.DoRequest(r); err == nil {
+		if _, earned, err := s.db.PointsBalance(r.Context(), u.ID); err == nil {
+			clubFree = dominio.ClubFreeShipping(earned)
+		}
+	}
+
 	var options []dominio.ShippingOption
 	if uf != "" {
-		options = dominio.ShippingOptions(uf, dominio.Cents(subtotal))
+		options = dominio.ShippingOptionsFor(uf, dominio.Cents(subtotal), clubFree)
 	}
 
 	responder(w, http.StatusOK, mapa{
-		"free_above_cents": int64(dominio.FreeShippingAbove),
-		"options":          options,
+		"free_above_cents":   int64(dominio.FreeShippingAbove),
+		"options":            options,
+		"club_free_shipping": clubFree,
 	})
 }

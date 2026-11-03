@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mirava/api/internal/db"
 	"github.com/mirava/api/internal/dominio"
@@ -27,14 +28,19 @@ func (s *Servidor) requireAdmin(h http.HandlerFunc) http.HandlerFunc {
 			responder(w, http.StatusUnauthorized, mapa{"error": "não autenticado"})
 			return
 		}
-		ok, err := s.db.IsAdmin(r.Context(), user.ID)
+		role, err := s.db.AdminRole(r.Context(), user.ID)
 		if err != nil {
 			s.log.Error("falha ao conferir admin", "erro", err)
 			responder(w, http.StatusInternalServerError, mapa{"error": "Erro ao conferir acesso"})
 			return
 		}
-		if !ok {
+		if role == "" {
 			responder(w, http.StatusForbidden, mapa{"error": "Acesso restrito à administração da loja"})
+			return
+		}
+		// Papel de despacho (decisão 27): só pedidos e lote.
+		if role == "dispatch" && !dispatchAllowed(r.URL.Path) {
+			responder(w, http.StatusForbidden, mapa{"error": "Seu acesso é só de despacho (pedidos e lote)"})
 			return
 		}
 		h(w, r)
@@ -44,7 +50,13 @@ func (s *Servidor) requireAdmin(h http.HandlerFunc) http.HandlerFunc {
 // adminMe: o front usa para saber se mostra o painel ou a tela de acesso
 // restrito.
 func (s *Servidor) adminMe(w http.ResponseWriter, r *http.Request) {
-	responder(w, http.StatusOK, mapa{"ok": true})
+	role := "master"
+	if u, err := s.auth.DoRequest(r); err == nil {
+		if r2, err := s.db.AdminRole(r.Context(), u.ID); err == nil && r2 != "" {
+			role = r2
+		}
+	}
+	responder(w, http.StatusOK, mapa{"ok": true, "role": role})
 }
 
 func (s *Servidor) adminSummary(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +66,28 @@ func (s *Servidor) adminSummary(w http.ResponseWriter, r *http.Request) {
 		responder(w, http.StatusInternalServerError, mapa{"error": "Não consegui carregar o resumo"})
 		return
 	}
-	responder(w, http.StatusOK, sum)
+	// Cartões do design v5: peças esgotadas, mais vendidas do mês e a próxima
+	// sincronização automática (frequência do painel).
+	stock, err1 := s.db.UnavailablePublished(r.Context())
+	top, err2 := s.db.TopSellers(r.Context())
+	if err := errors.Join(err1, err2); err != nil {
+		s.log.Error("falha ao montar resumo do painel", "erro", err)
+		responder(w, http.StatusInternalServerError, mapa{"error": "Não consegui carregar o resumo"})
+		return
+	}
+	var nextSync *time.Time
+	if st, err := s.db.Settings(r.Context()); err == nil {
+		if last, err := s.db.LastSyncStarted(r.Context()); err == nil && last != nil {
+			t := last.Add(time.Duration(st.SyncEveryHours) * time.Hour)
+			nextSync = &t
+		}
+	}
+	responder(w, http.StatusOK, struct {
+		*db.AdminSummary
+		StockAlerts []db.StockAlertItem `json:"stock_alerts"`
+		TopSellers  []db.TopSeller      `json:"top_sellers"`
+		NextSync    *time.Time          `json:"next_sync_at"`
+	}{sum, stock, top, nextSync})
 }
 
 func (s *Servidor) adminOrders(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +206,9 @@ func (s *Servidor) adminProducts(w http.ResponseWriter, r *http.Request) {
 		Category: q.Get("categoria"),
 		Metal:    q.Get("banho"),
 		Status:   q.Get("status"),
+		Price:    q.Get("preco"),
+		Vitrine:  q.Get("vitrine"),
+		Sales:    q.Get("vendas"),
 		Limit:    produtosPorPagina,
 		Offset:   (pagina - 1) * produtosPorPagina,
 	}
@@ -213,12 +249,38 @@ func (s *Servidor) adminUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		}
 		u.Name = &nome
 	}
+	if u.Metal != nil && *u.Metal != "prata" && *u.Metal != "ouro" {
+		responder(w, http.StatusBadRequest, mapa{"error": "Banho inválido"})
+		return
+	}
+	if (u.SEOTitle != nil && utf8.RuneCountInString(*u.SEOTitle) > 70) ||
+		(u.SEODescription != nil && utf8.RuneCountInString(*u.SEODescription) > 170) {
+		responder(w, http.StatusBadRequest, mapa{"error": "Título do Google até 70 e descrição até 170 caracteres"})
+		return
+	}
+	if u.Images != nil {
+		if len(*u.Images) > 10 {
+			responder(w, http.StatusBadRequest, mapa{"error": "No máximo 10 fotos"})
+			return
+		}
+		for _, img := range *u.Images {
+			if !strings.HasPrefix(img, "/images/") {
+				responder(w, http.StatusBadRequest, mapa{"error": "Use fotos enviadas pelo painel ou já sincronizadas"})
+				return
+			}
+		}
+	}
 	ok, err := s.db.UpdateProduct(r.Context(), r.PathValue("id"), u)
+	if err != nil && u.Category != nil {
+		responder(w, http.StatusBadRequest, mapa{"error": "Categoria inválida"})
+		return
+	}
 	s.respondProductAction(w, ok, err, "peça atualizada", r.PathValue("id"))
 }
 
+// markupRequest: markup_pct nulo = voltar a herdar (decisão 21).
 type markupRequest struct {
-	MarkupPct float64 `json:"markup_pct"`
+	MarkupPct *float64 `json:"markup_pct"`
 }
 
 func (s *Servidor) adminApplyMarkup(w http.ResponseWriter, r *http.Request) {
@@ -227,7 +289,7 @@ func (s *Servidor) adminApplyMarkup(w http.ResponseWriter, r *http.Request) {
 		responder(w, http.StatusBadRequest, mapa{"error": "Requisição inválida"})
 		return
 	}
-	if !dominio.ValidMarkup(req.MarkupPct) {
+	if req.MarkupPct != nil && !dominio.ValidMarkup(*req.MarkupPct) {
 		responder(w, http.StatusBadRequest, mapa{"error": fmt.Sprintf(
 			"O markup precisa ficar entre %d%% e %d%%", dominio.MinMarkupPct, dominio.MaxMarkupPct)})
 		return
@@ -296,12 +358,20 @@ func (s *Servidor) adminFinance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := dominio.MonthlyFinance(data.Input)
+	fees, err := s.db.FeesByMethod(r.Context(), inicio, fim)
+	if err != nil {
+		s.log.Error("falha nas taxas por forma", "erro", err)
+		fees = []db.FeeByMethod{}
+	}
+	settings, _ := s.db.Settings(r.Context())
 	responder(w, http.StatusOK, mapa{
 		"month":                inicio.Format("2006-01"),
 		"orders_count":         f.Orders,
 		"revenue_cents":        f.Revenue,
 		"subtotal_cents":       f.Subtotal,
 		"shipping_cents":       f.ShippingCharged,
+		"discount_cents":       f.Discount,
+		"gift_wrap_cents":      f.GiftWrap,
 		"cost_cents":           f.Cost,
 		"fees_cents":           f.Fees,
 		"packaging_cents":      f.Packaging,
@@ -313,6 +383,13 @@ func (s *Servidor) adminFinance(w http.ResponseWriter, r *http.Request) {
 		"orders":               data.Orders,
 		"categories":           data.Categories,
 		"top_pieces":           data.TopPieces,
+		// Design v5: taxas reais por forma de pagamento e metas do mês.
+		"fees_by_method": fees,
+		"goals": mapa{
+			"revenue_cents": settings.GoalRevenue,
+			"orders":        settings.GoalOrders,
+			"profit_cents":  settings.GoalProfit,
+		},
 	})
 }
 
@@ -399,6 +476,11 @@ type loteProdutosRequest struct {
 	Published *bool    `json:"published"`
 	Featured  *bool    `json:"featured"`
 	MarkupPct *float64 `json:"markup_pct"`
+	// "Aplicar markup padrão": as peças voltam a herdar (decisão 21).
+	InheritMarkup bool `json:"inherit_markup"`
+	// Promoção rápida nas peças escolhidas (decisão 32): % e dias a partir de agora.
+	PromoPct  int `json:"promo_pct"`
+	PromoDays int `json:"promo_days"`
 }
 
 // adminBulkProducts aplica a mesma mudança em várias peças (seleção em massa
@@ -420,6 +502,24 @@ func (s *Servidor) adminBulkProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.PromoPct != 0 {
+		if req.PromoPct < 1 || req.PromoPct > dominio.MaxPromoPct || req.PromoDays < 1 || req.PromoDays > 60 {
+			responder(w, http.StatusBadRequest, mapa{"error": "Promoção: de 1% a 30%, por 1 a 60 dias"})
+			return
+		}
+		now := time.Now()
+		_, err := s.db.CreatePromotion(r.Context(), db.Promotion{
+			Name: fmt.Sprintf("Promoção %d%% (%d peças)", req.PromoPct, len(req.IDs)), Pct: req.PromoPct,
+			Scope: "products", ProductIDs: req.IDs, StartsAt: now, EndsAt: now.AddDate(0, 0, req.PromoDays),
+		})
+		if err != nil {
+			s.falha(w, err, "criar a promoção")
+			return
+		}
+		responder(w, http.StatusOK, mapa{"updated": len(req.IDs), "failed": 0})
+		return
+	}
+
 	feitas, falhas := 0, 0
 	for _, id := range req.IDs {
 		ok, err := true, error(nil)
@@ -427,7 +527,10 @@ func (s *Servidor) adminBulkProducts(w http.ResponseWriter, r *http.Request) {
 			ok, err = s.db.UpdateProduct(r.Context(), id, db.AdminProductUpdate{Published: req.Published, Featured: req.Featured})
 		}
 		if err == nil && ok && req.MarkupPct != nil {
-			ok, err = s.db.ApplyMarkup(r.Context(), id, *req.MarkupPct)
+			ok, err = s.db.ApplyMarkup(r.Context(), id, req.MarkupPct)
+		}
+		if err == nil && ok && req.InheritMarkup {
+			ok, err = s.db.ApplyMarkup(r.Context(), id, nil)
 		}
 		if err != nil || !ok {
 			falhas++

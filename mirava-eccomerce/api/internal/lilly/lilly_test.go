@@ -538,3 +538,19 @@ func TestBestSellersIgnoraQueNaoEhProduto(t *testing.T) {
 		t.Errorf("deixou passar página que não é produto: %v", slugs)
 	}
 }
+
+// Mapeamento editável no painel (Sincronização → mapeamento de categorias):
+// a primeira palavra da lista que aparecer no nome decide.
+func TestGuessCategoryWith(t *testing.T) {
+	m := []CategoryKeyword{{"conjunto", "conjuntos"}, {"argola", "argolas"}, {"brinco", "brincos"}}
+	if got := GuessCategoryWith("Brinco Argola Lisa", m); got != "argolas" {
+		t.Errorf("veio %q", got)
+	}
+	if got := GuessCategoryWith("Pulseira Nó", m); got != "outros" {
+		t.Errorf("sem palavra conhecida vai para outros, veio %q", got)
+	}
+	// Lista vazia (banco sem mapeamento): cai na regra embutida.
+	if got := GuessCategoryWith("Anel Aura", nil); got != "aneis" {
+		t.Errorf("veio %q", got)
+	}
+}

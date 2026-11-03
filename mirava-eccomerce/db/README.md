@@ -17,6 +17,15 @@ Espera uns segundos o Postgres subir, depois aplica o schema:
 docker exec -i mirava-postgres psql -U mirava -d mirava < schema.sql
 ```
 
+**Banco que já existia antes do design v5?** O `schema.sql` serve para banco
+novo. Para um banco que já tem dados, aplique a alteração do bloco de
+descontos, Club, avaliações, trocas, vitrine e automações (decisão 31) — ela
+pode rodar mais de uma vez sem estragar nada:
+
+```bash
+docker exec -i mirava-postgres psql -U mirava -d mirava < alter-design-v5.sql
+```
+
 Confirma que criou as tabelas:
 
 ```bash

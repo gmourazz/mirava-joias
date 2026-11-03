@@ -127,3 +127,42 @@ func safeName(s string) string {
 	}
 	return s
 }
+
+// MaxUploadBytes é o maior arquivo aceito do painel (foto, banner).
+const MaxUploadBytes = 5 << 20
+
+var uploadFolders = map[string]bool{"produtos": true, "banners": true, "galeria": true}
+
+// SaveUpload guarda uma imagem enviada pelo painel (decisão 35) em
+// <dir>/uploads/<pasta>/<hash><ext> e devolve o caminho público. O tipo é
+// conferido pelo conteúdo, não pelo nome do arquivo: só JPEG, PNG e WebP.
+// O nome vem do hash, então reenviar a mesma foto não duplica nada.
+func (s *Store) SaveUpload(r io.Reader, folder string) (string, error) {
+	if !uploadFolders[folder] {
+		return "", fmt.Errorf("pasta de upload inválida")
+	}
+	data, err := io.ReadAll(io.LimitReader(r, MaxUploadBytes+1))
+	if err != nil {
+		return "", err
+	}
+	if len(data) > MaxUploadBytes {
+		return "", fmt.Errorf("a imagem passa de 5 MB")
+	}
+	ext := map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}[http.DetectContentType(data)]
+	if ext == "" {
+		return "", fmt.Errorf("envie uma foto em JPG, PNG ou WebP")
+	}
+	sum := sha256.Sum256(data)
+	name := hex.EncodeToString(sum[:12]) + ext
+	dir := filepath.Join(s.dir, "uploads", folder)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	full := filepath.Join(dir, name)
+	if _, err := os.Stat(full); err != nil {
+		if err := os.WriteFile(full, data, 0o644); err != nil {
+			return "", err
+		}
+	}
+	return "/images/uploads/" + folder + "/" + name, nil
+}

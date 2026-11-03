@@ -32,6 +32,15 @@ func (s *Servidor) avisar(ctx context.Context, orderID string, ev notificacao.Ev
 		return
 	}
 	s.notif.Avisar(ctx, ev, s.paraNotificacao(o))
+	s.registrarAviso(ctx, orderID, ev)
+}
+
+// registrarAviso guarda que o aviso saiu (lista "Avisos para a cliente" no
+// drawer do pedido). Sem e-mail configurado, nada saiu — nada é registrado.
+func (s *Servidor) registrarAviso(ctx context.Context, orderID string, ev notificacao.Evento) {
+	if orderID != "" && s.notif.Ativo() {
+		s.db.LogOrderNotice(ctx, orderID, string(ev))
+	}
 }
 
 func (s *Servidor) paraNotificacao(o *db.OrderNotification) notificacao.Pedido {

@@ -36,6 +36,19 @@ const (
 	PecaComprada Evento = "peca_comprada"
 	// PedidoEnviado leva o código de rastreio dos Correios.
 	PedidoEnviado Evento = "pedido_enviado"
+
+	// Automações (decisão 31), disparadas pela tarefa /tarefas/automacoes.
+	PagamentoPendente  Evento = "pagamento_pendente"  // 24h sem pagar
+	CarrinhoAbandonado Evento = "carrinho_abandonado" // sacola parada há 1h
+	PedirAvaliacao     Evento = "pedir_avaliacao"     // 7 dias depois de entregue
+	VoltouAoEstoque    Evento = "voltou_ao_estoque"   // avise-me
+	TrocaAtualizada    Evento = "troca_atualizada"    // etapa da troca mudou
+
+	// Conta e marketing (design v5, decisão 34).
+	RecuperarSenha Evento = "recuperar_senha" // link para criar senha nova
+	CupomEnviado   Evento = "cupom_enviado"   // a dona mandou um cupom pelo painel
+	BoasVindas     Evento = "boas_vindas"     // cadastro de novidades, com o BEMVINDA10
+	TesteAutomacao Evento = "teste_automacao" // "enviar teste" do painel
 )
 
 // Pedido é o mínimo que um aviso precisa saber. Deliberadamente não é o
@@ -51,6 +64,35 @@ type Pedido struct {
 	PrazoTexto  string // "até 20 dias úteis"
 	URLPedido   string // link para a cliente acompanhar
 	URLWhatsApp string // conversa já preenchida com o número do pedido
+
+	// Avisos que não são sobre um pedido (sacola, avise-me) ou que levam a
+	// outra página: o botão do e-mail aponta para URLAcao com TextoAcao.
+	Produto   string // nome da peça (avise-me, avaliação)
+	Etapa     string // etapa da troca, em texto
+	URLAcao   string
+	TextoAcao string
+	Cupom     string // código do cupom (boas-vindas, cupom enviado)
+
+	// Texto editado no painel (Automações). Vazio = texto padrão. Aceita as
+	// variáveis {nome}, {pedido}, {produto}, {total}, {cupom} e {link}.
+	AssuntoPersonalizado string
+	MioloPersonalizado   string
+}
+
+// Preencher troca as variáveis do texto editado no painel pelos dados do aviso.
+func Preencher(tpl string, p Pedido) string {
+	nome := "você"
+	if f := strings.Fields(p.Nome); len(f) > 0 {
+		nome = f[0]
+	}
+	return strings.NewReplacer(
+		"{nome}", nome,
+		"{pedido}", fmt.Sprint(p.Numero),
+		"{produto}", p.Produto,
+		"{total}", p.Total.String(),
+		"{cupom}", p.Cupom,
+		"{link}", p.URLAcao,
+	).Replace(tpl)
 }
 
 // Canal é por onde o aviso sai. E-mail hoje; WhatsApp oficial no futuro.
@@ -118,7 +160,18 @@ func (n *Notificador) Avisar(ctx context.Context, e Evento, p Pedido) {
 // transporte.
 
 func Assunto(e Evento, p Pedido) string {
+	if p.AssuntoPersonalizado != "" {
+		return Preencher(p.AssuntoPersonalizado, p)
+	}
 	switch e {
+	case RecuperarSenha:
+		return "Crie uma senha nova · Mirava"
+	case CupomEnviado:
+		return "Um presente da Mirava pra você ✦"
+	case BoasVindas:
+		return "Bem-vinda à Mirava ✦ seu cupom chegou"
+	case TesteAutomacao:
+		return "[Teste] Mensagem automática da Mirava"
 	case PedidoPago:
 		return fmt.Sprintf("Pedido #%d confirmado · Mirava", p.Numero)
 	case PagamentoFalhou:
@@ -127,6 +180,16 @@ func Assunto(e Evento, p Pedido) string {
 		return fmt.Sprintf("Sua peça do pedido #%d já foi encomendada", p.Numero)
 	case PedidoEnviado:
 		return fmt.Sprintf("Pedido #%d a caminho ✨", p.Numero)
+	case PagamentoPendente:
+		return fmt.Sprintf("Seu pedido #%d está te esperando", p.Numero)
+	case CarrinhoAbandonado:
+		return "Suas peças ainda estão na sacola ✦"
+	case PedirAvaliacao:
+		return "Conta pra gente: o que achou da sua peça?"
+	case VoltouAoEstoque:
+		return p.Produto + " voltou ✦"
+	case TrocaAtualizada:
+		return fmt.Sprintf("Sua troca do pedido #%d: %s", p.Numero, p.Etapa)
 	}
 	return fmt.Sprintf("Novidade no seu pedido #%d", p.Numero)
 }
@@ -140,6 +203,17 @@ func corpoTexto(e Evento, p Pedido) string {
 
 	var miolo string
 	switch e {
+	case RecuperarSenha:
+		miolo = "Recebemos um pedido para criar uma senha nova na sua conta Mirava. " +
+			"O link vale por 1 hora. Se não foi você, é só ignorar este e-mail — sua senha continua a mesma."
+	case CupomEnviado:
+		miolo = fmt.Sprintf("Separamos um cupom especial pra você: %s.\n\nÉ só usar na finalização da compra.", p.Cupom)
+	case BoasVindas:
+		miolo = fmt.Sprintf("Que bom ter você por aqui! Seu cupom de boas-vindas é %s: 10%% de desconto "+
+			"nas peças da sua primeira compra. É só usar na finalização.\n\n"+
+			"Você também vai receber os lançamentos antes de todo mundo.", p.Cupom)
+	case TesteAutomacao:
+		miolo = "Este é um e-mail de teste das automações da Mirava."
 	case PedidoPago:
 		miolo = fmt.Sprintf(
 			"Recebemos o pagamento do seu pedido #%d, no valor de %s.\n\n"+
@@ -155,7 +229,7 @@ func corpoTexto(e Evento, p Pedido) string {
 			p.Numero)
 	case PecaComprada:
 		miolo = fmt.Sprintf(
-			"Boa notícia: a peça do seu pedido #%d já foi encomendada na produção.\n\n"+
+			"Boa notícia: a peça do seu pedido #%d já foi encomendada na fornecedora.\n\n"+
 				"Assim que ela chegar até nós, conferimos, embalamos e despachamos — "+
 				"e você recebe o código de rastreio por aqui.",
 			p.Numero)
@@ -168,9 +242,34 @@ func corpoTexto(e Evento, p Pedido) string {
 					"O código costuma levar algumas horas até aparecer no site dos Correios.",
 				p.Rastreio)
 		}
+	case PagamentoPendente:
+		miolo = fmt.Sprintf(
+			"O pedido #%d ainda está esperando o pagamento. As peças são encomendadas "+
+				"só depois que ele é confirmado — pelo Pix, cai na hora.\n\n"+
+				"Se mudou de ideia, tudo bem: sem pagamento, nada é cobrado.",
+			p.Numero)
+	case CarrinhoAbandonado:
+		miolo = "Você deixou peças lindas na sacola. Elas continuam guardadas para você — " +
+			"é só voltar e finalizar quando quiser."
+	case PedirAvaliacao:
+		miolo = fmt.Sprintf("Sua peça do pedido #%d já está com você há uns dias. "+
+			"Conta pra gente o que achou? Sua avaliação ajuda outras clientes a escolher "+
+			"e ainda soma no seu Mirava Club.", p.Numero)
+	case VoltouAoEstoque:
+		miolo = fmt.Sprintf("Boa notícia: %s voltou a ficar disponível. "+
+			"Garanta a sua antes que acabe de novo.", p.Produto)
+	case TrocaAtualizada:
+		miolo = fmt.Sprintf("Sua solicitação de troca do pedido #%d mudou de etapa: %s.", p.Numero, p.Etapa)
+	}
+
+	if p.MioloPersonalizado != "" {
+		miolo = Preencher(p.MioloPersonalizado, p)
 	}
 
 	rodape := ""
+	if p.URLAcao != "" {
+		rodape += "\n\n" + p.TextoAcao + ": " + p.URLAcao
+	}
 	if p.URLPedido != "" {
 		rodape += "\n\nAcompanhe seu pedido: " + p.URLPedido
 	}

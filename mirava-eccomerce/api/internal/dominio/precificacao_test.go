@@ -126,3 +126,34 @@ func TestFormatting(t *testing.T) {
 		t.Errorf("String() = %q", got)
 	}
 }
+
+// Decisão 21: markup da peça > da categoria > padrão global.
+func TestMarkupEmCamadas(t *testing.T) {
+	p, c := 150.0, 180.0
+	if got := EffectiveMarkup(&p, &c, 200); got != 150 {
+		t.Errorf("peça manda: %v", got)
+	}
+	if got := EffectiveMarkup(nil, &c, 200); got != 180 {
+		t.Errorf("sem markup da peça vale a categoria: %v", got)
+	}
+	if got := EffectiveMarkup(nil, nil, 200); got != 200 {
+		t.Errorf("sem os dois vale o padrão: %v", got)
+	}
+}
+
+// "Arredondar para ,90": sobe para o próximo X,90 (nunca baixa o preço). A
+// mesma conta existe em SQL (public.round_to_90).
+func TestArredondaParaNoventa(t *testing.T) {
+	cases := map[Cents]Cents{6900: 6990, 6990: 6990, 6991: 7090, 6950: 6990, 100: 190, 0: 0}
+	for in, want := range cases {
+		if got := RoundTo90(in); got != want {
+			t.Errorf("RoundTo90(%d) = %d, esperado %d", in, got, want)
+		}
+	}
+	if got := PriceFromMarkupRounded(2300, 200, true); got != 6990 {
+		t.Errorf("R$23 com 200%% arredondado = R$69,90, veio %d", got)
+	}
+	if got := PriceFromMarkupRounded(2300, 200, false); got != 6900 {
+		t.Errorf("sem arredondar = R$69,00, veio %d", got)
+	}
+}

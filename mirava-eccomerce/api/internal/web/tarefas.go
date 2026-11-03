@@ -85,6 +85,21 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 	}
 	s.log.Info("sincronização iniciada", "urls", len(entries))
 
+	// Regras do painel (Sincronização): importar sozinho, fotos, textos,
+	// esgotados e o mapeamento de categorias. Lidas uma vez por rodada.
+	settings, err := s.db.Settings(ctx)
+	if err != nil {
+		s.log.Error("não consegui ler as regras da sincronização", "erro", err)
+		s.finishSync(ctx, syncID, db.SyncResult{Status: dominio.SyncError, Error: "configurações ilegíveis"})
+		return
+	}
+	var mappings []lilly.CategoryKeyword
+	if ms, err := s.db.CategoryMappings(ctx); err == nil {
+		for _, m := range ms {
+			mappings = append(mappings, lilly.CategoryKeyword{Keyword: m.Keyword, Category: m.Category})
+		}
+	}
+
 	var res db.SyncResult
 	seen := make([]string, 0, len(entries))
 	consecutiveFailures := 0
@@ -199,9 +214,10 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 		}
 		if len(localImages) > 0 {
 			_, _, err := s.db.EnsureProduct(itemCtx, mirrorID, db.EnsureProductInput{
+				Settings: settings, Available: p.Available,
 				SKU: p.SKU, Name: p.Name, Description: p.Description,
 				Cost:         p.Wholesale,
-				Category:     lilly.GuessCategory(p.Name),
+				Category:     lilly.GuessCategoryWith(p.Name, mappings),
 				Metal:        lilly.GuessMetal(p.Name),
 				Images:       localImages,
 				Rating:       p.Rating,

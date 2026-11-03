@@ -95,3 +95,38 @@ func ValidMarkup(pct float64) bool { return pct >= MinMarkupPct && pct <= MaxMar
 func PriceFromMarkup(cost Cents, markupPct float64) Cents {
 	return Cents(math.Round(float64(cost) * (1 + markupPct/100)))
 }
+
+// EffectiveMarkup é o markup que vale para a peça (decisão 21): o da própria
+// peça, senão o da categoria, senão o padrão da loja. A mesma ordem existe em
+// SQL, em public.effective_markup (db/schema.sql).
+func EffectiveMarkup(product, category *float64, global float64) float64 {
+	if product != nil {
+		return *product
+	}
+	if category != nil {
+		return *category
+	}
+	return global
+}
+
+// RoundTo90 sobe o preço para o próximo X,90 — nunca baixa. Igual a
+// public.round_to_90 no SQL.
+func RoundTo90(c Cents) Cents {
+	if c <= 0 {
+		return 0
+	}
+	reais := c / 100
+	if c%100 > 90 {
+		reais++
+	}
+	return reais*100 + 90
+}
+
+// PriceFromMarkupRounded aplica o markup e, se a loja pedir, o ,90.
+func PriceFromMarkupRounded(cost Cents, markupPct float64, round90 bool) Cents {
+	p := PriceFromMarkup(cost, markupPct)
+	if round90 {
+		return RoundTo90(p)
+	}
+	return p
+}

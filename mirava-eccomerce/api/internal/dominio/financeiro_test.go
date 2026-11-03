@@ -47,3 +47,25 @@ func TestMargemSobreAVendaDasPecas(t *testing.T) {
 		t.Errorf("margem = %v, esperado 60", f.NetMarginPct)
 	}
 }
+
+// Desconto (cupom ou pontos) sai da venda das peças; embrulho é receita da
+// loja e entra no faturamento e no lucro (decisão 31).
+func TestFechamentoComDescontoEEmbrulho(t *testing.T) {
+	f := MonthlyFinance(FinanceInput{
+		Orders:   2,
+		Subtotal: 20000, // R$200 em peças
+		Discount: 3000,  // um cupom de R$30
+		GiftWrap: 500,   // um embrulho
+		Cost:     7000,
+	})
+	if f.Revenue != 17500 {
+		t.Errorf("faturamento = %d, esperado 17500 (200 − 30 + 5)", f.Revenue)
+	}
+	if f.GrossProfit != 10500 {
+		t.Errorf("lucro bruto = %d, esperado 10500 (200 − 30 − 70 + 5)", f.GrossProfit)
+	}
+	// Margem sobre as peças já com desconto: 10500 / 17000.
+	if got := f.NetMarginPct; got < 61.76 || got > 61.77 {
+		t.Errorf("margem = %v, esperado ~61,76", got)
+	}
+}

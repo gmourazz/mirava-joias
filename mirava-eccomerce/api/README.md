@@ -58,8 +58,25 @@ go run ./cmd/servidor
 | `GET /saude` | pública | health check do Cloud Run |
 | `POST /checkout` | JWT da cliente | cria o pedido e devolve a URL de pagamento |
 | `POST /webhook/mercadopago` | assinatura HMAC | confirma pagamento — a fonte da verdade |
-| `POST /tarefas/sincronizar` | `CRON_SECRET` | varre o catálogo da Lilly |
+| `POST /tarefas/sincronizar` | `CRON_SECRET` | varre o catálogo da Lilly agora |
+| `POST /tarefas/sincronizar-se-devido` | `CRON_SECRET` | varre só se passou a frequência do painel (é a que o agendador chama) |
 | `POST /tarefas/avaliar-lote` | `CRON_SECRET` | fecha o lote se bateu meta ou teto |
+| `POST /tarefas/automacoes` | `CRON_SECRET` | e-mails automáticos: lembrete de pagamento, carrinho abandonado, pedir avaliação, avise-me |
+| `POST /checkout/previa` | JWT da cliente | mesma conta do checkout (cupom, pontos, embrulho), sem criar pedido |
+
+As rotas da loja e do painel (`/clube`, `/avaliacoes`, `/avise-me`, `/trocas`,
+`/vitrine`, `/avisos`, `/carrinho`, `/categorias`, `/banners`, `/galeria`,
+`/novidades`, `/cupons`, `/auth/esqueci`, `/auth/redefinir`, `/admin/*`) estão
+todas em `internal/web/servidor.go`.
+
+Fotos enviadas pelo painel (produto, banner, galeria) vão para
+`UPLOADS_DIR/uploads/` e são servidas em `/images/uploads/...` (decisão 35). No
+Cloud Run o disco some a cada deploy: lá, `UPLOADS_DIR` precisa ser um volume
+montado. Na VPS funciona direto.
+
+Papel de despacho (decisão 27): a dona dá acesso em Configurações → Equipe a
+uma conta já cadastrada; o despacho só abre `/admin/pedidos*` e `/admin/lotes*`
+(conferido em `requireAdmin`).
 
 ## Deploy no Cloud Run
 
@@ -110,12 +127,13 @@ parado — aceitável para uma loja começando.
 ## Agendamentos (Cloud Scheduler)
 
 ```bash
-# Sincronizar o catálogo a cada 6 horas
+# Sincronizar o catálogo: roda a cada hora, mas só lê a Lilly quando passou
+# a frequência escolhida no painel (Sincronização → Regras: 3, 6, 12 ou 24 h)
 gcloud scheduler jobs create http mirava-sincronizar \
   --location southamerica-east1 \
-  --schedule "0 */6 * * *" \
+  --schedule "0 * * * *" \
   --time-zone "America/Sao_Paulo" \
-  --uri "https://SUA-API.run.app/tarefas/sincronizar" \
+  --uri "https://SUA-API.run.app/tarefas/sincronizar-se-devido" \
   --http-method POST \
   --headers "Authorization=Bearer SEU_CRON_SECRET"
 
@@ -127,9 +145,21 @@ gcloud scheduler jobs create http mirava-lote \
   --uri "https://SUA-API.run.app/tarefas/avaliar-lote" \
   --http-method POST \
   --headers "Authorization=Bearer SEU_CRON_SECRET"
+
+# Automações por e-mail, a cada hora
+gcloud scheduler jobs create http mirava-automacoes \
+  --location southamerica-east1 \
+  --schedule "0 * * * *" \
+  --time-zone "America/Sao_Paulo" \
+  --uri "https://SUA-API.run.app/tarefas/automacoes" \
+  --http-method POST \
+  --headers "Authorization=Bearer SEU_CRON_SECRET"
 ```
 
-O free tier do Scheduler cobre 3 jobs.
+O free tier do Scheduler cobre 3 jobs — estes três. A tarefa de automações não
+faz nada enquanto o e-mail (Resend) não estiver configurado: as filas esperam,
+nada é marcado como enviado. Cada fila marca o envio na mesma consulta que lê,
+então rodar duas vezes não manda o mesmo e-mail duas vezes.
 
 ## Configurar o webhook no Mercado Pago
 

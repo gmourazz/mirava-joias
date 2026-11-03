@@ -57,6 +57,28 @@ type NewPreference struct {
 	// total. Sem isto o MP cobraria só a soma dos itens, e o webhook recusaria
 	// o pagamento por valor menor que o do pedido (defesa 3 do webhook.go).
 	ShippingCents int64
+	// Forma escolhida no checkout (decisão 33): "pix", "card", "boleto" ou "".
+	PaymentChoice string
+}
+
+// ExcludedPaymentTypes tira do Mercado Pago as formas que a cliente não
+// escolheu. Com Pix escolhido, sobra só o Pix — senão o desconto do Pix
+// viraria desconto num pagamento com cartão. Sem escolha, só tira o boleto
+// (comportamento de antes da decisão 33).
+func ExcludedPaymentTypes(choice string) []map[string]string {
+	ids := map[string][]string{
+		"pix":    {"credit_card", "debit_card", "prepaid_card", "ticket", "atm", "account_money"},
+		"card":   {"bank_transfer", "ticket", "atm", "account_money"},
+		"boleto": {"credit_card", "debit_card", "prepaid_card", "bank_transfer", "atm", "account_money"},
+	}[choice]
+	if ids == nil {
+		ids = []string{"ticket"}
+	}
+	out := make([]map[string]string, len(ids))
+	for i, id := range ids {
+		out[i] = map[string]string{"id": id}
+	}
+	return out
 }
 
 type Preference struct {
@@ -84,9 +106,8 @@ func (c *Client) CreatePreference(ctx context.Context, p NewPreference) (*Prefer
 		"payment_methods": map[string]any{
 			// Acima do limite sem juros o custo sai do lucro: 12x custa
 			// 12,49% contra 4,98% à vista. Ver PLANO.md, seção 9.
-			"installments": p.InstallmentsNoInterest,
-			// Sem boleto: 3 dias de compensação atrasam o fechamento do lote.
-			"excluded_payment_types": []map[string]string{{"id": "ticket"}},
+			"installments":           p.InstallmentsNoInterest,
+			"excluded_payment_types": ExcludedPaymentTypes(p.PaymentChoice),
 		},
 		"metadata": map[string]any{"order_number": p.OrderNumber},
 	}

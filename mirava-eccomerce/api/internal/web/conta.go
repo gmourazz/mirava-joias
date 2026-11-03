@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/mirava/api/internal/db"
 )
@@ -26,6 +27,13 @@ func (s *Servidor) updateProfile(w http.ResponseWriter, r *http.Request) {
 	if p.Name == "" {
 		responder(w, http.StatusBadRequest, mapa{"error": "Informe seu nome"})
 		return
+	}
+	if p.BirthDate != nil && *p.BirthDate != "" {
+		d, err := time.Parse("2006-01-02", *p.BirthDate)
+		if err != nil || d.After(time.Now()) || d.Year() < 1900 {
+			responder(w, http.StatusBadRequest, mapa{"error": "Data de nascimento inválida"})
+			return
+		}
 	}
 
 	if err := s.db.UpdateProfile(r.Context(), user.ID, p); err != nil {

@@ -102,3 +102,31 @@ func TestFeeCents(t *testing.T) {
 		t.Errorf("FeeCents() = %d, esperado 344", got)
 	}
 }
+
+// Decisão 33: o Mercado Pago abre só com a forma escolhida no checkout — o
+// desconto do Pix não pode virar desconto num pagamento com cartão.
+func TestTiposExcluidosPorForma(t *testing.T) {
+	has := func(list []map[string]string, id string) bool {
+		for _, m := range list {
+			if m["id"] == id {
+				return true
+			}
+		}
+		return false
+	}
+	pix := ExcludedPaymentTypes("pix")
+	if has(pix, "bank_transfer") || !has(pix, "credit_card") || !has(pix, "ticket") || !has(pix, "account_money") {
+		t.Errorf("pix: %v", pix)
+	}
+	card := ExcludedPaymentTypes("card")
+	if has(card, "credit_card") || !has(card, "bank_transfer") || !has(card, "ticket") {
+		t.Errorf("cartão: %v", card)
+	}
+	boleto := ExcludedPaymentTypes("boleto")
+	if has(boleto, "ticket") || !has(boleto, "bank_transfer") || !has(boleto, "credit_card") {
+		t.Errorf("boleto: %v", boleto)
+	}
+	if def := ExcludedPaymentTypes(""); !has(def, "ticket") || has(def, "credit_card") {
+		t.Errorf("sem escolha mantém o antigo (sem boleto): %v", def)
+	}
+}

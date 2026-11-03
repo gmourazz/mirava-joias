@@ -154,19 +154,27 @@ type AdminOrderDetail struct {
 	Address       json.RawMessage   `json:"address"`
 	Items         []AdminOrderItem  `json:"items"`
 	Events        []AdminOrderEvent `json:"events"`
+	Discount      dominio.Cents     `json:"discount_cents"`
+	CouponCode    *string           `json:"coupon_code"`
+	PointsUsed    int               `json:"points_used"`
+	GiftWrap      bool              `json:"gift_wrap"`
+	GiftWrapCents dominio.Cents     `json:"gift_wrap_cents"`
+	GiftMessage   *string           `json:"gift_message"`
 	Actions       []dominio.Status  `json:"actions"`
 }
 
 func (d *DB) AdminOrderByID(ctx context.Context, id string) (*AdminOrderDetail, error) {
 	var o AdminOrderDetail
 	var addr []byte
-	row := d.pool.QueryRow(ctx, `select `+adminOrderColumns+`, o.customer_phone, o.address
+	row := d.pool.QueryRow(ctx, `select `+adminOrderColumns+`, o.customer_phone, o.address,
+		o.discount_cents, o.coupon_code, o.points_used, o.gift_wrap, o.gift_wrap_cents, o.gift_message
 		from orders o left join batches b on b.id = o.batch_id
 		where o.id = $1`, id)
 	err := row.Scan(&o.ID, &o.Number, &o.Status, &o.CustomerName, &o.CustomerEmail,
 		&o.Total, &o.Subtotal, &o.Shipping, &o.Cost, &o.ItemsCount,
 		&o.ShippingMethod, &o.TrackingCode, &o.BatchNumber,
-		&o.CreatedAt, &o.PaidAt, &o.ShippedAt, &o.State, &o.CustomerPhone, &addr)
+		&o.CreatedAt, &o.PaidAt, &o.ShippedAt, &o.State, &o.CustomerPhone, &addr,
+		&o.Discount, &o.CouponCode, &o.PointsUsed, &o.GiftWrap, &o.GiftWrapCents, &o.GiftMessage)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -553,26 +561,39 @@ func (d *DB) AdminSummary(ctx context.Context) (*AdminSummary, error) {
 // ---------------------------------------------------------------------------
 
 type AdminProduct struct {
-	ID               string        `json:"id"`
-	Slug             string        `json:"slug"`
-	Name             string        `json:"name"`
-	Description      *string       `json:"description"`
-	Category         string        `json:"category"`
-	Metal            string        `json:"metal"`
-	Price            dominio.Cents `json:"price_cents"`
-	Cost             dominio.Cents `json:"cost_cents"`
-	MarkupPct        float64       `json:"markup_pct"`
-	AutoPrice        bool          `json:"auto_price"`
-	SuggestedPrice   *int          `json:"suggested_price_cents"`
-	SuggestionReason *string       `json:"suggestion_reason"`
-	Published        bool          `json:"published"`
-	Featured         bool          `json:"featured"`
-	Image            *string       `json:"image"`
-	SKU              *string       `json:"sku"`
-	SupplierURL      *string       `json:"supplier_url"`
-	RetailCents      *int          `json:"supplier_retail_cents"`
-	UnitsSold        int           `json:"units_sold"`
-	UpdatedAt        time.Time     `json:"updated_at"`
+	ID          string        `json:"id"`
+	Slug        string        `json:"slug"`
+	Name        string        `json:"name"`
+	Description *string       `json:"description"`
+	Category    string        `json:"category"`
+	Metal       string        `json:"metal"`
+	Price       dominio.Cents `json:"price_cents"`
+	Cost        dominio.Cents `json:"cost_cents"`
+	// Markup da própria peça (nulo = herda) e o que vale de fato (decisão 21).
+	MarkupPct        *float64  `json:"markup_pct"`
+	EffectiveMarkup  float64   `json:"effective_markup_pct"`
+	AutoPrice        bool      `json:"auto_price"`
+	SuggestedPrice   *int      `json:"suggested_price_cents"`
+	SuggestionReason *string   `json:"suggestion_reason"`
+	Published        bool      `json:"published"`
+	Featured         bool      `json:"featured"`
+	Image            *string   `json:"image"`
+	SKU              *string   `json:"sku"`
+	SupplierURL      *string   `json:"supplier_url"`
+	RetailCents      *int      `json:"supplier_retail_cents"`
+	UnitsSold        int       `json:"units_sold"`
+	UpdatedAt        time.Time `json:"updated_at"`
+
+	Images         []string `json:"images"`
+	SEOTitle       *string  `json:"seo_title"`
+	SEODescription *string  `json:"seo_description"`
+	KeepOwnPhotos  bool     `json:"keep_own_photos"`
+	Available      bool     `json:"available"` // na Lilly
+	Manual         bool     `json:"manual"`    // cadastrada à mão, sem espelho
+	PromoPct       int      `json:"promo_pct"`
+	Showcase       []string `json:"showcase"` // espaços da vitrine onde aparece
+	// Dias desde a última venda paga (nulo = nunca vendeu).
+	LastSaleDays *int `json:"last_sale_days"`
 }
 
 type AdminProductFilter struct {
@@ -580,6 +601,9 @@ type AdminProductFilter struct {
 	Category string
 	Metal    string
 	Status   string // "publicados" | "despublicados" | "alerta" | "destaque"
+	Price    string // "ate60" | "60a100" | "acima100"
+	Vitrine  string // "capa" | "home" | "fora"
+	Sales    string // "promocao" | "parados"
 	Limit    int
 	Offset   int
 }
@@ -588,13 +612,22 @@ const adminProductColumns = `
 	p.id::text, p.slug, p.name, p.description, p.category, p.metal,
 	p.price_cents, p.cost_cents, p.markup_pct::float8, p.auto_price,
 	p.suggested_price_cents, p.suggestion_reason, p.published, p.featured,
-	p.images[1], sp.sku, sp.url, sp.retail_cents, p.units_sold, p.updated_at`
+	p.images[1], sp.sku, sp.url, sp.retail_cents, p.units_sold, p.updated_at,
+	p.images, p.seo_title, p.seo_description, p.keep_own_photos,
+	coalesce(sp.available, true), p.supplier_product_id is null,
+	public.promo_pct(p.id, p.category),
+	coalesce(array(select s.slot from showcase_items s where s.product_id = p.id order by s.slot), '{}'),
+	public.effective_markup(p.markup_pct, p.category)::float8,
+	(select extract(day from now() - max(o.paid_at))::int from order_items i join orders o on o.id = i.order_id
+	  where i.product_id = p.id and o.status in ` + revenueStatuses + `)`
 
 func scanAdminProduct(row pgx.Row, p *AdminProduct) error {
 	return row.Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.Category, &p.Metal,
 		&p.Price, &p.Cost, &p.MarkupPct, &p.AutoPrice,
 		&p.SuggestedPrice, &p.SuggestionReason, &p.Published, &p.Featured,
-		&p.Image, &p.SKU, &p.SupplierURL, &p.RetailCents, &p.UnitsSold, &p.UpdatedAt)
+		&p.Image, &p.SKU, &p.SupplierURL, &p.RetailCents, &p.UnitsSold, &p.UpdatedAt,
+		&p.Images, &p.SEOTitle, &p.SEODescription, &p.KeepOwnPhotos,
+		&p.Available, &p.Manual, &p.PromoPct, &p.Showcase, &p.EffectiveMarkup, &p.LastSaleDays)
 }
 
 // AdminProducts pagina o catálogo no servidor: são milhares de peças, e a
@@ -608,19 +641,37 @@ func (d *DB) AdminProducts(ctx context.Context, f AdminProductFilter) ([]AdminPr
 	         when 'despublicados' then not p.published
 	         when 'alerta'        then p.suggested_price_cents is not null
 	         when 'destaque'      then p.featured
+	         when 'margem'        then p.price_cents > 0 and (p.price_cents - p.cost_cents) * 100.0 / p.price_cents
+	                                   < (select min_margin_pct from store_settings limit 1)
+	         else true end)
+	  and (case $7
+	         when 'ate60'    then p.price_cents <= 6000
+	         when '60a100'   then p.price_cents > 6000 and p.price_cents <= 10000
+	         when 'acima100' then p.price_cents > 10000
+	         else true end)
+	  and (case $8
+	         when 'capa' then p.featured
+	         when 'home' then exists (select 1 from showcase_items s where s.product_id = p.id)
+	         when 'fora' then not p.featured and not exists (select 1 from showcase_items s where s.product_id = p.id)
+	         else true end)
+	  and (case $9
+	         when 'promocao' then public.promo_pct(p.id, p.category) > 0
+	         when 'parados'  then not exists (select 1 from order_items i join orders o on o.id = i.order_id
+	                              where i.product_id = p.id and o.paid_at > now() - interval '30 days'
+	                                and o.status in ` + revenueStatuses + `)
 	         else true end)`
 	from := ` from products p left join supplier_products sp on sp.id = p.supplier_product_id `
 
 	var total int
-	if err := d.pool.QueryRow(ctx, `select count(*)`+from+where,
-		f.Search, f.Category, f.Metal, f.Status).Scan(&total); err != nil {
+	if err := d.pool.QueryRow(ctx, `select count(*)`+from+where+` and $5::int >= 0 and $6::int >= 0`,
+		f.Search, f.Category, f.Metal, f.Status, 0, 0, f.Price, f.Vitrine, f.Sales).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
 	rows, err := d.pool.Query(ctx, `select `+adminProductColumns+from+where+`
 		order by (p.suggested_price_cents is not null) desc, p.units_sold desc, p.name
 		limit $5 offset $6`,
-		f.Search, f.Category, f.Metal, f.Status, f.Limit, f.Offset)
+		f.Search, f.Category, f.Metal, f.Status, f.Limit, f.Offset, f.Price, f.Vitrine, f.Sales)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -652,39 +703,114 @@ func (d *DB) AdminProductByID(ctx context.Context, id string) (*AdminProduct, er
 // mexe. Preço não está aqui de propósito: preço só muda por markup
 // (ApplyMarkup) ou aceitando a sugestão do disjuntor.
 type AdminProductUpdate struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	Published   *bool   `json:"published"`
-	Featured    *bool   `json:"featured"`
+	Name           *string   `json:"name"`
+	Description    *string   `json:"description"`
+	Published      *bool     `json:"published"`
+	Featured       *bool     `json:"featured"`
+	Category       *string   `json:"category"`
+	Metal          *string   `json:"metal"`
+	SEOTitle       *string   `json:"seo_title"`
+	SEODescription *string   `json:"seo_description"`
+	Images         *[]string `json:"images"`
+	KeepOwnPhotos  *bool     `json:"keep_own_photos"`
 }
 
+// UpdateProduct grava o que a dona editou. Mexeu no nome/descrição, na
+// categoria ou nas fotos: a sincronização para de sobrescrever aquilo
+// (keep_own_text, category_locked, keep_own_photos).
 func (d *DB) UpdateProduct(ctx context.Context, id string, u AdminProductUpdate) (bool, error) {
+	var images []string
+	if u.Images != nil {
+		images = *u.Images
+	}
 	tag, err := d.pool.Exec(ctx, `
 		update products set
-		  name        = coalesce($2, name),
-		  description = coalesce($3, description),
-		  published   = coalesce($4, published),
-		  featured    = coalesce($5, featured)
-		where id = $1`, id, u.Name, u.Description, u.Published, u.Featured)
+		  name            = coalesce($2, name),
+		  description     = coalesce($3, description),
+		  published       = coalesce($4, published),
+		  featured        = coalesce($5, featured),
+		  category        = coalesce($6, category),
+		  metal           = coalesce($7, metal),
+		  seo_title       = case when $8::text is null then seo_title else nullif($8, '') end,
+		  seo_description = case when $9::text is null then seo_description else nullif($9, '') end,
+		  images          = case when $10::boolean then $11 else images end,
+		  keep_own_photos = coalesce($12, keep_own_photos or $10::boolean),
+		  keep_own_text   = keep_own_text or $2::text is not null or $3::text is not null,
+		  category_locked = category_locked or $6::text is not null,
+		  hidden_by_sync  = case when $4::boolean is not null then false else hidden_by_sync end
+		where id = $1`, id, u.Name, u.Description, u.Published, u.Featured, u.Category, u.Metal,
+		u.SEOTitle, u.SEODescription, u.Images != nil, images, u.KeepOwnPhotos)
 	return tag.RowsAffected() > 0, err
+}
+
+// NewManualProduct: peça cadastrada à mão no painel (sem espelho da Lilly).
+type NewManualProduct struct {
+	Name        string
+	Description string
+	Category    string
+	Metal       string
+	Cost        dominio.Cents
+	MarkupPct   *float64
+	Images      []string
+	Published   bool
+}
+
+// CreateManualProduct grava a peça com o preço calculado no Go (markup em
+// camadas e ,90 — decisão 21).
+func (d *DB) CreateManualProduct(ctx context.Context, p NewManualProduct) (string, error) {
+	price, err := d.priceFor(ctx, p.Cost, p.MarkupPct, p.Category)
+	if err != nil {
+		return "", err
+	}
+	var id string
+	err = d.pool.QueryRow(ctx, `
+		insert into products (slug, name, description, price_cents, cost_cents, category, metal,
+			images, published, auto_price, markup_pct, keep_own_text, keep_own_photos, category_locked)
+		values (public.generate_slug($1 || ' ' || substr(md5(random()::text), 1, 5)), $1, nullif($2,''),
+			$3, $4, $5, $6, $7, $8, true, $9, true, true, true)
+		returning id::text`,
+		p.Name, p.Description, price, p.Cost, p.Category, p.Metal, p.Images, p.Published, p.MarkupPct).Scan(&id)
+	return id, err
+}
+
+// priceFor: preço a partir do custo com o markup em camadas, em Go.
+func (d *DB) priceFor(ctx context.Context, cost dominio.Cents, own *float64, category string) (dominio.Cents, error) {
+	var cat *float64
+	var global float64
+	var round90 bool
+	err := d.pool.QueryRow(ctx, `
+		select (select markup_pct::float8 from categories where slug = $1),
+		       default_markup_pct::float8, round_to_90 from store_settings limit 1`, category).
+		Scan(&cat, &global, &round90)
+	if err != nil {
+		return 0, err
+	}
+	price := dominio.PriceFromMarkupRounded(cost, dominio.EffectiveMarkup(own, cat, global), round90)
+	if price <= 0 {
+		return 0, errors.New("custo zerado: preço não pode ser calculado")
+	}
+	return price, nil
 }
 
 // ApplyMarkup grava o markup e o preço que sai dele. O preço é calculado no
 // domínio (dominio.PriceFromMarkup), com o mesmo arredondamento da função SQL
 // do disjuntor. Volta o preço para automático e descarta sugestão pendente:
 // a dona acabou de decidir o preço.
-func (d *DB) ApplyMarkup(ctx context.Context, id string, markupPct float64) (bool, error) {
+//
+// markupPct nulo = a peça volta a herdar o markup da categoria ou o padrão.
+func (d *DB) ApplyMarkup(ctx context.Context, id string, markupPct *float64) (bool, error) {
 	var cost dominio.Cents
-	err := d.pool.QueryRow(ctx, `select cost_cents from products where id = $1`, id).Scan(&cost)
+	var category string
+	err := d.pool.QueryRow(ctx, `select cost_cents, category from products where id = $1`, id).Scan(&cost, &category)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	price := dominio.PriceFromMarkup(cost, markupPct)
-	if price <= 0 {
-		return false, errors.New("custo zerado: preço não pode ser calculado")
+	price, err := d.priceFor(ctx, cost, markupPct, category)
+	if err != nil {
+		return false, err
 	}
 	tag, err := d.pool.Exec(ctx, `
 		update products set markup_pct = $2, price_cents = $3, auto_price = true,
@@ -726,6 +852,8 @@ type FinanceOrder struct {
 	Total          dominio.Cents `json:"total_cents"`
 	Cost           dominio.Cents `json:"cost_cents"`
 	Fee            dominio.Cents `json:"fee_cents"`
+	Discount       dominio.Cents `json:"discount_cents"`
+	GiftWrap       dominio.Cents `json:"gift_wrap_cents"`
 }
 
 type FinanceGroup struct {
@@ -751,7 +879,7 @@ func (d *DB) FinanceMonth(ctx context.Context, start, end time.Time, packagingEa
 
 	rows, err := d.pool.Query(ctx, `
 		select o.id::text, o.number, o.customer_name, o.paid_at, o.shipping_method,
-		       o.subtotal_cents, o.shipping_cents, o.total_cents,
+		       o.subtotal_cents, o.shipping_cents, o.total_cents, o.discount_cents, o.gift_wrap_cents,
 		       coalesce((select sum(i.unit_cost_cents * i.quantity) from order_items i where i.order_id = o.id), 0),
 		       coalesce((select sum(p.fee_cents) from payments p
 		                  where p.order_id = o.id and p.status = 'approved'), 0)
@@ -766,12 +894,14 @@ func (d *DB) FinanceMonth(ctx context.Context, start, end time.Time, packagingEa
 	for rows.Next() {
 		var o FinanceOrder
 		if err := rows.Scan(&o.ID, &o.Number, &o.CustomerName, &o.PaidAt, &o.ShippingMethod,
-			&o.Subtotal, &o.Shipping, &o.Total, &o.Cost, &o.Fee); err != nil {
+			&o.Subtotal, &o.Shipping, &o.Total, &o.Discount, &o.GiftWrap, &o.Cost, &o.Fee); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		in.Orders++
 		in.Subtotal += o.Subtotal
+		in.Discount += o.Discount
+		in.GiftWrap += o.GiftWrap
 		in.ShippingCharged += o.Shipping
 		in.Cost += o.Cost
 		in.Fees += o.Fee
@@ -805,6 +935,8 @@ func (d *DB) FinanceMonth(ctx context.Context, start, end time.Time, packagingEa
 		}
 		return res, rows.Err()
 	}
+	// Por categoria e por peça a conta é item a item, antes do desconto do
+	// pedido (cupom e pontos valem para o pedido inteiro, não para uma peça).
 	base := `from order_items i join orders o on o.id = i.order_id
 		left join products pr on pr.id = i.product_id
 		where o.paid_at >= $1 and o.paid_at < $2 and o.status in ` + revenueStatuses
@@ -941,6 +1073,9 @@ type AdminCustomer struct {
 	LastOrderAt *time.Time    `json:"last_order_at"`
 	Favorites   int           `json:"favorites"`
 	IsAdmin     bool          `json:"is_admin"`
+	// Design v5: nível do Mirava Club (pelos pontos já ganhos) e etiquetas.
+	Level dominio.ClubLevel `json:"level"`
+	Tags  []string          `json:"tags"`
 }
 
 // AdminCustomers lista as contas com o que cada uma comprou. "Pedidos" e
@@ -952,7 +1087,9 @@ func (d *DB) AdminCustomers(ctx context.Context, search string) ([]AdminCustomer
 		       coalesce(sum(o.total_cents) filter (where o.status in `+revenueStatuses+`), 0)::int,
 		       max(o.paid_at),
 		       (select count(*) from favorites f where f.user_id = u.id)::int,
-		       exists (select 1 from admins a where a.user_id = u.id)
+		       exists (select 1 from admins a where a.user_id = u.id),
+		       coalesce(sum(o.points_earned) filter (where o.status = 'delivered'), 0)::int,
+		       coalesce((select n.tags from customer_notes n where n.user_id = u.id), '{}')
 		from users u
 		left join profiles p on p.id = u.id
 		left join orders o on o.user_id = u.id
@@ -967,10 +1104,12 @@ func (d *DB) AdminCustomers(ctx context.Context, search string) ([]AdminCustomer
 	out := []AdminCustomer{}
 	for rows.Next() {
 		var c AdminCustomer
+		var earned int
 		if err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.Phone, &c.CreatedAt,
-			&c.Orders, &c.Spent, &c.LastOrderAt, &c.Favorites, &c.IsAdmin); err != nil {
+			&c.Orders, &c.Spent, &c.LastOrderAt, &c.Favorites, &c.IsAdmin, &earned, &c.Tags); err != nil {
 			return nil, err
 		}
+		c.Level = dominio.ClubLevelFor(earned)
 		out = append(out, c)
 	}
 	return out, rows.Err()
