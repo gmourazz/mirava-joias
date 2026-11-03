@@ -76,7 +76,7 @@ gcloud run deploy mirava-api \
   --memory 512Mi \
   --timeout 3600 \
   --set-env-vars "SITE_URL=https://miravajoias.com.br,MP_MODO=producao,PARCELAS_SEM_JUROS=3" \
-  --set-secrets "DATABASE_URL=mirava-db:latest,SUPABASE_JWT_SECRET=mirava-jwt:latest,MP_ACCESS_TOKEN=mirava-mp-token:latest,MP_WEBHOOK_SECRET=mirava-mp-webhook:latest,CRON_SECRET=mirava-cron:latest"
+  --set-secrets "DATABASE_URL=mirava-db:latest,AUTH_SECRET=mirava-auth:latest,MP_ACCESS_TOKEN=mirava-mp-token:latest,MP_WEBHOOK_SECRET=mirava-mp-webhook:latest,CRON_SECRET=mirava-cron:latest"
 ```
 
 Guarde os segredos no Secret Manager, não em `--set-env-vars`:
@@ -92,6 +92,20 @@ o webhook. A proteção real são a assinatura HMAC e o `CRON_SECRET`.
 tier (2 milhões de requisições/mês) cobre a operação com folga. O custo é uma
 partida a frio de 1 a 2 segundos na primeira visita depois de um período
 parado — aceitável para uma loja começando.
+
+> ⚠️ **Sincronização em segundo plano no Cloud Run.** `POST /tarefas/sincronizar`
+> responde 202 na hora e continua lendo o catálogo numa goroutine por 1–2 horas.
+> No Cloud Run padrão a CPU só fica ligada enquanto há requisição aberta: depois
+> da resposta, a leitura é congelada e a instância pode ser desligada no meio.
+> Antes de ligar o agendador em produção, escolha uma saída:
+>
+> - **`--no-cpu-throttling`** (CPU sempre alocada) no deploy — mais simples, mas
+>   cobra a instância enquanto ela estiver de pé;
+> - **Cloud Run Job** só para a sincronização, separado da API;
+> - **VPS** (decisão 15 da arquitetura): processo comum, sem esse limite.
+>
+> A leitura que morre no meio fica registrada: o progresso é gravado a cada 50
+> páginas e a próxima leitura encerra a anterior como "interrompida".
 
 ## Agendamentos (Cloud Scheduler)
 

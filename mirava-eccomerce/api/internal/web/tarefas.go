@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -30,10 +31,10 @@ func toDBReviews(rs []lilly.Review) []db.Review {
 // sincronizar lê o catálogo da Lilly e atualiza o espelho.
 //
 // Duas coisas que este handler NUNCA faz:
-//   1. escrever direto em `products` — só no espelho, e o preço passa pelo
-//      disjuntor da função SQL apply_synced_cost
-//   2. gravar dado que não passou em Validate() — extrator quebrado que grave
-//      custo zero no catálogo inteiro é muito pior que sync que falha alto
+//  1. escrever direto em `products` — só no espelho, e o preço passa pelo
+//     disjuntor da função SQL apply_synced_cost
+//  2. gravar dado que não passou em Validate() — extrator quebrado que grave
+//     custo zero no catálogo inteiro é muito pior que sync que falha alto
 func (s *Servidor) syncCatalog(w http.ResponseWriter, r *http.Request) {
 	// Cloud Run corta a requisição em 60s por padrão; a varredura leva mais.
 	// context.WithoutCancel desliga o cancelamento pelo fim da requisição.
@@ -74,6 +75,10 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 	}
 
 	syncID, err := s.db.StartSync(ctx, supplierID, len(entries))
+	if errors.Is(err, db.ErrSyncRunning) {
+		s.log.Warn("sincronização ignorada: outra já está em andamento")
+		return
+	}
 	if err != nil {
 		s.log.Error("não consegui registrar a sincronização", "erro", err)
 		return
@@ -91,12 +96,11 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 			// resultado (a query seria cancelada na hora, e o registro de
 			// sincronização ficaria com status errado pra sempre). Por isso
 			// um contexto novo, curto, só pra esse último UPDATE.
-			res.Status = "parcial"
-			res.Error = "tempo esgotado"
+			res.Status, res.Error = dominio.SyncOutcome(res.Processed, res.Failed, true)
 			s.log.Warn("sincronização interrompida — bateu o prazo total",
 				"processados", res.Processed, "de", len(entries))
 			finishCtx, cancelFinish := context.WithTimeout(context.Background(), 10*time.Second)
-			_ = s.db.FinishSync(finishCtx, syncID, res)
+			s.finishSync(finishCtx, syncID, res)
 			cancelFinish()
 			return
 		default:
@@ -196,10 +200,10 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 		if len(localImages) > 0 {
 			_, _, err := s.db.EnsureProduct(itemCtx, mirrorID, db.EnsureProductInput{
 				SKU: p.SKU, Name: p.Name, Description: p.Description,
-				Cost:        p.Wholesale,
-				Category:    lilly.GuessCategory(p.Name),
-				Metal:       lilly.GuessMetal(p.Name),
-				Images:      localImages,
+				Cost:         p.Wholesale,
+				Category:     lilly.GuessCategory(p.Name),
+				Metal:        lilly.GuessMetal(p.Name),
+				Images:       localImages,
 				Rating:       p.Rating,
 				RatingCount:  p.RatingCount,
 				Reviews:      toDBReviews(p.Reviews),
@@ -220,6 +224,9 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 			s.log.Info("sincronização em andamento",
 				"processados", res.Processed, "de", len(entries),
 				"novos", res.Created, "atualizados", res.Updated, "falhas", res.Failed)
+			if err := s.db.UpdateSyncProgress(ctx, syncID, res); err != nil {
+				s.log.Warn("não consegui gravar o progresso da sincronização", "erro", err)
+			}
 		}
 	}
 
@@ -234,17 +241,24 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 
 	// Taxa de sucesso baixa = o layout da Lilly mudou. Você quer saber por
 	// aqui, não pela cliente reclamando que o site está com preço errado.
-	res.Status = "sucesso"
-	if res.Processed > 0 && float64(res.Failed)/float64(res.Processed) > 0.10 {
-		res.Status = "parcial"
-		res.Error = "mais de 10% das páginas falharam — o layout da Lilly pode ter mudado"
+	res.Status, res.Error = dominio.SyncOutcome(res.Processed, res.Failed, false)
+	if res.Status == dominio.SyncPartial {
 		s.log.Error("sincronização degradada", "falhas", res.Failed, "total", res.Processed)
 	}
 
-	_ = s.db.FinishSync(ctx, syncID, res)
+	s.finishSync(ctx, syncID, res)
 	s.log.Info("sincronização concluída",
 		"novos", res.Created, "atualizados", res.Updated,
 		"falhas", res.Failed, "travados", res.LockedPrices, "sumidos", res.Vanished)
+}
+
+// finishSync grava o fim da leitura. Nunca ignore o erro daqui: foi um
+// FinishSync falhando em silêncio (status em português barrado pelo CHECK do
+// banco) que deixou todas as leituras de agosto/2026 "rodando" para sempre.
+func (s *Servidor) finishSync(ctx context.Context, syncID string, res db.SyncResult) {
+	if err := s.db.FinishSync(ctx, syncID, res); err != nil {
+		s.log.Error("não consegui gravar o fim da sincronização", "erro", err, "sync", syncID)
+	}
 }
 
 // atualizarMaisVendidos guarda os dois sinais da vitrine de mais vendidos.

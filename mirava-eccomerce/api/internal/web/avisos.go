@@ -52,12 +52,11 @@ func (s *Servidor) paraNotificacao(o *db.OrderNotification) notificacao.Pedido {
 	}
 }
 
-// prazoTexto formata o prazo prometido: "10 a 20 dias úteis". Os números vêm
-// do domínio (EstimatedDeadline), não daqui — o texto do site e o do e-mail
-// precisam dizer a mesma coisa.
+// prazoTexto formata o prazo prometido: "até 20 dias úteis" (decisão 22). O
+// número vem do domínio (PromisedBusinessDays), não daqui — o texto do site e
+// o do e-mail precisam dizer a mesma coisa.
 func prazoTexto() string {
-	min, max := dominio.EstimatedDeadline()
-	return fmt.Sprintf("%d a %d dias úteis", min, max)
+	return fmt.Sprintf("até %d dias úteis", dominio.PromisedBusinessDays)
 }
 
 // linkWhatsApp monta o wa.me com a mensagem já escrita.

@@ -12,6 +12,17 @@ func TestEconomicoFicaGratisAcimaDoLimite(t *testing.T) {
 	}
 }
 
+// Decisão 20 da arquitetura: R$300 em pedido. Os testes acima usam a
+// constante e passariam com qualquer valor; este trava o número em si.
+func TestEconomicoGratisAPartirDeTrezentosReais(t *testing.T) {
+	if options := ShippingOptions("SP", 30000); !options[0].Free {
+		t.Fatal("pedido de R$300 deveria ter econômico grátis")
+	}
+	if options := ShippingOptions("SP", 29999); options[0].Free {
+		t.Fatal("pedido de R$299,99 não pode ter econômico grátis")
+	}
+}
+
 func TestUmCentavoAbaixoDoLimiteAindaCobra(t *testing.T) {
 	options := ShippingOptions("SP", FreeShippingAbove-1)
 	if options[0].Cents == 0 {

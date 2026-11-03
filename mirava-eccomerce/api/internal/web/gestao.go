@@ -10,18 +10,11 @@ import (
 	"github.com/mirava/api/internal/notificacao"
 )
 
-// Rotas de gestão da loja — o começo do painel.
-//
-// Por enquanto existe uma só: marcar um pedido como postado. É a única
-// mudança de status que a cliente vê acontecer, e a única que depende de uma
-// informação que só a dona tem (o código de rastreio dos Correios). Tudo
-// entre o pagamento e a postagem a cliente enxerga como "em preparação", e
-// esses passos internos o próprio sistema movimenta.
-//
-// Protegidas pelo CRON_SECRET por enquanto — o mesmo segredo das tarefas
-// agendadas. Quando o painel existir, isto vira login de admin de verdade
-// (a tabela `admins` já está no schema esperando). Trocar depois é mexer no
-// middleware, não nos handlers.
+// Despacho do pedido — a única mudança de status que depende de uma
+// informação que só a dona tem (o código de rastreio dos Correios) e que
+// dispara aviso à cliente. Fica numa rota própria do painel
+// (POST /admin/pedidos/{id}/despachar, protegida por requireAdmin); as outras
+// transições manuais estão em admin.go.
 
 // Formato dos Correios: 2 letras + 9 dígitos + 2 letras (ex.: AA123456789BR).
 var reRastreio = regexp.MustCompile(`^[A-Z]{2}[0-9]{9}[A-Z]{2}$`)
@@ -82,16 +75,4 @@ func (s *Servidor) shipOrder(w http.ResponseWriter, r *http.Request) {
 	s.avisar(ctx, orderID, notificacao.PedidoEnviado)
 
 	responder(w, http.StatusOK, mapa{"ok": true, "tracking_code": code})
-}
-
-// listOrdersToShip é a fila de despacho: pedidos pagos que ainda não foram
-// postados, do mais antigo para o mais novo.
-func (s *Servidor) listOrdersToShip(w http.ResponseWriter, r *http.Request) {
-	pedidos, err := s.db.OrdersToShip(r.Context())
-	if err != nil {
-		s.log.Error("falha ao listar fila de despacho", "erro", err)
-		responder(w, http.StatusInternalServerError, mapa{"error": "Não consegui carregar a fila"})
-		return
-	}
-	responder(w, http.StatusOK, pedidos)
 }

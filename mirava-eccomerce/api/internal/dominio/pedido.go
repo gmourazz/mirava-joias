@@ -84,7 +84,7 @@ func (s Status) Label() string {
 	case Paid, InBatch:
 		return "Pagamento confirmado · preparando sua encomenda"
 	case PurchasedFromSupplier:
-		return "Sua peça está sendo produzida"
+		return "Sua peça foi encomendada"
 	case ReceivedByOwner:
 		return "Peça recebida · sendo embalada com carinho"
 	case Shipped:

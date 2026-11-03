@@ -40,9 +40,12 @@ type ShippingOption struct {
 // limite existe para que o frete grátis venha junto com um pedido que o
 // sustente.
 //
-// Este número também aparece no texto do site ("frete grátis acima de R$ 350",
+// Valor fixado na decisão 20 da arquitetura (R$300; antes era R$350). Não tem
+// relação com os R$300 do lote de atacado — mesmo número, regras diferentes.
+//
+// Este número também aparece no texto do site ("frete grátis acima de R$ 300",
 // em frontend/src/data/content.ts). Mudou aqui, mude lá.
-const FreeShippingAbove Cents = 35000
+const FreeShippingAbove Cents = 30000
 
 // region agrupa os estados por distância a partir de São Paulo, de onde a
 // Mirava despacha.

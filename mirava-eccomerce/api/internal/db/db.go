@@ -63,10 +63,10 @@ func isDuplicate(err error) bool {
 // ---------------------------------------------------------------------------
 
 type ProductVariant struct {
-	ID              string `json:"id"`
-	Size            string `json:"size"`
-	PriceAdjustCents int   `json:"price_adjust_cents"`
-	Available       bool   `json:"available"`
+	ID               string `json:"id"`
+	Size             string `json:"size"`
+	PriceAdjustCents int    `json:"price_adjust_cents"`
+	Available        bool   `json:"available"`
 }
 
 // Review é a avaliação tal como veio da Lilly — nome, data e comentário
@@ -90,23 +90,27 @@ func unmarshalReviews(raw []byte, out *[]Review) error {
 }
 
 type CatalogProduct struct {
-	ID          string           `json:"id"`
-	Slug        string           `json:"slug"`
-	Name        string           `json:"name"`
-	Description *string          `json:"description"`
-	PriceCents  int              `json:"price_cents"`
-	Category    string           `json:"category"`
-	Metal       string           `json:"metal"`
-	Images      []string         `json:"images"`
-	Featured    bool             `json:"featured"`
-	Rating      *float64         `json:"rating"`
-	RatingCount int              `json:"rating_count"`
-	Reviews     []Review         `json:"reviews"`
-	Available   bool             `json:"available"`
+	ID          string   `json:"id"`
+	Slug        string   `json:"slug"`
+	Name        string   `json:"name"`
+	Description *string  `json:"description"`
+	PriceCents  int      `json:"price_cents"`
+	Category    string   `json:"category"`
+	Metal       string   `json:"metal"`
+	Images      []string `json:"images"`
+	Featured    bool     `json:"featured"`
+	Rating      *float64 `json:"rating"`
+	RatingCount int      `json:"rating_count"`
+	Reviews     []Review `json:"reviews"`
+	Available   bool     `json:"available"`
 	// Como chamar o grupo de opção desta peça: "Tamanho" num anel, "Letras"
 	// num colar de letra. Vazio quando a peça não tem escolha nenhuma.
 	VariantLabel *string          `json:"variant_label"`
 	Variants     []ProductVariant `json:"variants"`
+	// IsNew: cadastrada há até dominio.NewProductDays — selo "Novo" e aba
+	// Lançamentos da vitrine.
+	IsNew     bool      `json:"is_new"`
+	CreatedAt time.Time `json:"-"`
 }
 
 type ProductFilter struct {
@@ -133,7 +137,7 @@ func (d *DB) ListProducts(ctx context.Context, f ProductFilter) ([]CatalogProduc
 		       p.category, p.metal, p.images, p.featured,
 		       coalesce(sp.available, true),
 		       p.rating::float8, coalesce(p.rating_count, 0), coalesce(p.reviews, '[]'::jsonb),
-		       p.variant_label
+		       p.variant_label, p.created_at
 		from products p
 		left join supplier_products sp on sp.id = p.supplier_product_id
 		where p.published = true`
@@ -176,9 +180,10 @@ func (d *DB) ListProducts(ctx context.Context, f ProductFilter) ([]CatalogProduc
 		var reviewsRaw []byte
 		if err := rows.Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.PriceCents,
 			&p.Category, &p.Metal, &p.Images, &p.Featured, &p.Available,
-			&p.Rating, &p.RatingCount, &reviewsRaw, &p.VariantLabel); err != nil {
+			&p.Rating, &p.RatingCount, &reviewsRaw, &p.VariantLabel, &p.CreatedAt); err != nil {
 			return nil, err
 		}
+		p.IsNew = dominio.IsNewProduct(p.CreatedAt, time.Now())
 		if err := unmarshalReviews(reviewsRaw, &p.Reviews); err != nil {
 			return nil, err
 		}
@@ -209,13 +214,14 @@ func (d *DB) ProductBySlug(ctx context.Context, slug string) (*CatalogProduct, e
 		       p.category, p.metal, p.images, p.featured,
 		       coalesce(sp.available, true),
 		       p.rating::float8, coalesce(p.rating_count, 0), coalesce(p.reviews, '[]'::jsonb),
-		       p.variant_label
+		       p.variant_label, p.created_at
 		from products p
 		left join supplier_products sp on sp.id = p.supplier_product_id
 		where p.slug = $1 and p.published = true`, slug).
 		Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.PriceCents,
 			&p.Category, &p.Metal, &p.Images, &p.Featured, &p.Available,
-			&p.Rating, &p.RatingCount, &reviewsRaw, &p.VariantLabel)
+			&p.Rating, &p.RatingCount, &reviewsRaw, &p.VariantLabel, &p.CreatedAt)
+	p.IsNew = dominio.IsNewProduct(p.CreatedAt, time.Now())
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -538,12 +544,12 @@ type OrderItem struct {
 }
 
 type NewOrder struct {
-	UserID    string
-	Name      string
-	Email     string
-	Phone     string
-	CPF       string
-	Address   any
+	UserID   string
+	Name     string
+	Email    string
+	Phone    string
+	CPF      string
+	Address  any
 	Subtotal dominio.Cents
 	Shipping dominio.Cents
 	Discount dominio.Cents
@@ -675,17 +681,17 @@ func (d *DB) RegisterAlert(ctx context.Context, orderID, detail string) error {
 // ---------------------------------------------------------------------------
 
 type MirrorProduct struct {
-	SupplierID      string
-	SKU, URL, Name  string
-	Description     string
-	Warranty        string
-	Cost, Retail    dominio.Cents
-	CostConfirmed   bool
-	Available       bool
-	Images          []string
-	Rating          float64
-	RatingCount     int
-	Reviews         []Review
+	SupplierID     string
+	SKU, URL, Name string
+	Description    string
+	Warranty       string
+	Cost, Retail   dominio.Cents
+	CostConfirmed  bool
+	Available      bool
+	Images         []string
+	Rating         float64
+	RatingCount    int
+	Reviews        []Review
 }
 
 // UpsertMirror grava no ESPELHO — nunca no catálogo da dona.
@@ -802,12 +808,12 @@ func (d *DB) syncVariants(ctx context.Context, productID string, sizes []string)
 
 type EnsureProductInput struct {
 	SKU, Name, Description string
-	Cost                    dominio.Cents
-	Category, Metal         string
-	Images                  []string
-	Rating                  float64
-	RatingCount             int
-	Reviews                 []Review
+	Cost                   dominio.Cents
+	Category, Metal        string
+	Images                 []string
+	Rating                 float64
+	RatingCount            int
+	Reviews                []Review
 	// Grupo de opção da Lilly: rótulo ("Tamanho", "Letras") e os valores.
 	VariantLabel string
 	Variants     []string
@@ -850,17 +856,49 @@ func (d *DB) ActiveSupplier(ctx context.Context) (id, sitemap string, ratio floa
 	return
 }
 
+// ErrSyncRunning: já existe uma leitura em andamento. Duas ao mesmo tempo
+// dobram o tráfego no site da Lilly e brigam pelas mesmas linhas do espelho.
+var ErrSyncRunning = errors.New("já existe uma sincronização em andamento")
+
+// StartSync registra o início de uma leitura, se nenhuma outra estiver
+// rodando. Leitura "running" com mais de 3 horas morreu no meio (servidor
+// reiniciou, máquina dormiu) e nunca gravou o fim: é encerrada como erro
+// antes, para não bloquear as próximas para sempre.
 func (d *DB) StartSync(ctx context.Context, supplierID string, total int) (string, error) {
+	if _, err := d.pool.Exec(ctx, `
+		update syncs set status = 'error', finished_at = now(),
+		       error = coalesce(error, 'interrompida — o processo parou antes de terminar')
+		where status = 'running' and started_at < now() - interval '3 hours'`); err != nil {
+		return "", err
+	}
+
 	var id string
 	err := d.pool.QueryRow(ctx, `
 		insert into syncs (supplier_id, sitemap_urls)
-		values ($1,$2) returning id::text`, supplierID, total).Scan(&id)
+		select $1, $2
+		where not exists (select 1 from syncs where status = 'running')
+		returning id::text`, supplierID, total).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrSyncRunning
+	}
 	return id, err
 }
 
 type SyncResult struct {
 	Processed, Created, Updated, Failed, Vanished, LockedPrices int
-	Status, Error                                                string
+	Status                                                      dominio.SyncStatus
+	Error                                                       string
+}
+
+// UpdateSyncProgress grava a contagem parcial durante a leitura. Se o
+// processo morrer no meio, o registro mostra até onde chegou.
+func (d *DB) UpdateSyncProgress(ctx context.Context, syncID string, r SyncResult) error {
+	_, err := d.pool.Exec(ctx, `
+		update syncs set processed=$2, created_count=$3, updated_count=$4,
+			failed=$5, locked_prices=$6
+		where id=$1 and status = 'running'`,
+		syncID, r.Processed, r.Created, r.Updated, r.Failed, r.LockedPrices)
+	return err
 }
 
 func (d *DB) FinishSync(ctx context.Context, syncID string, r SyncResult) error {
@@ -1028,18 +1066,18 @@ type CustomerOrderItem struct {
 }
 
 type CustomerOrder struct {
-	ID             string         `json:"id"`
-	Number         int            `json:"number"`
-	Status         dominio.Status `json:"status"`
-	Subtotal       dominio.Cents  `json:"subtotal_cents"`
-	Shipping       dominio.Cents  `json:"shipping_cents"`
-	Total          dominio.Cents  `json:"total_cents"`
-	ShippingMethod *string        `json:"shipping_method"`
-	TrackingCode   *string        `json:"tracking_code"`
-	Address        []byte         `json:"-"`
-	CreatedAt      time.Time      `json:"created_at"`
-	PaidAt         *time.Time     `json:"paid_at"`
-	ShippedAt      *time.Time     `json:"shipped_at"`
+	ID             string              `json:"id"`
+	Number         int                 `json:"number"`
+	Status         dominio.Status      `json:"status"`
+	Subtotal       dominio.Cents       `json:"subtotal_cents"`
+	Shipping       dominio.Cents       `json:"shipping_cents"`
+	Total          dominio.Cents       `json:"total_cents"`
+	ShippingMethod *string             `json:"shipping_method"`
+	TrackingCode   *string             `json:"tracking_code"`
+	Address        []byte              `json:"-"`
+	CreatedAt      time.Time           `json:"created_at"`
+	PaidAt         *time.Time          `json:"paid_at"`
+	ShippedAt      *time.Time          `json:"shipped_at"`
 	Items          []CustomerOrderItem `json:"items"`
 }
 
@@ -1145,92 +1183,23 @@ func (d *DB) OrderForNotification(ctx context.Context, orderID string) (*OrderNo
 // O `and status <> 'shipped'` na condição é a defesa contra despacho
 // repetido: se duas requisições chegarem juntas, só uma altera linha, e o
 // aviso à cliente sai uma vez só. O gatilho do banco preenche shipped_at.
+//
+// Só o painel chama isto (POST /admin/pedidos/{id}/despachar), então o evento
+// fica gravado com origem 'admin'.
 func (d *DB) MarkShipped(ctx context.Context, orderID, trackingCode string) error {
-	_, err := d.pool.Exec(ctx, `
+	tx, err := d.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `select set_config('app.origin', 'admin', true)`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
 		update orders
 		set status = 'shipped', tracking_code = $2
-		where id = $1 and status <> 'shipped'`, orderID, trackingCode)
-	return err
-}
-
-// PendingShipment é uma linha da fila de despacho da dona.
-type PendingShipment struct {
-	ID        string         `json:"id"`
-	Number    int            `json:"number"`
-	Status    dominio.Status `json:"status"`
-	Stage     string         `json:"stage"`
-	Name      string         `json:"customer_name"`
-	Total     dominio.Cents  `json:"total_cents"`
-	Method    *string        `json:"shipping_method"`
-	Address   []byte         `json:"address"`
-	PaidAt    *time.Time     `json:"paid_at"`
-	Items     []CustomerOrderItem `json:"items"`
-}
-
-// OrdersToShip traz os pedidos pagos que ainda não foram postados.
-//
-// Ordem por paid_at: quem pagou primeiro sai primeiro. É a mesma regra que o
-// lote usa para decidir quando fechar, e evita que um pedido antigo fique
-// esquecido no fim da fila enquanto os novos passam na frente.
-func (d *DB) OrdersToShip(ctx context.Context) ([]PendingShipment, error) {
-	rows, err := d.pool.Query(ctx, `
-		select id::text, number, status, customer_name, total_cents,
-		       shipping_method, address, paid_at
-		from orders
-		where status in ('paid','in_batch','purchased_from_supplier','received_by_owner')
-		order by paid_at asc nulls last
-		limit 200`)
-	if err != nil {
-		return nil, err
+		where id = $1 and status <> 'shipped'`, orderID, trackingCode); err != nil {
+		return err
 	}
-	defer rows.Close()
-
-	pedidos := []PendingShipment{}
-	ids := []string{}
-	for rows.Next() {
-		var p PendingShipment
-		if err := rows.Scan(&p.ID, &p.Number, &p.Status, &p.Name, &p.Total,
-			&p.Method, &p.Address, &p.PaidAt); err != nil {
-			return nil, err
-		}
-		p.Stage = string(dominio.PublicStage(p.Status))
-		p.Items = []CustomerOrderItem{}
-		pedidos = append(pedidos, p)
-		ids = append(ids, p.ID)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	if len(ids) == 0 {
-		return pedidos, nil
-	}
-
-	// Os itens vêm numa consulta só, não uma por pedido: com 50 pedidos na
-	// fila, o laço viraria 50 idas ao banco para montar uma tela.
-	itemRows, err := d.pool.Query(ctx, `
-		select order_id::text, name_snapshot, size, quantity, unit_price_cents
-		from order_items where order_id = any($1) order by id`, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer itemRows.Close()
-
-	porPedido := map[string][]CustomerOrderItem{}
-	for itemRows.Next() {
-		var orderID string
-		var it CustomerOrderItem
-		if err := itemRows.Scan(&orderID, &it.Name, &it.Size, &it.Quantity, &it.Price); err != nil {
-			return nil, err
-		}
-		porPedido[orderID] = append(porPedido[orderID], it)
-	}
-	if err := itemRows.Err(); err != nil {
-		return nil, err
-	}
-	for i := range pedidos {
-		if its := porPedido[pedidos[i].ID]; its != nil {
-			pedidos[i].Items = its
-		}
-	}
-	return pedidos, nil
+	return tx.Commit(ctx)
 }

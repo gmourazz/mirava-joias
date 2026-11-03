@@ -78,3 +78,20 @@ func VariationAcceptable(current, updated Cents) bool {
 	delta := math.Abs(float64(updated-current)) / float64(current)
 	return delta <= PriceVariationLimit
 }
+
+// Faixa aceita de markup no painel. Abaixo de 20% a peça mal paga a taxa e a
+// embalagem; acima de 500% é quase sempre erro de digitação (2000 no lugar de
+// 200).
+const (
+	MinMarkupPct = 20
+	MaxMarkupPct = 500
+)
+
+func ValidMarkup(pct float64) bool { return pct >= MinMarkupPct && pct <= MaxMarkupPct }
+
+// PriceFromMarkup é o preço de venda a partir do custo de atacado e do
+// markup. A MESMA conta existe em SQL, na função public.apply_synced_cost
+// (db/schema.sql): round(custo * (1 + markup/100)). Mudou aqui, mude lá.
+func PriceFromMarkup(cost Cents, markupPct float64) Cents {
+	return Cents(math.Round(float64(cost) * (1 + markupPct/100)))
+}

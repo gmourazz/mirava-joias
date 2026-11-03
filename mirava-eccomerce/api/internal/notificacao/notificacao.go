@@ -16,6 +16,7 @@ package notificacao
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/mirava/api/internal/dominio"
@@ -41,15 +42,15 @@ const (
 // struct do banco: o pacote de notificação não deve depender do formato das
 // tabelas, senão mexer no schema quebra o e-mail.
 type Pedido struct {
-	ID           string
-	Numero       int
-	Nome         string
-	Email        string
-	Total        dominio.Cents
-	Rastreio     string
-	PrazoTexto   string // "10 a 20 dias úteis"
-	URLPedido    string // link para a cliente acompanhar
-	URLWhatsApp  string // conversa já preenchida com o número do pedido
+	ID          string
+	Numero      int
+	Nome        string
+	Email       string
+	Total       dominio.Cents
+	Rastreio    string
+	PrazoTexto  string // "até 20 dias úteis"
+	URLPedido   string // link para a cliente acompanhar
+	URLWhatsApp string // conversa já preenchida com o número do pedido
 }
 
 // Canal é por onde o aviso sai. E-mail hoje; WhatsApp oficial no futuro.
@@ -74,12 +75,19 @@ type Logger interface {
 func Novo(log Logger, canais ...Canal) *Notificador {
 	ativos := make([]Canal, 0, len(canais))
 	for _, c := range canais {
-		if c != nil {
-			ativos = append(ativos, c)
+		// `c != nil` não basta: um *Email nulo (NovoEmail sem chave) dentro
+		// da interface Canal tem tipo, então não é igual a nil.
+		if v := reflect.ValueOf(c); c == nil || (v.Kind() == reflect.Pointer && v.IsNil()) {
+			continue
 		}
+		ativos = append(ativos, c)
 	}
 	return &Notificador{canais: ativos, log: log}
 }
+
+// Ativo diz se existe algum canal configurado (o painel mostra isso em
+// Configurações).
+func (n *Notificador) Ativo() bool { return n != nil && len(n.canais) > 0 }
 
 // Avisar tenta todos os canais e NUNCA devolve erro.
 //
@@ -135,7 +143,7 @@ func corpoTexto(e Evento, p Pedido) string {
 	case PedidoPago:
 		miolo = fmt.Sprintf(
 			"Recebemos o pagamento do seu pedido #%d, no valor de %s.\n\n"+
-				"Agora a gente encomenda sua peça na produção, confere quando "+
+				"Agora a gente encomenda sua peça na fornecedora, confere quando "+
 				"chega e reembala na embalagem Mirava antes de enviar. "+
 				"A entrega leva %s a partir de agora.",
 			p.Numero, p.Total.String(), p.PrazoTexto)

@@ -85,10 +85,3 @@ func BusinessDaysBetween(start, end time.Time) int {
 	}
 	return n
 }
-
-// EstimatedDeadline devolve a faixa de dias úteis prometida à cliente,
-// contando a partir do pagamento.
-//
-// Composição: até 5 dias esperando o lote + 4 dias de postagem da Lilly +
-// 3 a 6 do transporte até Minas + 1 a 2 para reembalar + 3 a 7 até a cliente.
-func EstimatedDeadline() (min, max int) { return 10, 20 }

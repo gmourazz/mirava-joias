@@ -73,6 +73,11 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("GET /frete", s.shippingQuote)
 
 	mux.HandleFunc("GET /pedidos", s.listOrders)
+	mux.HandleFunc("POST /pedidos/rastrear", s.trackOrder)
+
+	mux.HandleFunc("GET /favoritos", s.listFavorites)
+	mux.HandleFunc("POST /favoritos/{id}", s.addFavorite)
+	mux.HandleFunc("DELETE /favoritos/{id}", s.removeFavorite)
 	mux.HandleFunc("GET /pedidos/{id}", s.orderByID)
 
 	mux.HandleFunc("POST /checkout", s.createPayment)
@@ -80,10 +85,28 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("POST /tarefas/sincronizar", s.protegidoPorCron(s.syncCatalog))
 	mux.HandleFunc("POST /tarefas/avaliar-lote", s.protegidoPorCron(s.evaluateBatch))
 
-	// Gestão da loja (ver gestao.go). Protegida pelo mesmo segredo das
-	// tarefas até o painel com login de admin existir.
-	mux.HandleFunc("GET /gestao/pedidos", s.protegidoPorCron(s.listOrdersToShip))
-	mux.HandleFunc("POST /gestao/pedidos/{id}/despachar", s.protegidoPorCron(s.shipOrder))
+	// Painel de gestão (ver admin.go): login da loja + tabela `admins`.
+	mux.HandleFunc("GET /admin/eu", s.requireAdmin(s.adminMe))
+	mux.HandleFunc("GET /admin/resumo", s.requireAdmin(s.adminSummary))
+	mux.HandleFunc("GET /admin/pedidos", s.requireAdmin(s.adminOrders))
+	mux.HandleFunc("GET /admin/pedidos/{id}", s.requireAdmin(s.adminOrder))
+	mux.HandleFunc("POST /admin/pedidos/{id}/transicao", s.requireAdmin(s.adminTransition))
+	mux.HandleFunc("POST /admin/pedidos/{id}/despachar", s.requireAdmin(s.shipOrder))
+	mux.HandleFunc("GET /admin/lotes", s.requireAdmin(s.adminBatches))
+	mux.HandleFunc("POST /admin/lotes/{id}/comprar", s.requireAdmin(s.adminPurchaseBatch))
+	mux.HandleFunc("POST /admin/lotes/{id}/receber", s.requireAdmin(s.adminReceiveBatch))
+	mux.HandleFunc("GET /admin/produtos", s.requireAdmin(s.adminProducts))
+	mux.HandleFunc("GET /admin/produtos/{id}", s.requireAdmin(s.adminProduct))
+	mux.HandleFunc("PUT /admin/produtos/{id}", s.requireAdmin(s.adminUpdateProduct))
+	mux.HandleFunc("POST /admin/produtos/{id}/markup", s.requireAdmin(s.adminApplyMarkup))
+	mux.HandleFunc("POST /admin/produtos/{id}/sugestao", s.requireAdmin(s.adminResolveSuggestion))
+	mux.HandleFunc("GET /admin/financeiro", s.requireAdmin(s.adminFinance))
+	mux.HandleFunc("GET /admin/sincronizacao", s.requireAdmin(s.adminSync))
+	mux.HandleFunc("POST /admin/produtos/lote", s.requireAdmin(s.adminBulkProducts))
+	mux.HandleFunc("GET /admin/clientes", s.requireAdmin(s.adminCustomers))
+	mux.HandleFunc("GET /admin/clientes/{id}/pedidos", s.requireAdmin(s.adminCustomerOrders))
+	mux.HandleFunc("GET /admin/atividades", s.requireAdmin(s.adminActivities))
+	mux.HandleFunc("GET /admin/configuracoes", s.requireAdmin(s.adminConfig))
 	return s.comCORS(s.comLog(mux))
 }
 
@@ -99,7 +122,7 @@ func (s *Servidor) comCORS(prox http.Handler) http.Handler {
 		}
 		w.Header().Set("Access-Control-Allow-Origin", origem)
 		w.Header().Set("Access-Control-Allow-Headers", "authorization, content-type")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
