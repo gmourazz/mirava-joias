@@ -1,118 +1,120 @@
-import type { MouseEvent } from "react";
-import { Link } from "react-router-dom";
-import { ShoppingBag } from "lucide-react";
+import { useState, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Check, Eye, Heart, ShoppingBag } from "lucide-react";
 import type { Product } from "../catalogo/tipos";
 import { METAL_LABEL } from "../catalogo/tipos";
 import { imageUrl } from "../catalogo/consultas";
-import { formatarBRL, textoParcelas, textoPix } from "../lib/dinheiro";
+import { formatarBRL, precoPix, temDescontoPix, textoParcelas } from "../lib/dinheiro";
 import { useCart } from "../context/CartContext";
+import { useFavorites } from "../context/FavoritesContext";
+import QuickView from "./QuickView";
 
-// Sem estrelas de avaliação aqui, de propósito.
+// Card de produto do design v5: cartão branco com borda leve, foto quadrada
+// com cantos arredondados (zoom lento no hover), preço em teal com o valor no
+// Pix e as parcelas embaixo, e o botão "Adicionar à sacola" em pill.
 //
-// As notas anteriores eram inventadas, e avaliação falsa é publicidade
-// enganosa. Quando existirem avaliações reais de clientes, a nota volta —
-// vinda do banco, não de um array no código.
+// Coração de favoritos no canto, selo "Novo" (decidido no servidor) e o botão
+// "Espiar peça" no hover, que abre a janela rápida. Estrelas ficam de fora: as
+// notas antigas eram inventadas (decisão 28).
 
 export default function ProductCard({ product }: { product: Product }) {
   const cover = imageUrl(product.images[0]);
-  const sizes = product.variants.filter((v) => v.available);
   const { addItem } = useCart();
+  const navigate = useNavigate();
+  const [justAdded, setJustAdded] = useState(false);
+  const [espiando, setEspiando] = useState(false);
+  const { isFavorite, toggle } = useFavorites();
+  const favorito = isFavorite(product.id);
+  const href = `/produto/${product.slug}`;
+  // Peça com tamanho precisa da escolha da cliente: o botão leva à página.
+  const needsChoice = product.variants.length > 0;
 
-  // Adiciona direto da vitrine, sem abrir a peça. Quando tem tamanho, usa o
-  // primeiro disponível — ajustar depois é rapidinho no drawer do carrinho,
-  // e é melhor do que obrigar a cliente a entrar na peça só pra isso.
-  const quickAdd = (e: MouseEvent) => {
+  const onAdd = (e: MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-    const size = sizes[0];
+    if (needsChoice) {
+      navigate(href);
+      return;
+    }
     addItem({
       productId: product.id,
       slug: product.slug,
       name: product.name,
       image: cover,
-      priceCents: product.priceCents + (size?.priceAdjustCents ?? 0),
-      size: size?.size ?? null,
+      priceCents: product.priceCents,
+      size: null,
     });
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1600);
   };
 
   return (
-    <div>
-      <Link to={`/produto/${product.slug}`} className="block">
-        <div className="zoom-on-hover relative aspect-[4/5] overflow-hidden rounded-[14px] bg-[#FBF6F8]">
-          {cover ? (
-            <img
-              src={cover}
-              alt={product.name}
-              loading="lazy"
-              className="block h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-[11px] text-mauve">
-              sem foto
-            </div>
-          )}
-
-          <span className="absolute top-3 left-3 rounded-full bg-plum px-3.5 py-1.5 text-[9.5px] tracking-[0.18em] text-blush uppercase">
-            Sob encomenda
+    <div className="group flex h-full flex-col gap-3 rounded-3xl border border-line-soft bg-white p-2.5 pb-4 transition-[box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(11,74,77,0.10)]">
+      <Link to={href} className="relative block aspect-square overflow-hidden rounded-[18px] bg-mist-3">
+        {cover ? (
+          <img
+            src={cover}
+            alt={product.name}
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1100ms] ease-out group-hover:scale-[1.08]"
+          />
+        ) : (
+          <span className="absolute inset-0 grid place-items-center text-[12px] text-muted">sem foto</span>
+        )}
+        {!product.available ? (
+          <span className="absolute top-2.5 left-2.5 rounded-full bg-white px-3 py-[5px] text-[12px] font-semibold text-muted">
+            Indisponível
           </span>
+        ) : (
+          product.isNew && (
+            <span className="absolute top-2.5 left-2.5 rounded-full bg-white px-3 py-[5px] text-[12px] font-semibold text-teal">Novo</span>
+          )
+        )}
+        <button
+          type="button"
+          aria-label={favorito ? "Tirar dos favoritos" : "Salvar nos favoritos"}
+          onClick={(e) => {
+            e.preventDefault();
+            toggle(product.id);
+          }}
+          className={`absolute top-2.5 right-2.5 grid h-9 w-9 cursor-pointer place-items-center rounded-full border-none bg-white text-teal-soft transition-transform duration-300 ease-[cubic-bezier(.3,1.6,.5,1)] ${favorito ? "scale-110" : ""}`}
+        >
+          <Heart size={17} strokeWidth={1.8} fill={favorito ? "#5FB8B0" : "none"} />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            setEspiando(true);
+          }}
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 translate-y-2.5 cursor-pointer items-center gap-1.5 rounded-full border-none bg-white/95 px-4 py-2 text-[12.5px] font-semibold whitespace-nowrap text-teal opacity-0 transition-[opacity,transform] duration-300 group-hover:translate-y-0 group-hover:opacity-100 focus:translate-y-0 focus:opacity-100"
+        >
+          <Eye size={14} strokeWidth={1.8} />
+          Espiar peça
+        </button>
+      </Link>
 
-          <span className="absolute bottom-3 left-3 rounded-full border border-mauve bg-white/94 px-3 py-1.5 text-[9.5px] tracking-[0.14em] text-ink-soft uppercase">
-            {METAL_LABEL[product.metal]}
-          </span>
-
-          {!product.available && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/75">
-              <span className="rounded-full bg-plum px-4 py-2 text-[10px] tracking-[0.16em] text-blush uppercase">
-                Indisponível
-              </span>
-            </div>
-          )}
-        </div>
+      <Link to={href} className="grid gap-[5px] px-1.5 text-text hover:text-text">
+        <span className="text-[15px] leading-[1.35] font-medium">{product.name}</span>
+        <span className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-[17px] font-bold text-teal [font-variant-numeric:tabular-nums]">{formatarBRL(product.priceCents)}</span>
+          {temDescontoPix && <span className="text-[12.5px] text-muted">{formatarBRL(precoPix(product.priceCents))} no Pix</span>}
+        </span>
+        <span className="text-[12.5px] text-muted">{textoParcelas(product.priceCents)}</span>
+        <span className="text-[12px] text-teal-mid">{METAL_LABEL[product.metal]}</span>
       </Link>
 
       {product.available && (
-        <div className="flex flex-col gap-2 pt-3">
-          {sizes.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {sizes.slice(0, 4).map((v) => (
-                <span
-                  key={v.id}
-                  className="min-w-9 rounded-full border border-rose px-2.5 py-1.5 text-center text-[11px]"
-                >
-                  {v.size}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <Link
-              to={`/produto/${product.slug}`}
-              className="flex-1 rounded-full border border-wine/70 p-2.5 text-center font-serif text-[13.5px] font-semibold tracking-[0.2em] text-wine uppercase hover:bg-wine hover:text-white"
-            >
-              Ver peça
-            </Link>
-            <button
-              type="button"
-              onClick={quickAdd}
-              aria-label="Adicionar à sacola"
-              className="flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-wine/70 bg-none text-wine transition-colors hover:bg-wine hover:text-white"
-            >
-              <ShoppingBag className="pointer-events-none h-4 w-4" strokeWidth={1.6} />
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="mx-1.5 mt-auto flex cursor-pointer items-center justify-center gap-2 rounded-full border-none bg-mist-2 p-3 text-[14px] font-semibold text-teal transition-colors hover:bg-teal hover:text-white"
+        >
+          {justAdded ? <Check size={15} strokeWidth={2} /> : <ShoppingBag size={15} strokeWidth={1.8} />}
+          {justAdded ? "Na sacola" : needsChoice ? `Escolher ${(product.variantLabel ?? "tamanho").toLowerCase()}` : "Adicionar à sacola"}
+        </button>
       )}
-
-      <div className="flex flex-col gap-1.5 pt-3.5">
-        <h3 className="m-0 font-serif text-[16.5px] font-normal">
-          <Link to={`/produto/${product.slug}`} className="hover:text-wine">
-            {product.name}
-          </Link>
-        </h3>
-        <span className="text-[16px] text-ink">{formatarBRL(product.priceCents)}</span>
-        <span className="text-xs text-ink-soft">{textoParcelas(product.priceCents)}</span>
-        <span className="text-xs text-wine">{textoPix(product.priceCents)}</span>
-      </div>
+      {espiando && <QuickView product={product} fechar={() => setEspiando(false)} />}
     </div>
   );
 }

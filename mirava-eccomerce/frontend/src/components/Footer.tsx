@@ -1,36 +1,100 @@
-import { AtSign, MessageCircle } from "lucide-react";
-import Monogram from "./Monogram";
-import { FOOTER_COLS } from "../data/content";
+import { Link } from "react-router-dom";
+import { AtSign, Clock, HelpCircle, Lock, Mail, Moon, Package, RefreshCw, Sparkles, Sun, Truck, Link2, Flame, type LucideIcon } from "lucide-react";
+import { LOJA } from "../config/loja";
+
+// Rodapé do design v5: bloco teal-escuro com o topo arredondado, coluna da
+// marca e três colunas de links com ícone.
+
+interface FooterLink {
+  label: string;
+  Icon: LucideIcon;
+  to?: string;
+  href?: string;
+}
+
+const COLS: { title: string; links: FooterLink[] }[] = [
+  {
+    title: "COMPRAR",
+    links: [
+      { label: "Lançamentos", to: "/categoria/colecoes/todos", Icon: Sparkles },
+      { label: "Mais vendidos", to: "/categoria/colecoes/todos", Icon: Flame },
+      { label: "Banhados a prata", to: "/categoria/prata/todos", Icon: Moon },
+      { label: "Banhados a ouro", to: "/categoria/ouro/todos", Icon: Sun },
+      { label: "Berloques", to: "/categoria/colecoes/berloques", Icon: Link2 },
+    ],
+  },
+  {
+    title: "AJUDA",
+    links: [
+      { label: "Acompanhar pedido", to: "/rastreio", Icon: Truck },
+      { label: "Meus pedidos", to: "/conta?aba=pedidos", Icon: Package },
+      { label: "Perguntas frequentes", to: "/perguntas-frequentes", Icon: HelpCircle },
+      { label: "Entrega e prazos", to: "/politicas/entrega", Icon: Clock },
+      { label: "Trocas e devoluções", to: "/politicas/trocas", Icon: RefreshCw },
+      { label: "Privacidade e termos", to: "/politicas/privacidade", Icon: Lock },
+    ],
+  },
+  {
+    title: "ATENDIMENTO",
+    links: [
+      { label: LOJA.email, href: `mailto:${LOJA.email}`, Icon: Mail },
+      { label: "Seg a sex, 9h às 18h", Icon: Clock },
+      { label: "@miravajoias", Icon: AtSign },
+    ],
+  },
+];
+
+const linkClass =
+  "flex w-fit items-center gap-2.5 text-[14px] text-[#D9ECEA] transition-[color,transform] duration-200 hover:translate-x-1 hover:text-white";
 
 export default function Footer() {
   return (
-    <>
-      <footer className="grid grid-cols-1 gap-9 bg-wine-dark px-6 pt-[72px] pb-9 text-white sm:px-16 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-24">
-        <div className="flex flex-col gap-3.5">
-          <Monogram className="h-10 w-[54px]" color="#FDCAE1" />
-          <span className="font-serif text-[23px] font-medium tracking-[0.22em] text-white uppercase">Mirava</span>
-          <p className="m-0 max-w-[280px] text-[13.5px] leading-relaxed text-blush/72">
-            Joias que contam histórias: prata 925 e banho de ouro, feitos sob medida pra você.
+    <footer className="mt-20 rounded-t-[40px] bg-teal-dark text-[#D9ECEA]">
+      <div className="mx-auto grid max-w-[1360px] grid-cols-1 gap-8 px-[clamp(16px,3vw,40px)] pt-[60px] pb-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,minmax(0,1fr))]">
+        <div className="grid content-start gap-5">
+          <div className="grid gap-1.5">
+            <span className="font-logo text-[32px] leading-none tracking-[0.28em] text-white">MIRAVA</span>
+            <span className="text-[9px] tracking-[0.42em] text-teal-pale">SEMIJOIAS · PRATA &amp; OURO</span>
+          </div>
+          <p className="m-0 max-w-[34ch] text-[14px] leading-[1.7]">
+            Semijoias banhadas a prata e ouro 18k, delicadas e feitas pra durar.
           </p>
-          <div className="flex gap-3.5">
-            <AtSign className="h-[18px] w-[18px] cursor-pointer text-white" strokeWidth={1.6} />
-            <MessageCircle className="h-[18px] w-[18px] cursor-pointer text-white" strokeWidth={1.6} />
+          <div className="flex gap-2.5">
+            <a
+              href={`mailto:${LOJA.email}`}
+              aria-label="E-mail"
+              className="grid h-[42px] w-[42px] place-items-center rounded-full bg-white/8 text-teal-pale transition-colors hover:bg-teal hover:text-white"
+            >
+              <Mail size={18} strokeWidth={1.6} />
+            </a>
           </div>
         </div>
-        {FOOTER_COLS.map((col) => (
-          <div key={col.title} className="flex flex-col gap-2.5">
-            <span className="mb-1 text-[10px] tracking-[0.18em] text-blush-2 uppercase">{col.title}</span>
-            {col.links.map((l) => (
-              <span key={l} className="cursor-pointer text-[13.5px] text-blush/78 transition-colors duration-300 hover:text-blush-2">
-                {l}
-              </span>
-            ))}
+
+        {COLS.map((col) => (
+          <div key={col.title} className="grid content-start gap-3.5">
+            <span className="text-[12.5px] font-bold tracking-[0.12em] text-[#CFEAE7]">{col.title}</span>
+            {col.links.map(({ label, to, href, Icon }) => {
+              const content = (
+                <>
+                  <Icon size={16} strokeWidth={1.6} className="shrink-0 text-teal-pale" />
+                  {label}
+                </>
+              );
+              if (to) return <Link key={label} to={to} className={linkClass}>{content}</Link>;
+              if (href) return <a key={label} href={href} className={linkClass}>{content}</a>;
+              return <span key={label} className="flex items-center gap-2.5 text-[14px]">{content}</span>;
+            })}
           </div>
         ))}
-      </footer>
-      <div className="border-t border-blush/16 bg-wine-dark px-5 py-5 text-center text-[11.5px] text-blush/55">
-        © 2026 Mirava · Todas as peças são feitas sob encomenda
       </div>
-    </>
+
+      <div className="mx-auto flex max-w-[1360px] flex-wrap items-center justify-between gap-4 border-t border-white/12 px-[clamp(16px,3vw,40px)] py-6 text-[12.5px]">
+        <span>Todas as peças são feitas sob encomenda</span>
+        <span className="flex items-center gap-1.5">
+          <Lock size={13} strokeWidth={1.8} />
+          Site seguro · © 2026 Mirava
+        </span>
+      </div>
+    </footer>
   );
 }

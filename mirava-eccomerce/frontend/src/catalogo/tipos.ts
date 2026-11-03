@@ -48,6 +48,8 @@ export interface Product {
   rating: number | null;
   ratingCount: number;
   reviews: Review[];
+  /** Cadastrada há até 30 dias (decidido no servidor): selo "Novo". */
+  isNew: boolean;
 }
 
 export const CATEGORY_LABEL: Record<Category, string> = {
@@ -61,7 +63,7 @@ export const CATEGORY_LABEL: Record<Category, string> = {
 };
 
 export const METAL_LABEL: Record<Metal, string> = {
-  prata: "Prata",
+  prata: "Banhado a prata",
   ouro: "Banhado a ouro",
 };
 

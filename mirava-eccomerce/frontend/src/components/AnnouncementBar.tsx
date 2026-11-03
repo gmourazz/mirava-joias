@@ -1,18 +1,24 @@
+// Faixa de avisos do design v5: esteira contínua em teal, texto branco,
+// avisos separados por ✦. A lista vai duas vezes e o trilho anda -50%, então
+// o loop nunca "pula". Pausa no hover. Não é sticky: quem gruda no topo é o
+// header.
+
+import { Fragment } from "react";
 import { ANNOUNCEMENTS } from "../data/content";
 
 export default function AnnouncementBar() {
+  const track = [...ANNOUNCEMENTS, ...ANNOUNCEMENTS, ...ANNOUNCEMENTS, ...ANNOUNCEMENTS];
+
   return (
-    <div className="relative h-10 overflow-hidden bg-plum">
-      {ANNOUNCEMENTS.map((msg, i) => (
-        <div
-          key={i}
-          className="absolute inset-0 flex items-center justify-center gap-2.5 whitespace-nowrap text-[11.5px] tracking-[0.16em] text-blush/90 uppercase opacity-0 animate-ann-in"
-          style={{ animationDelay: msg.delay }}
-        >
-          <span className="h-1 w-1 rotate-45 bg-blush-2" />
-          {msg.text}
-        </div>
-      ))}
+    <div className="esteira flex h-[38px] items-center overflow-hidden bg-teal text-[13px] font-medium text-white">
+      <div className="esteira-trilho flex w-max items-center gap-7 whitespace-nowrap" style={{ animationDuration: "38s" }}>
+        {track.map((msg, i) => (
+          <Fragment key={i}>
+            <span className="px-7">{msg.text}</span>
+            <span aria-hidden className="text-[#CFEAE7]">✦</span>
+          </Fragment>
+        ))}
+      </div>
     </div>
   );
 }

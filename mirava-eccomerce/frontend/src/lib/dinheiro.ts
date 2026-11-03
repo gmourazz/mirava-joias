@@ -24,6 +24,9 @@ export function textoParcelas(centavos: number): string {
   return `${n}x de ${formatarBRL(Math.round(centavos / n))} sem juros`;
 }
 
+/** Se existe desconto no Pix. Com 0 na config, as telas não mencionam. */
+export const temDescontoPix = LOJA.descontoPixPct > 0;
+
 /** Valor com o desconto do Pix aplicado. */
 export function precoPix(centavos: number): number {
   return Math.round(centavos * (1 - LOJA.descontoPixPct / 100));
@@ -34,8 +37,7 @@ export function textoPix(centavos: number): string {
   return `${LOJA.descontoPixPct}% off no PIX · ${formatarBRL(precoPix(centavos))}`;
 }
 
-/** "10 a 20 dias úteis" — o prazo prometido, num lugar só. */
+/** "até 20 dias úteis" — o prazo prometido, num lugar só. */
 export function textoPrazo(): string {
-  const { minDiasUteis, maxDiasUteis } = LOJA.prazo;
-  return `${minDiasUteis} a ${maxDiasUteis} dias úteis`;
+  return `até ${LOJA.prazo.maxDiasUteis} dias úteis`;
 }

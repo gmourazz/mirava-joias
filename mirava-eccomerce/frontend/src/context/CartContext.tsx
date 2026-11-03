@@ -53,7 +53,7 @@ interface CartContextValue {
   openCart: () => void;
   closeCart: () => void;
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "key" | "quantity">) => void;
+  addItem: (item: Omit<CartItem, "key" | "quantity">, quantity?: number) => void;
   removeItem: (key: string) => void;
   updateQuantity: (key: string, quantity: number) => void;
   clearCart: () => void;
@@ -77,16 +77,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items]);
 
   // Adicionar a mesma peça/tamanho de novo soma quantidade, não duplica linha.
-  const addItem = (item: Omit<CartItem, "key" | "quantity">) => {
+  const addItem = (item: Omit<CartItem, "key" | "quantity">, quantity = 1) => {
     const key = `${item.productId}:${item.size ?? ""}`;
     setItems((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {
         return prev.map((i) =>
-          i.key === key ? { ...i, quantity: i.quantity + 1 } : i,
+          i.key === key ? { ...i, quantity: i.quantity + quantity } : i,
         );
       }
-      return [...prev, { ...item, key, quantity: 1 }];
+      return [...prev, { ...item, key, quantity }];
     });
     setCartOpen(true); // feedback imediato: a cliente vê que entrou
   };

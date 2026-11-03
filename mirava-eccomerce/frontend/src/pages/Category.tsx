@@ -1,112 +1,179 @@
 import { useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Clock } from "lucide-react";
 import ProductCard from "../components/ProductCard";
-import {
-  CatalogLoading, CatalogError, CatalogEmpty,
-} from "../components/EstadosCatalogo";
+import { CatalogLoading, CatalogError } from "../components/EstadosCatalogo";
 import { useProducts } from "../catalogo/hooks";
-import {
-  MENU_CATEGORIES, CATEGORY_LABEL,
-  type Category, type Metal,
-} from "../catalogo/tipos";
-import { MENUS, type MenuKey } from "../data/navegacao";
-import { img } from "../lib/images";
-import { textoPrazo } from "../lib/dinheiro";
+import { MENU_CATEGORIES, CATEGORY_LABEL, type Category, type Metal } from "../catalogo/tipos";
+import type { MenuKey } from "../data/navegacao";
+import { formatarBRL, textoPrazo } from "../lib/dinheiro";
+import Select from "../components/Select";
+
+// Página de categoria do design v5: breadcrumb, título com a contagem, abas
+// de categoria e três filtros em pill (banho, preço, ordem).
+//
+// A rota continua /categoria/:menuKey/:filter — menuKey é o banho (prata,
+// ouro ou "colecoes" para todos) e filter é a categoria. Preço e ordem vão na
+// query string (?ate=, ?de=, ?ordem=) e são aplicados aqui, porque a API ainda
+// não filtra por preço; a lista já vem limitada a 48 peças.
 
 const MENU_KEYS: MenuKey[] = ["prata", "ouro", "colecoes"];
 
-/** "colecoes" mostra tudo — não é um metal, é uma vitrine. */
-function metalFromMenu(menu: MenuKey): Metal | undefined {
-  return menu === "colecoes" ? undefined : menu;
-}
+/** Faixas dos links "Presentes" do menu e da home — mudam o título da página. */
+const FAIXAS_PRESENTE = [5000, 8000, 12000, 20000];
+
+const PRECOS = [
+  { value: "", label: "Preço: todos" },
+  { value: "ate-6000", label: "Até R$ 60" },
+  { value: "ate-10000", label: "Até R$ 100" },
+  { value: "de-10000", label: "Acima de R$ 100" },
+];
+
+const ORDENS = [
+  { value: "", label: "Ordenar: mais recentes" },
+  { value: "novos", label: "Lançamentos" },
+  { value: "menor", label: "Menor preço" },
+  { value: "maior", label: "Maior preço" },
+];
 
 export default function CategoryPage() {
-  const { menuKey = "prata", filter = "todos" } = useParams();
+  const { menuKey = "colecoes", filter = "todos" } = useParams();
+  const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const menu: MenuKey = MENU_KEYS.includes(menuKey as MenuKey)
-    ? (menuKey as MenuKey)
-    : "prata";
+  const menu: MenuKey = MENU_KEYS.includes(menuKey as MenuKey) ? (menuKey as MenuKey) : "colecoes";
+  const metal: Metal | undefined = menu === "colecoes" ? undefined : menu;
+  const category: Category | undefined = MENU_CATEGORIES.includes(filter as Category)
+    ? (filter as Category)
+    : undefined;
 
-  const category: Category | undefined =
-    MENU_CATEGORIES.includes(filter as Category)
-      ? (filter as Category)
-      : undefined;
+  const ate = Number(params.get("ate")) || 0;
+  const de = Number(params.get("de")) || 0;
+  const ordem = params.get("ordem") ?? "";
 
-  const { data: products, loading, error, retry } = useProducts({
-    metal: metalFromMenu(menu),
-    category,
-  });
+  const { data, loading, error, retry } = useProducts({ metal, category });
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [menuKey, filter]);
 
-  const info = MENUS[menu];
-  const filters: Array<{ key: string; label: string }> = [
-    { key: "todos", label: "Todas" },
-    ...MENU_CATEGORIES.map((c) => ({ key: c, label: CATEGORY_LABEL[c] })),
-  ];
+  let products = data.filter((p) => (!ate || p.priceCents <= ate) && (!de || p.priceCents > de));
+  if (ordem === "menor") products = [...products].sort((a, b) => a.priceCents - b.priceCents);
+  if (ordem === "maior") products = [...products].sort((a, b) => b.priceCents - a.priceCents);
+
+  // A API já devolve as peças mais recentes primeiro: "novos" só muda o título.
+  const titulo = category
+    ? CATEGORY_LABEL[category]
+    : ordem === "novos" && !metal && !ate
+      ? "Lançamentos"
+    : !metal && FAIXAS_PRESENTE.includes(ate)
+      ? `Presentes até ${formatarBRL(ate)}`
+      : metal === "prata"
+        ? "Banhados a prata"
+        : metal === "ouro"
+          ? "Banhados a ouro 18k"
+          : "Todas as joias";
+
+  const qs = params.toString() ? `?${params}` : "";
+  const ir = (m: MenuKey, f: string) => navigate(`/categoria/${m}/${f}${qs}`);
+
+  const setParam = (updates: Record<string, string>) => {
+    const next = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(updates)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    setParams(next, { replace: true });
+  };
+
+  const precoAtual = ate ? `ate-${ate}` : de ? `de-${de}` : "";
+  const filtrosAtivos = Boolean(ate || de || ordem || metal || category);
 
   return (
-    <div>
-      <div className="relative overflow-hidden">
-        <img src={img(`banner-${menu}`)} alt="" className="block h-[280px] w-full object-cover" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-plum/38">
-          <span className="text-[10px] tracking-[0.22em] text-rose uppercase">
-            Início / {info.label}
+    <div className="mx-auto grid max-w-[1360px] gap-5 px-[clamp(16px,3vw,40px)] pt-7">
+      <nav className="text-[12px] tracking-[0.1em] text-[#5E7473] uppercase">
+        <Link to="/" className="text-[#5E7473] hover:text-teal">Início</Link>
+        <span className="mx-2">/</span>
+        <span className="font-semibold text-teal">{titulo}</span>
+      </nav>
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="m-0 font-serif text-[clamp(34px,4vw,52px)] leading-[1.05] font-normal text-teal-dark">{titulo}</h1>
+        {!loading && !error && (
+          <span className="text-[13.5px] text-muted">
+            {products.length} {products.length === 1 ? "peça" : "peças"}
           </span>
-          <h1 className="m-0 font-serif text-[clamp(28px,3.4vw,44px)] font-normal text-white">
-            {info.title}
-          </h1>
-          <span className="rounded-full border border-blush/70 px-4 py-1.5 text-[10px] tracking-[0.2em] text-white uppercase">
-            Produção sob encomenda · {textoPrazo()}
-          </span>
-        </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5 px-6 pt-[34px] sm:px-16 lg:px-24">
-        {filters.map((f) => {
-          const active = (category ?? "todos") === f.key;
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+        {[{ key: "todos", label: "Todas" }, ...MENU_CATEGORIES.map((c) => ({ key: c, label: CATEGORY_LABEL[c] }))].map((t) => {
+          const ativa = (category ?? "todos") === t.key;
           return (
             <button
-              key={f.key}
+              key={t.key}
               type="button"
-              onClick={() => navigate(`/categoria/${menu}/${f.key}`)}
-              className="cursor-pointer rounded-full border border-rose px-[18px] py-[9px] font-serif text-sm font-semibold tracking-[0.2em] uppercase"
-              style={{
-                background: active ? "#8E3B6B" : "transparent",
-                color: active ? "#ffffff" : "#8E3B6B",
-              }}
+              onClick={() => ir(menu, t.key)}
+              className={`shrink-0 cursor-pointer rounded-full border-none px-[18px] py-2.5 text-[13.5px] font-semibold transition-colors ${
+                ativa ? "bg-teal text-white" : "bg-chip text-text hover:bg-mist-2"
+              }`}
             >
-              {f.label}
+              {t.label}
             </button>
           );
         })}
       </div>
 
-      <div className="px-6 pt-7 pb-5 text-[13px] text-ink-soft sm:px-16 lg:px-24">
-        {loading
-          ? "carregando peças…"
-          : error
-            ? " "
-            : `${products.length} ${products.length === 1 ? "peça" : "peças"} · todas feitas sob encomenda`}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Select
+          value={metal ?? ""}
+          onChange={(v) => ir((v || "colecoes") as MenuKey, filter)}
+          active={Boolean(metal)}
+          options={[
+            { value: "", label: "Banho: todos" },
+            { value: "prata", label: "Banhado a prata" },
+            { value: "ouro", label: "Banhado a ouro 18k" },
+          ]}
+        />
+        <Select
+          value={precoAtual}
+          active={Boolean(precoAtual)}
+          onChange={(v) => {
+            const [tipo, valor] = v.split("-");
+            setParam({ ate: tipo === "ate" ? valor : "", de: tipo === "de" ? valor : "" });
+          }}
+          options={
+            // Faixa vinda de "Presentes" (R$50, 80…) não está na lista fixa.
+            PRECOS.some((p) => p.value === precoAtual)
+              ? PRECOS
+              : [...PRECOS, { value: precoAtual, label: `Até ${formatarBRL(ate)}` }]
+          }
+        />
+        <Select value={ordem} active={Boolean(ordem)} onChange={(v) => setParam({ ordem: v })} options={ORDENS} />
+        <span className="flex items-center gap-2 text-[13px] font-semibold text-teal-mid sm:ml-auto">
+          <Clock size={15} strokeWidth={1.8} />
+          Feitas sob encomenda · chegam em {textoPrazo()}
+        </span>
       </div>
 
-      <section className="grid grid-cols-2 gap-[22px] px-6 pb-20 sm:px-16 md:grid-cols-3 lg:grid-cols-4 lg:px-24">
+      <section className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-[18px] pt-2">
         {loading && <CatalogLoading />}
         {!loading && error && <CatalogError message={error} onRetry={retry} />}
         {!loading && !error && products.length === 0 && (
-          <CatalogEmpty
-            message={
-              category
-                ? `Nenhuma peça em ${CATEGORY_LABEL[category].toLowerCase()} ainda`
-                : undefined
-            }
-          />
+          <div className="col-span-full flex flex-col items-center gap-4 py-16 text-center">
+            <p className="m-0 font-serif text-[24px] text-teal-dark">Nenhuma peça com esses filtros</p>
+            {filtrosAtivos && (
+              <button
+                type="button"
+                onClick={() => navigate("/categoria/colecoes/todos")}
+                className="cursor-pointer rounded-full border-none bg-teal px-6 py-3.5 text-[14px] font-semibold text-white hover:bg-teal-dark"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
         )}
-        {!loading && !error &&
-          products.map((p) => <ProductCard key={p.id} product={p} />)}
+        {!loading && !error && products.map((p) => <ProductCard key={p.id} product={p} />)}
       </section>
     </div>
   );

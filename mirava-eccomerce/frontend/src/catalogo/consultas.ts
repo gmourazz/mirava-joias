@@ -6,7 +6,7 @@
 import { api, BASE_URL } from "../lib/api";
 import type { Category, Metal, Product, Review, Variant } from "./tipos";
 
-interface ProductRow {
+export interface ProductRow {
   id: string;
   slug: string;
   name: string;
@@ -27,6 +27,7 @@ interface ProductRow {
     price_adjust_cents: number;
     available: boolean;
   }> | null;
+  is_new: boolean;
 }
 
 function toProduct(row: ProductRow): Product {
@@ -64,6 +65,7 @@ function toProduct(row: ProductRow): Product {
     ratingCount: row.rating_count ?? 0,
     reviews,
     variants,
+    isNew: row.is_new ?? false,
   };
 }
 
@@ -89,6 +91,11 @@ function toQuery(filter: ProductFilter): string {
   // catálogo inteiro para o navegador da cliente.
   params.set("limit", String(filter.limit ?? 48));
   return params.toString();
+}
+
+/** Converte linhas cruas da API (usado também pelos favoritos). */
+export function listFromRows(rows: ProductRow[] | null): Product[] {
+  return (rows ?? []).map(toProduct);
 }
 
 export async function listProducts(filter: ProductFilter = {}): Promise<Product[]> {

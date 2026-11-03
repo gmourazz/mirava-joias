@@ -1,33 +1,44 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import Hero from "../components/Hero";
-import OrderBand from "../components/OrderBand";
+import Beneficios from "../components/Beneficios";
 import CategoryGrid from "../components/CategoryGrid";
-import LinesSection from "../components/LinesSection";
-import HowItWorks from "../components/HowItWorks";
-import ProductCarousel from "../components/ProductCarousel";
-import Faq from "../components/Faq";
 import MaisVendidos from "../components/MaisVendidos";
-import TrustBar from "../components/TrustBar";
+import QuizBrilho from "../components/QuizBrilho";
+import BerloquesSection from "../components/BerloquesSection";
+import CompraSegura from "../components/CompraSegura";
+import PresentesSection from "../components/PresentesSection";
+import AjudaSection from "../components/AjudaSection";
+import Faq from "../components/Faq";
+import Reveal from "../components/Reveal";
 
+// Home do design v5 (mirava-novo-design/Mirava Site v5.dc.html), na mesma
+// ordem do protótipo. Ficam de fora as seções que dependem de algo que ainda
+// não existe: avaliações de clientes e a grade do Instagram (decisão 28) e a
+// newsletter, que prometia cupom sem haver cadastro nem cupom no backend.
+// O FAQ aqui mostra só as primeiras perguntas e leva à página completa.
 export default function Home() {
+  const { hash } = useLocation();
+
+  // Links "/#duvidas" apontam para a âncora nesta página. useNavigate não
+  // rola sozinho até o #id — fazemos na mão.
+  useEffect(() => {
+    if (!hash) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [hash]);
+
   return (
     <div>
       <Hero />
-      <OrderBand />
+      <Beneficios />
       <CategoryGrid />
-      <LinesSection />
-      <HowItWorks />
-      <ProductCarousel />
-      {/* Seção de gravação removida da vitrine: prometia "grave o que você
-          não quer esquecer, sem custo extra", e a Lilly não faz gravação por
-          texto livre — o que ela oferece é escolha de letra pronta. O
-          componente continua em components/EngravingSection.tsx para o dia em
-          que existir alguém que grave de verdade. */}
-      {/* Seção de depoimentos removida até existirem avaliações reais.
-          O componente segue em components/Testimonials.tsx para quando
-          vierem do banco. */}
       <MaisVendidos />
+      <Reveal><QuizBrilho /></Reveal>
+      <Reveal><BerloquesSection /></Reveal>
+      <Reveal><CompraSegura /></Reveal>
+      <Reveal><PresentesSection /></Reveal>
+      <Reveal><AjudaSection /></Reveal>
       <Faq />
-      <TrustBar />
     </div>
   );
 }

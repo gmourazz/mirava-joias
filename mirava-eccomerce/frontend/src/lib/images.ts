@@ -7,6 +7,8 @@ import av6 from "../assets/images/av6.webp";
 import heroA from "../assets/images/hero-a.webp";
 import heroB from "../assets/images/hero-b.webp";
 import heroC from "../assets/images/hero-c.webp";
+import heroArgolas from "../assets/images/hero-argolas.webp";
+import heroBerloques from "../assets/images/hero-berloques.webp";
 import catAneis from "../assets/images/cat-aneis.webp";
 import catColares from "../assets/images/cat-colares.webp";
 import catPulseiras from "../assets/images/cat-pulseiras.webp";
@@ -38,6 +40,8 @@ const POOL: Record<string, string> = {
   "hero-a": heroA,
   "hero-b": heroB,
   "hero-c": heroC,
+  "hero-argolas": heroArgolas,
+  "hero-berloques": heroBerloques,
   "cat-aneis": catAneis,
   "cat-colares": catColares,
   "cat-pulseiras": catPulseiras,

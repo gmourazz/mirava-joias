@@ -7,8 +7,8 @@
 // Se os dois divergirem, quem manda é o servidor — e é assim que tem que ser.
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Loader2, Lock, MapPin, Plus, Trash2, Truck, User } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Check, CreditCard, Loader2, Lock, Percent, Plus, QrCode, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { api, ApiError } from "../lib/api";
@@ -28,7 +28,8 @@ import {
   type ShippingOption,
   type ShippingService,
 } from "../lib/frete";
-import { formatarBRL, textoParcelas, textoPix } from "../lib/dinheiro";
+import { formatarBRL, temDescontoPix, textoParcelas, textoPix, textoPrazo } from "../lib/dinheiro";
+import { LOJA } from "../config/loja";
 
 const EMPTY_ADDRESS: NewAddress = {
   label: "Casa",
@@ -55,7 +56,6 @@ interface CheckoutResponse {
 export default function Checkout() {
   const { user, loading: loadingUser } = useAuth();
   const { items, subtotalCents } = useCart();
-  const navigate = useNavigate();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
@@ -69,6 +69,9 @@ export default function Checkout() {
   const [shipping, setShipping] = useState<ShippingService>("economico");
 
   const [phone, setPhone] = useState("");
+
+  const [aceitePrazo, setAceitePrazo] = useState(false);
+  const [aceiteTrocas, setAceiteTrocas] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -198,6 +201,10 @@ export default function Checkout() {
       setError("Escolha um endereço de entrega.");
       return;
     }
+    if (!aceitePrazo || !aceiteTrocas) {
+      setError("Confirme o prazo da encomenda e a política de trocas para finalizar.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api<CheckoutResponse>("/checkout", {
@@ -224,19 +231,17 @@ export default function Checkout() {
     }
   }
 
+
   if (loadingUser) return null;
 
   if (!user) {
     return (
       <Aviso titulo="Entre para finalizar">
-        <p className="m-0 text-[14px] leading-relaxed text-ink-soft">
+        <p className="m-0 text-[15px] leading-relaxed text-text-2">
           A conta guarda seu endereço e o histórico dos pedidos, e é como a
           gente te avisa quando a peça for despachada.
         </p>
-        <Link
-          to="/conta"
-          className="mt-2 rounded-full bg-wine px-7 py-3 font-serif text-[13px] font-semibold tracking-[0.18em] text-white uppercase hover:bg-wine-dark"
-        >
+        <Link to="/conta?voltar=/checkout" className={botaoPrimario}>
           Entrar ou criar conta
         </Link>
       </Aviso>
@@ -246,63 +251,42 @@ export default function Checkout() {
   if (items.length === 0) {
     return (
       <Aviso titulo="Sua sacola está vazia">
-        <p className="m-0 text-[14px] leading-relaxed text-ink-soft">
-          Escolha uma peça e ela aparece aqui.
-        </p>
-        <Link
-          to="/categoria/colecoes/todos"
-          className="mt-2 rounded-full bg-wine px-7 py-3 font-serif text-[13px] font-semibold tracking-[0.18em] text-white uppercase hover:bg-wine-dark"
-        >
-          Ver coleções
+        <p className="m-0 text-[15px] leading-relaxed text-text-2">Escolha uma peça e ela aparece aqui.</p>
+        <Link to="/categoria/colecoes/todos" className={botaoPrimario}>
+          Ver as joias
         </Link>
       </Aviso>
     );
   }
 
+  const podePagar = Boolean(selected) && aceitePrazo && aceiteTrocas && !submitting;
+
   return (
-    <div className="mx-auto max-w-5xl px-4 pt-8 pb-20 sm:px-8">
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="mb-6 flex cursor-pointer items-center gap-1 border-none bg-none p-0 text-[12px] tracking-[0.12em] text-mauve uppercase hover:text-wine"
-      >
-        <ChevronLeft className="h-3.5 w-3.5" /> Voltar
-      </button>
+    <div className="min-h-screen bg-snow">
+      <BarraCheckout />
 
-      <h1 className="m-0 font-serif text-[clamp(26px,3vw,34px)] leading-tight font-normal">
-        Finalizar compra
-      </h1>
-
-      <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_360px] lg:gap-14">
-        <div className="flex flex-col gap-9">
-          {/* Endereço */}
-          <section>
-            <Passo numero={1} icone={<MapPin className="h-4 w-4" strokeWidth={1.6} />}>
-              Endereço de entrega
-            </Passo>
-
+      <div className="mx-auto flex max-w-[1180px] flex-wrap items-start gap-6 px-[clamp(16px,3vw,40px)] pt-8 pb-20">
+        <div className="flex min-w-0 flex-[1.6_1_480px] flex-col gap-5">
+          {/* 1 · Entrega */}
+          <Cartao numero={1} titulo="Endereço de entrega">
             {loadingAddresses ? (
-              <p className="m-0 text-[13px] text-ink-soft">Carregando…</p>
+              <p className="m-0 text-[14px] text-muted">Carregando…</p>
             ) : (
               <div className="flex flex-col gap-2.5">
                 {addresses.map((a) => (
                   <label
                     key={a.id}
-                    className="flex cursor-pointer items-start gap-3 rounded-[14px] border p-4 transition"
-                    style={{
-                      borderColor: selected === a.id ? "#8E3B6B" : "#FFE5F0",
-                      background: selected === a.id ? "#FFF7FB" : "transparent",
-                    }}
+                    className={`flex cursor-pointer items-start gap-3 rounded-[18px] border-[1.5px] p-4 transition-colors ${
+                      selected === a.id ? "border-teal bg-[#F1F8F7]" : "border-line bg-white"
+                    }`}
                   >
-                    <input
-                      type="radio"
-                      name="endereco"
-                      checked={selected === a.id}
-                      onChange={() => setSelected(a.id)}
-                      className="mt-1 accent-wine-dark"
-                    />
-                    <span className="flex-1 text-[13px] leading-relaxed text-ink-soft">
-                      <span className="block font-serif text-[15px] text-ink">{a.recipient}</span>
+                    <input type="radio" name="endereco" checked={selected === a.id} onChange={() => setSelected(a.id)} className="sr-only" />
+                    <Radio ativo={selected === a.id} />
+                    <span className="flex-1 text-[14px] leading-relaxed text-text-2">
+                      <span className="block text-[15px] font-semibold text-text">
+                        {a.recipient}
+                        {a.label && <span className="ml-2 text-[12px] font-medium text-muted">{a.label}</span>}
+                      </span>
                       {a.street}, {a.number}
                       {a.complement && ` · ${a.complement}`}
                       <br />
@@ -318,9 +302,9 @@ export default function Checkout() {
                         void removeAddress(a.id);
                       }}
                       aria-label="Excluir endereço"
-                      className="shrink-0 cursor-pointer border-none bg-none p-1 text-mauve hover:text-wine"
+                      className="shrink-0 cursor-pointer border-none bg-transparent p-1 text-muted hover:text-[#B4443C]"
                     >
-                      <Trash2 className="pointer-events-none h-3.5 w-3.5" strokeWidth={1.6} />
+                      <Trash2 className="pointer-events-none h-4 w-4" strokeWidth={1.6} />
                     </button>
                   </label>
                 ))}
@@ -329,192 +313,136 @@ export default function Checkout() {
                   <button
                     type="button"
                     onClick={() => setShowForm(true)}
-                    className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full border border-mauve bg-none px-4 py-2 text-[12px] tracking-[0.1em] text-ink uppercase hover:border-wine hover:text-wine"
+                    className="flex w-fit cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] border-line-strong bg-white px-4 py-2.5 text-[13.5px] font-semibold text-teal hover:border-teal"
                   >
-                    <Plus className="h-3.5 w-3.5" strokeWidth={1.8} /> Novo endereço
+                    <Plus className="h-4 w-4" strokeWidth={2} /> Novo endereço
                   </button>
                 )}
               </div>
             )}
 
             {showForm && (
-              <form onSubmit={saveAddress} className="mt-3 grid gap-3.5 rounded-[16px] border border-blush bg-cream/40 p-5 sm:grid-cols-2">
-                <Campo
-                  label="Quem recebe"
-                  value={form.recipient}
-                  onChange={(v) => setForm({ ...form, recipient: v })}
-                  required
-                  className="sm:col-span-2"
-                />
+              <form onSubmit={saveAddress} className="animate-fade-in mt-3 grid gap-3.5 rounded-[18px] bg-snow p-5 sm:grid-cols-2">
+                <Campo label="Quem recebe" value={form.recipient} onChange={(v) => setForm({ ...form, recipient: v })} required className="sm:col-span-2" />
                 <Campo
                   label={zipLoading ? "CEP (buscando…)" : "CEP"}
                   value={formatZip(form.zip_code)}
                   onChange={(v) => setForm({ ...form, zip_code: v })}
                   required
                   inputMode="numeric"
+                  placeholder="00000-000"
                 />
-                <Campo
-                  label="Apelido (casa, trabalho…)"
-                  value={form.label}
-                  onChange={(v) => setForm({ ...form, label: v })}
-                />
-                <Campo
-                  label="Rua"
-                  value={form.street}
-                  onChange={(v) => setForm({ ...form, street: v })}
-                  required
-                  className="sm:col-span-2"
-                />
-                <Campo
-                  label="Número"
-                  value={form.number}
-                  onChange={(v) => setForm({ ...form, number: v })}
-                  required
-                />
-                <Campo
-                  label="Complemento"
-                  value={form.complement}
-                  onChange={(v) => setForm({ ...form, complement: v })}
-                />
-                <Campo
-                  label="Bairro"
-                  value={form.neighborhood}
-                  onChange={(v) => setForm({ ...form, neighborhood: v })}
-                  required
-                />
+                <Campo label="Apelido (casa, trabalho…)" value={form.label} onChange={(v) => setForm({ ...form, label: v })} />
+                <Campo label="Rua" value={form.street} onChange={(v) => setForm({ ...form, street: v })} required className="sm:col-span-2" />
+                <Campo label="Número" value={form.number} onChange={(v) => setForm({ ...form, number: v })} required />
+                <Campo label="Complemento" value={form.complement} onChange={(v) => setForm({ ...form, complement: v })} placeholder="Apto, bloco" />
+                <Campo label="Bairro" value={form.neighborhood} onChange={(v) => setForm({ ...form, neighborhood: v })} required />
                 <div className="grid min-w-0 grid-cols-[1fr_76px] gap-3">
-                  <Campo
-                    label="Cidade"
-                    value={form.city}
-                    onChange={(v) => setForm({ ...form, city: v })}
-                    required
-                  />
-                  <Campo
-                    label="UF"
-                    value={form.state}
-                    onChange={(v) => setForm({ ...form, state: v.toUpperCase().slice(0, 2) })}
-                    required
-                  />
+                  <Campo label="Cidade" value={form.city} onChange={(v) => setForm({ ...form, city: v })} required />
+                  <Campo label="UF" value={form.state} onChange={(v) => setForm({ ...form, state: v.toUpperCase().slice(0, 2) })} required />
                 </div>
 
-                <div className="flex items-center gap-3 sm:col-span-2">
-                  <button
-                    type="submit"
-                    disabled={savingAddress}
-                    className="cursor-pointer rounded-full bg-wine px-6 py-2.5 font-serif text-[12.5px] font-semibold tracking-[0.16em] text-white uppercase hover:bg-wine-dark disabled:opacity-50"
-                  >
+                <div className="flex items-center gap-4 sm:col-span-2">
+                  <button type="submit" disabled={savingAddress} className={`${botaoPrimario} mt-0 border-none disabled:opacity-50`}>
                     {savingAddress ? "Salvando…" : "Salvar endereço"}
                   </button>
                   {addresses.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowForm(false)}
-                      className="cursor-pointer border-none bg-none p-0 text-[12.5px] text-mauve underline hover:text-wine"
-                    >
+                    <button type="button" onClick={() => setShowForm(false)} className="cursor-pointer border-none bg-transparent p-0 text-[13.5px] font-semibold text-muted hover:text-teal">
                       Cancelar
                     </button>
                   )}
                 </div>
               </form>
             )}
-          </section>
+          </Cartao>
 
-          {/* Entrega */}
+          {/* 2 · Envio */}
           {shippingOptions.length > 0 && !somenteTeste && (
-            <section>
-              <Passo numero={2} icone={<Truck className="h-4 w-4" strokeWidth={1.6} />}>
-                Forma de entrega
-              </Passo>
+            <Cartao numero={2} titulo="Forma de envio">
               <div className="flex flex-col gap-2.5">
                 {shippingOptions.map((o) => (
                   <label
                     key={o.service}
-                    className="flex cursor-pointer items-center gap-3 rounded-[14px] border p-4 transition"
-                    style={{
-                      borderColor: shipping === o.service ? "#8E3B6B" : "#FFE5F0",
-                      background: shipping === o.service ? "#FFF7FB" : "transparent",
-                    }}
+                    className={`flex cursor-pointer items-center gap-3 rounded-[18px] border-[1.5px] p-4 transition-colors ${
+                      shipping === o.service ? "border-teal bg-[#F1F8F7]" : "border-line bg-white"
+                    }`}
                   >
-                    <input
-                      type="radio"
-                      name="frete"
-                      checked={shipping === o.service}
-                      onChange={() => setShipping(o.service)}
-                      className="accent-wine-dark"
-                    />
+                    <input type="radio" name="frete" checked={shipping === o.service} onChange={() => setShipping(o.service)} className="sr-only" />
+                    <Radio ativo={shipping === o.service} />
                     <span className="flex-1">
-                      <span className="block font-serif text-[15px] text-ink">{o.label}</span>
-                      <span className="text-[12px] text-ink-soft">
-                        {shippingPrazo(o)} após a confirmação
-                      </span>
+                      <span className="block text-[15px] font-semibold text-text">Correios {o.label}</span>
+                      <span className="text-[13px] text-muted">Encomenda + {shippingPrazo(o)} de transporte</span>
                     </span>
-                    <span className="shrink-0 text-[14px] text-ink">
-                      {o.free ? <span className="text-wine">Grátis</span> : formatarBRL(o.cents)}
+                    <span className={`shrink-0 text-[15px] font-bold ${o.free ? "text-teal" : "text-text"}`}>
+                      {o.free ? "Grátis" : formatarBRL(o.cents)}
                     </span>
                   </label>
                 ))}
               </div>
-            </section>
+            </Cartao>
           )}
 
-          {/* Contato */}
-          <section>
-            <Passo numero={3} icone={<User className="h-4 w-4" strokeWidth={1.6} />}>
-              Contato
-            </Passo>
+          {/* 3 · Contato */}
+          <Cartao numero={3} titulo="Contato">
             {/* Só telefone: é o que a transportadora pede para a entrega. CPF
                 a gente não pede aqui — é exigência do processamento do
                 pagamento e é pedido na tela de pagamento, não nossa. */}
-            <Campo label="Telefone" value={phone} onChange={setPhone} inputMode="tel" />
-          </section>
+            <Campo label="Celular" value={phone} onChange={setPhone} inputMode="tel" placeholder="(00) 00000-0000" />
+          </Cartao>
 
+          {/* 4 · Pagamento — escolhido na tela do Mercado Pago (Checkout Pro,
+              decisão 25): nenhum dado de cartão passa pelo nosso site. */}
+          <Cartao numero={4} titulo="Pagamento">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <Tile icone={<QrCode size={20} strokeWidth={1.6} />} titulo="Pix" texto={temDescontoPix ? `${LOJA.descontoPixPct}% de desconto` : "aprovação na hora"} />
+              <Tile icone={<CreditCard size={20} strokeWidth={1.6} />} titulo="Cartão de crédito" texto={`até ${LOJA.parcelasSemJuros}x sem juros`} />
+            </div>
+            <p className="m-0 mt-3 flex items-start gap-2 text-[13.5px] leading-relaxed text-text-2">
+              <Lock size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-teal" />
+              Você escolhe a forma de pagamento na próxima tela, segura, do Mercado Pago.
+            </p>
+          </Cartao>
         </div>
 
         {/* Resumo */}
-        <aside className="h-fit lg:sticky lg:top-24">
-          <div className="rounded-[18px] border border-blush p-6">
-            <h2 className="m-0 mb-4 font-serif text-[19px] font-normal">Seu pedido</h2>
+        <aside className="flex-[1_1_320px] lg:sticky lg:top-5">
+          <div className="rounded-3xl border border-line bg-white p-[22px]">
+            <h2 className="m-0 mb-4 font-serif text-[24px] font-normal text-teal-dark">Resumo</h2>
 
             <div className="flex flex-col gap-3.5">
               {items.map((item) => (
-                <div key={item.key} className="flex items-center gap-3 text-[13px]">
-                  {item.image && (
-                    <img
-                      src={item.image}
-                      alt=""
-                      className="h-14 w-14 shrink-0 rounded-[10px] object-cover"
-                    />
-                  )}
-                  <span className="flex-1 text-ink-soft">
-                    <span className="block font-serif text-[14.5px] leading-tight text-ink">
-                      {item.name}
-                    </span>
-                    <span className="text-[11.5px]">
-                      {item.size && `${item.size} · `}
-                      {item.quantity} un.
+                <div key={item.key} className="flex items-center gap-3">
+                  <span className="relative shrink-0">
+                    {item.image ? (
+                      <img src={item.image} alt="" className="h-[58px] w-[58px] rounded-[14px] bg-mist-3 object-cover" />
+                    ) : (
+                      <span className="block h-[58px] w-[58px] rounded-[14px] bg-mist-3" />
+                    )}
+                    <span className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-teal-dark px-1 text-[11px] font-bold text-white">
+                      {item.quantity}
                     </span>
                   </span>
-                  <span className="shrink-0 text-ink">
-                    {formatarBRL(item.priceCents * item.quantity)}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-medium text-text">{item.name}</span>
+                    {item.size && <span className="text-[12.5px] text-muted">{item.size}</span>}
                   </span>
+                  <span className="shrink-0 text-[14px] font-semibold text-text">{formatarBRL(item.priceCents * item.quantity)}</span>
                 </div>
               ))}
             </div>
 
-            <div className="mt-5 flex flex-col gap-1.5 border-t border-blush pt-4 text-[13px]">
-              <div className="flex justify-between text-ink-soft">
+            <div className="mt-5 flex flex-col gap-2 border-t border-line pt-4 text-[14px] text-text-2">
+              <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>{formatarBRL(subtotalCents)}</span>
               </div>
-              <div className="flex justify-between text-ink-soft">
-                <span>Frete{!somenteTeste && chosen ? ` · ${chosen.label}` : ""}</span>
+              <div className="flex justify-between">
+                <span>Frete{!somenteTeste && chosen ? ` (${chosen.label})` : ""}</span>
                 <span>
-                  {somenteTeste ? (
-                    <span className="text-wine">Grátis</span>
+                  {somenteTeste || chosen?.free ? (
+                    <span className="font-semibold text-teal">Grátis</span>
                   ) : !selected ? (
-                    <span className="text-mauve">escolha o endereço</span>
-                  ) : chosen?.free ? (
-                    <span className="text-wine">Grátis</span>
+                    <span className="text-muted">escolha o endereço</span>
                   ) : (
                     formatarBRL(shippingCents)
                   )}
@@ -522,30 +450,41 @@ export default function Checkout() {
               </div>
             </div>
 
-            <div className="mt-3.5 border-t border-blush pt-3.5">
+            <div className="mt-3.5 border-t border-line pt-3.5">
               <div className="flex items-baseline justify-between">
-                <span className="text-[11px] tracking-[0.18em] text-ink-soft uppercase">Total</span>
-                <span className="text-[22px] leading-none text-ink">
-                  {formatarBRL(totalCents)}
-                </span>
+                <span className="text-[15px] font-semibold text-text">Total</span>
+                <span className="text-[24px] font-bold text-teal">{formatarBRL(totalCents)}</span>
               </div>
-              <div className="mt-1.5 flex flex-col items-end gap-0.5">
-                <span className="text-xs text-ink-soft">{textoParcelas(totalCents)}</span>
-                <span className="text-xs text-wine">{textoPix(totalCents)}</span>
+              <div className="mt-1 flex flex-col items-end gap-0.5 text-[12.5px]">
+                <span className="text-muted">{textoParcelas(totalCents)}</span>
+                {temDescontoPix && <span className="font-semibold text-teal">{textoPix(totalCents)}</span>}
               </div>
             </div>
 
+            <div className="mt-4 grid gap-3 rounded-[18px] bg-[#F7FAFA] p-4">
+              <Aceite marcado={aceitePrazo} onChange={setAceitePrazo}>
+                <strong className="text-text">Entendi que as peças são feitas sob encomenda</strong> e chegam em {textoPrazo()} após a confirmação do pagamento.
+              </Aceite>
+              <Aceite marcado={aceiteTrocas} onChange={setAceiteTrocas}>
+                Li a{" "}
+                <Link to="/politicas/trocas" target="_blank" className="font-semibold text-teal underline">
+                  política de trocas e devoluções
+                </Link>
+                .
+              </Aceite>
+            </div>
+
             {error && (
-              <p className="m-0 mt-4 rounded-[10px] bg-blush px-3.5 py-2.5 text-[12.5px] leading-relaxed text-wine-dark">
-                {error}
-              </p>
+              <p className="m-0 mt-4 rounded-[14px] bg-[#FDECEC] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#B4443C]">{error}</p>
             )}
 
             <button
               type="button"
               onClick={pay}
-              disabled={submitting || !selected}
-              className="mt-5 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-full border-none bg-wine p-4 font-serif text-[14px] font-semibold tracking-[0.2em] text-white uppercase transition-colors hover:bg-wine-dark disabled:cursor-not-allowed disabled:opacity-45"
+              disabled={submitting}
+              className={`mt-4 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-full border-none bg-teal p-[17px] text-[15px] font-semibold text-white transition-[background,opacity] hover:bg-teal-dark ${
+                podePagar ? "" : "opacity-55"
+              }`}
             >
               {submitting ? (
                 <>
@@ -553,16 +492,12 @@ export default function Checkout() {
                   Abrindo pagamento…
                 </>
               ) : (
-                <>
-                  <Lock className="h-[15px] w-[15px]" strokeWidth={1.6} />
-                  Ir para o pagamento
-                </>
+                <>Ir para o pagamento →</>
               )}
             </button>
 
-            <p className="m-0 mt-3.5 text-center text-[11px] leading-relaxed text-mauve">
-              Você será levada para uma tela segura de pagamento, com Pix ou cartão.
-              {chosen && ` Entrega em ${shippingPrazo(chosen)} após a confirmação.`}
+            <p className="m-0 mt-3.5 text-center text-[12.5px] leading-relaxed text-muted">
+              Peças sob encomenda: entrega em <strong className="text-text">{textoPrazo()}</strong>. Você recebe o código de rastreio por e-mail.
             </p>
           </div>
         </aside>
@@ -571,23 +506,90 @@ export default function Checkout() {
   );
 }
 
-function Passo({
-  numero,
-  icone,
-  children,
-}: {
-  numero: number;
-  icone: React.ReactNode;
-  children: React.ReactNode;
-}) {
+const botaoPrimario =
+  "mt-2 cursor-pointer rounded-full bg-teal px-7 py-3.5 text-[14px] font-semibold text-white hover:bg-teal-dark hover:text-white";
+
+/** Topo próprio do checkout (v5): logotipo, passos e selo de segurança. A
+ *  faixa de avisos, o menu e o rodapé da loja somem nesta tela. */
+function BarraCheckout() {
+  const passos = [
+    { n: 1, label: "Sacola", feito: true },
+    { n: 2, label: "Entrega e pagamento", ativo: true },
+    { n: 3, label: "Confirmação" },
+  ];
   return (
-    <h2 className="m-0 mb-4 flex items-center gap-2.5 font-serif text-[19px] font-normal">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cream text-wine">
-        {icone}
-      </span>
+    <header className="flex h-[76px] items-center border-b border-line bg-white">
+      <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-4 px-[clamp(16px,3vw,40px)]">
+        <Link to="/" className="font-logo text-[26px] tracking-[0.28em] text-teal-dark hover:text-teal-dark">
+          MIRAVA
+        </Link>
+        <ol className="m-0 hidden list-none items-center gap-5 p-0 md:flex">
+          {passos.map((p) => (
+            <li key={p.n} className={`flex items-center gap-2 text-[13.5px] font-semibold ${p.feito || p.ativo ? "text-teal-dark" : "text-faint"}`}>
+              <span
+                className={`grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold ${
+                  p.feito || p.ativo ? "bg-teal text-white" : "bg-[#EEF3F2] text-faint"
+                }`}
+              >
+                {p.feito ? <Check size={13} strokeWidth={3} /> : p.n}
+              </span>
+              {p.label}
+            </li>
+          ))}
+        </ol>
+        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-teal">
+          <Lock size={15} strokeWidth={1.8} />
+          Compra 100% segura
+        </span>
+      </div>
+    </header>
+  );
+}
+
+function Cartao({ numero, titulo, children }: { numero: number; titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-3xl border border-line bg-white p-[22px]">
+      <h2 className="m-0 mb-4 flex items-center gap-3 font-serif text-[22px] font-normal text-teal-dark">
+        <span className="grid h-[30px] w-[30px] place-items-center rounded-full bg-teal font-sans text-[14px] font-bold text-white">{numero}</span>
+        {titulo}
+      </h2>
       {children}
-      <span className="sr-only">passo {numero}</span>
-    </h2>
+    </section>
+  );
+}
+
+function Radio({ ativo }: { ativo: boolean }) {
+  return (
+    <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${ativo ? "border-teal" : "border-[#DDE4E4]"}`}>
+      {ativo && <span className="h-2.5 w-2.5 rounded-full bg-teal" />}
+    </span>
+  );
+}
+
+function Tile({ icone, titulo, texto }: { icone: React.ReactNode; titulo: string; texto: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-[18px] border border-line p-4">
+      <span className="grid h-10 w-10 place-items-center rounded-full bg-mist text-teal">{icone}</span>
+      <span className="grid">
+        <span className="text-[14.5px] font-semibold text-text">{titulo}</span>
+        <span className="flex items-center gap-1 text-[12.5px] text-muted">
+          {titulo === "Pix" && temDescontoPix && <Percent size={12} strokeWidth={2} />}
+          {texto}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function Aceite({ marcado, onChange, children }: { marcado: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 text-[13px] leading-relaxed text-text-2">
+      <input type="checkbox" checked={marcado} onChange={(e) => onChange(e.target.checked)} className="sr-only" />
+      <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg border-[1.5px] transition-colors ${marcado ? "border-teal bg-teal text-white" : "border-[#DDE4E4] bg-white"}`}>
+        {marcado && <Check size={14} strokeWidth={3} />}
+      </span>
+      <span>{children}</span>
+    </label>
   );
 }
 
@@ -595,30 +597,30 @@ function Campo({
   label,
   value,
   onChange,
-  onBlur,
   required,
   inputMode,
+  placeholder,
   className = "",
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  onBlur?: () => void;
   required?: boolean;
   inputMode?: "numeric" | "tel";
+  placeholder?: string;
   className?: string;
 }) {
   return (
     <label className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
-      <span className="text-[10.5px] tracking-[0.14em] text-ink-soft uppercase">{label}</span>
+      <span className="text-[12.5px] font-semibold text-text-2">{label}</span>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
         required={required}
         inputMode={inputMode}
-        className="w-full min-w-0 rounded-[10px] border border-mauve/50 bg-paper px-3.5 py-2.5 text-[14px] text-ink outline-none focus:border-wine"
+        placeholder={placeholder}
+        className="w-full min-w-0 rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-[13px] text-[14.5px] text-text outline-none placeholder:text-[#8A9A9B] focus:border-teal"
       />
     </label>
   );
@@ -626,9 +628,12 @@ function Campo({
 
 function Aviso({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-28 text-center">
-      <h1 className="m-0 font-serif text-[26px] font-normal">{titulo}</h1>
-      {children}
+    <div className="min-h-screen bg-snow">
+      <BarraCheckout />
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-28 text-center">
+        <h1 className="m-0 font-serif text-[32px] font-normal text-teal-dark">{titulo}</h1>
+        {children}
+      </div>
     </div>
   );
 }

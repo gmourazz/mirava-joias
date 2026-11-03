@@ -24,11 +24,19 @@ export const LOJA = {
    */
   parcelasSemJuros: 3,
 
-  /** Desconto no Pix. Mesmo dando 5%, o Pix continua a venda mais lucrativa. */
-  descontoPixPct: 5,
+  /**
+   * Desconto no Pix, em %. Hoje 0: o checkout (api/internal/web/checkout.go)
+   * ainda não aplica desconto nenhum, e o site não pode prometer o que o
+   * servidor não cobra (decisão de 03/11/2026). Com 0, as telas escondem toda
+   * menção a desconto no Pix. Quando o servidor passar a aplicar, volte para 5.
+   */
+  descontoPixPct: 0 as number,
 
-  /** Prazo prometido, contado a partir da confirmação do pagamento. */
-  prazo: { minDiasUteis: 10, maxDiasUteis: 20 },
+  /**
+   * Prazo prometido, contado a partir da confirmação do pagamento.
+   * Decisão 22: só o teto ("até 20 dias úteis"), sem piso.
+   */
+  prazo: { maxDiasUteis: 20 },
 
   // Frete NÃO mora aqui. Preço de entrega é dinheiro, e dinheiro é decidido no
   // servidor: a tabela está em api/internal/dominio/frete.go e o front pergunta
