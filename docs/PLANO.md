@@ -889,7 +889,7 @@ Feito sem regra nova de negócio:
 - [x] **Automações por e-mail**: lembrete de pagamento, carrinho abandonado (a sacola da cliente logada é salva no servidor), pedir avaliação, avise-me e andamento da troca — liga/desliga no painel.
 - [x] Financeiro passa a descontar cupons/pontos e somar embrulhos (`dominio.MonthlyFinance`, com teste).
 - [ ] Ligar o Resend e criar o job do Cloud Scheduler de `/tarefas/automacoes` (ver `api/README.md`).
-- [ ] Aplicar `db/alter-design-v5.sql` no banco que já tem dados.
+- [x] `db/alter-design-v5.sql` aplicado no banco local `mirava` (04/11/2026).
 
 ### Design v5 completo (03/11/2026, decisões 21, 27 e 32 a 35)
 
@@ -907,11 +907,11 @@ Feito sem regra nova de negócio:
 - [x] **Configurações**: dados da loja, remetente da etiqueta, metas do mês, calcular frete por CEP e equipe (papel de despacho).
 - [x] **Financeiro**: metas do mês e taxas por forma de pagamento. **Visão geral**: alertas de estoque, mais vendidos e próxima sincronização. **Pedido**: avisos enviados à cliente.
 - [x] **Loja**: preço riscado, "N pessoas compraram esta semana" (venda real), compre junto, guia de tamanhos, % que recomendam e compra verificada, "Quem usa, ama", Instagram, novidades, esqueci minha senha, lembrar de mim, Meus cupons, aniversário e preferências, nível e pontos na conta, "escolhidas pra você", embrulho já na sacola.
-- [ ] Aplicar `db/alter-design-v5.sql` no banco que já tem dados (agora inclui a seção 09).
+- [x] `db/alter-design-v5.sql` aplicado no banco local `mirava` (04/11/2026, com backup antes). Falta no banco de produção, quando existir.
 - [ ] Ligar o Resend; trocar o job de sincronização para `/tarefas/sincronizar-se-devido` (a cada hora) e criar o de `/tarefas/automacoes` (ver `api/README.md`).
 - [ ] Se for para o Cloud Run: volume para `UPLOADS_DIR` (fotos enviadas pelo painel).
 
-Ficou de fora de propósito (decisões registradas): formulário de cartão e cartão salvo (decisão 25 — pagamento no Mercado Pago), "Continuar com Google" (precisa da credencial OAuth), WhatsApp como canal (decisão 30 — atendimento por e-mail), avaliações/fotos/números inventados do protótipo (decisão 28) e a tela de QR do Pix no nosso site (o Checkout Pro mostra). O custo real do embrulho ainda não é registrado (o financeiro conta os R$5 inteiros como lucro).
+Ficou de fora de propósito (decisões registradas): formulário de cartão e cartão salvo (decisão 25 — pagamento no Mercado Pago), "Continuar com Google" (precisa da credencial OAuth), WhatsApp como canal (decisão 30 — atendimento por e-mail), avaliações/fotos/números inventados do protótipo (decisão 28) e a tela de QR do Pix no nosso site (o Checkout Pro mostra). O custo de cada embrulho é informado em Configurações e sai do lucro no Financeiro.
 
 ### Fase E — Crescimento · depois do lançamento, cada item é backend novo
 

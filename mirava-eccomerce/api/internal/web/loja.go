@@ -242,6 +242,9 @@ func (s *Servidor) adminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	case st.GoalRevenue < 0 || st.GoalOrders < 0 || st.GoalProfit < 0:
 		responder(w, http.StatusBadRequest, mapa{"error": "Metas não podem ser negativas"})
 		return
+	case st.GiftWrapCost < 0 || st.GiftWrapCost > 5000:
+		responder(w, http.StatusBadRequest, mapa{"error": "Custo do embrulho entre R$ 0 e R$ 50"})
+		return
 	case strings.TrimSpace(st.StoreName) == "" || !emailRe.MatchString(st.StoreEmail):
 		responder(w, http.StatusBadRequest, mapa{"error": "Nome da loja e e-mail de atendimento são obrigatórios"})
 		return

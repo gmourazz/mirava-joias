@@ -902,6 +902,9 @@ func (d *DB) FinanceMonth(ctx context.Context, start, end time.Time, packagingEa
 		in.Subtotal += o.Subtotal
 		in.Discount += o.Discount
 		in.GiftWrap += o.GiftWrap
+		if o.GiftWrap > 0 {
+			in.GiftWraps++
+		}
 		in.ShippingCharged += o.Shipping
 		in.Cost += o.Cost
 		in.Fees += o.Fee

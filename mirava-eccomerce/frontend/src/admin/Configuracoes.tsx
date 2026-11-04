@@ -150,10 +150,13 @@ function DadosDaLoja() {
           <input value={st.sender_zip} onChange={(e) => set("sender_zip", onlyDigits(e.target.value).slice(0, 8))} placeholder="CEP" className={campo} />
         </div>
       </Bloco>
-      <Bloco titulo="Metas do mês">
+      <Bloco titulo="Metas e custos">
         <Rotulo t="Faturamento (R$)"><input inputMode="decimal" defaultValue={reais(st.goal_revenue_cents)} onBlur={(e) => set("goal_revenue_cents", centavos(e.target.value))} className={campo} /></Rotulo>
         <Rotulo t="Pedidos"><input inputMode="numeric" value={st.goal_orders || ""} onChange={(e) => set("goal_orders", Number(onlyDigits(e.target.value)) || 0)} className={campo} /></Rotulo>
         <Rotulo t="Lucro líquido (R$)"><input inputMode="decimal" defaultValue={reais(st.goal_profit_cents)} onBlur={(e) => set("goal_profit_cents", centavos(e.target.value))} className={campo} /></Rotulo>
+        <Rotulo t="Custo de cada embrulho (R$) — caixinha, laço e cartão">
+          <input inputMode="decimal" defaultValue={reais(st.gift_wrap_cost_cents)} onBlur={(e) => set("gift_wrap_cost_cents", centavos(e.target.value))} placeholder="0,00" className={campo} />
+        </Rotulo>
       </Bloco>
       <div className="flex items-center gap-3 xl:col-span-3">
         <button type="submit" className="cursor-pointer rounded-full border-none bg-teal px-6 py-3 text-[14px] font-semibold text-white hover:bg-teal-dark">

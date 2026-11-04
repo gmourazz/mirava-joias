@@ -40,6 +40,7 @@ type StoreSettings struct {
 	GoalRevenue        int     `json:"goal_revenue_cents"`
 	GoalOrders         int     `json:"goal_orders"`
 	GoalProfit         int     `json:"goal_profit_cents"`
+	GiftWrapCost       int     `json:"gift_wrap_cost_cents"`
 }
 
 const settingsColumns = `default_markup_pct::float8, round_to_90, min_margin_pct::float8,
@@ -48,7 +49,7 @@ const settingsColumns = `default_markup_pct::float8, round_to_90, min_margin_pct
 	coalesce(sender_name,''), coalesce(sender_street,''), coalesce(sender_number,''),
 	coalesce(sender_complement,''), coalesce(sender_neighborhood,''), coalesce(sender_city,''),
 	coalesce(sender_state,''), coalesce(sender_zip,''),
-	goal_revenue_cents, goal_orders, goal_profit_cents`
+	goal_revenue_cents, goal_orders, goal_profit_cents, gift_wrap_cost_cents`
 
 func (d *DB) Settings(ctx context.Context) (StoreSettings, error) {
 	var s StoreSettings
@@ -56,7 +57,7 @@ func (d *DB) Settings(ctx context.Context) (StoreSettings, error) {
 		&s.DefaultMarkupPct, &s.RoundTo90, &s.MinMarginPct, &s.OutOfStockAction, &s.SyncEveryHours,
 		&s.AutoImport, &s.SyncImages, &s.SyncDescriptions, &s.StoreName, &s.StoreEmail, &s.StoreInstagram,
 		&s.SenderName, &s.SenderStreet, &s.SenderNumber, &s.SenderComplement, &s.SenderNeighborhood,
-		&s.SenderCity, &s.SenderState, &s.SenderZip, &s.GoalRevenue, &s.GoalOrders, &s.GoalProfit)
+		&s.SenderCity, &s.SenderState, &s.SenderZip, &s.GoalRevenue, &s.GoalOrders, &s.GoalProfit, &s.GiftWrapCost)
 	return s, err
 }
 
@@ -73,11 +74,11 @@ func (d *DB) SaveSettings(ctx context.Context, s StoreSettings) error {
 			sender_neighborhood = nullif($16,''), sender_city = nullif($17,''),
 			sender_state = nullif($18,''), sender_zip = nullif($19,''),
 			goal_revenue_cents = $20, goal_orders = $21, goal_profit_cents = $22,
-			updated_at = now()`,
+			gift_wrap_cost_cents = $23, updated_at = now()`,
 		s.DefaultMarkupPct, s.RoundTo90, s.MinMarginPct, s.OutOfStockAction, s.SyncEveryHours,
 		s.AutoImport, s.SyncImages, s.SyncDescriptions, s.StoreName, s.StoreEmail, s.StoreInstagram,
 		s.SenderName, s.SenderStreet, s.SenderNumber, s.SenderComplement, s.SenderNeighborhood,
-		s.SenderCity, s.SenderState, s.SenderZip, s.GoalRevenue, s.GoalOrders, s.GoalProfit)
+		s.SenderCity, s.SenderState, s.SenderZip, s.GoalRevenue, s.GoalOrders, s.GoalProfit, s.GiftWrapCost)
 	return err
 }
 

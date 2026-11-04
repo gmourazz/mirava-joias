@@ -89,7 +89,14 @@ export default function Financeiro() {
             {dados.discount_cents > 0 && (
               <Kpi label="Descontos dados" valor={-dados.discount_cents} nota={`cupons e pontos · ${pct(dados.discount_cents, dados.subtotal_cents)} das peças`} />
             )}
-            {dados.gift_wrap_cents > 0 && <Kpi label="Embrulhos" valor={dados.gift_wrap_cents} nota="cobrados das clientes" />}
+            {dados.gift_wrap_cents > 0 && <Kpi label="Embrulhos" valor={dados.gift_wrap_cents} nota={`${dados.gift_wraps} cobrados das clientes`} />}
+            {dados.gift_wraps > 0 && (
+              <Kpi
+                label="Custo dos embrulhos"
+                valor={-dados.gift_wrap_cost_cents}
+                nota={dados.gift_wrap_cost_cents > 0 ? "caixinha, laço e cartão" : "informe o custo em Configurações"}
+              />
+            )}
             <Kpi label="Embalagem" valor={-dados.packaging_cents} nota={`${formatarBRL(dados.packaging_each_cents)} por pedido`} />
             <Kpi label="Frete dos lotes" valor={-dados.batch_freight_cents} nota="pago à Lilly em lote abaixo da meta" />
             <div className="col-span-full grid gap-1 rounded-[20px] bg-teal p-5 text-white">
@@ -149,7 +156,7 @@ function ParaOndeVai({ dados }: { dados: FinanceMonth }) {
   const fatias = [
     { label: "Lucro líquido", v: Math.max(0, dados.net_profit_cents), cor: "#0F6E73" },
     { label: "Custo Lilly", v: dados.cost_cents, cor: "#9FDCD5" },
-    { label: "Embalagem e frete dos lotes", v: dados.packaging_cents + dados.batch_freight_cents, cor: "#CFE6E4" },
+    { label: "Embalagem, embrulhos e frete dos lotes", v: dados.packaging_cents + dados.gift_wrap_cost_cents + dados.batch_freight_cents, cor: "#CFE6E4" },
     { label: "Taxas", v: dados.fees_cents, cor: "#E8B4AE" },
   ];
   return (
@@ -255,6 +262,7 @@ function exportar(d: FinanceMonth) {
     ["Faturamento", reaisCSV(d.revenue_cents)],
     ["Descontos", reaisCSV(d.discount_cents)],
     ["Embrulhos", reaisCSV(d.gift_wrap_cents)],
+    ["Custo dos embrulhos", reaisCSV(d.gift_wrap_cost_cents)],
     ["Custo Lilly", reaisCSV(d.cost_cents)],
     ["Taxas Mercado Pago", reaisCSV(d.fees_cents)],
     ["Embalagem", reaisCSV(d.packaging_cents)],

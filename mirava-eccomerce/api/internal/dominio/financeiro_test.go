@@ -69,3 +69,19 @@ func TestFechamentoComDescontoEEmbrulho(t *testing.T) {
 		t.Errorf("margem = %v, esperado ~61,76", got)
 	}
 }
+
+// O embrulho tem custo (caixinha, laço, cartão): sai do lucro, por embrulho
+// vendido, como a embalagem sai por pedido.
+func TestCustoDoEmbrulho(t *testing.T) {
+	f := MonthlyFinance(FinanceInput{
+		Orders: 2, Subtotal: 20000, Cost: 7000,
+		GiftWrap: 1000, GiftWraps: 2, GiftWrapCostEach: 300,
+	})
+	if f.GiftWrapCost != 600 {
+		t.Errorf("custo dos embrulhos = %d, esperado 600", f.GiftWrapCost)
+	}
+	// 200 − 70 + 10 de embrulho − 6 de custo do embrulho
+	if f.NetProfit != 13400 {
+		t.Errorf("lucro líquido = %d, esperado 13400", f.NetProfit)
+	}
+}

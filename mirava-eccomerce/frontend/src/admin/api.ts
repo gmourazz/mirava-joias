@@ -221,6 +221,8 @@ export interface FinanceMonth {
   subtotal_cents: number;
   discount_cents: number;
   gift_wrap_cents: number;
+  gift_wrap_cost_cents: number;
+  gift_wraps: number;
   shipping_cents: number;
   cost_cents: number;
   fees_cents: number;
@@ -470,6 +472,7 @@ export interface StoreSettings {
   goal_revenue_cents: number;
   goal_orders: number;
   goal_profit_cents: number;
+  gift_wrap_cost_cents: number;
 }
 
 export interface AdminCategory {

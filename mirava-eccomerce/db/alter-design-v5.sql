@@ -253,6 +253,9 @@ create table if not exists public.store_settings (
   updated_at            timestamptz not null default now()
 );
 insert into public.store_settings (id) values (true) on conflict do nothing;
+-- Custo de cada embrulho para presente (caixinha, laço, cartão): sai do
+-- lucro no Financeiro. 0 = ainda não informado.
+alter table public.store_settings add column if not exists gift_wrap_cost_cents integer not null default 0 check (gift_wrap_cost_cents >= 0);
 
 -- Markup que vale para a peça: da peça > da categoria > padrão (decisão 21).
 -- Igual a dominio.EffectiveMarkup. Mudou aqui, mude lá.

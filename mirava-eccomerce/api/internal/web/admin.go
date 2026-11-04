@@ -357,13 +357,14 @@ func (s *Servidor) adminFinance(w http.ResponseWriter, r *http.Request) {
 		responder(w, http.StatusInternalServerError, mapa{"error": "Não consegui montar o financeiro"})
 		return
 	}
+	settings, _ := s.db.Settings(r.Context())
+	data.Input.GiftWrapCostEach = dominio.Cents(settings.GiftWrapCost)
 	f := dominio.MonthlyFinance(data.Input)
 	fees, err := s.db.FeesByMethod(r.Context(), inicio, fim)
 	if err != nil {
 		s.log.Error("falha nas taxas por forma", "erro", err)
 		fees = []db.FeeByMethod{}
 	}
-	settings, _ := s.db.Settings(r.Context())
 	responder(w, http.StatusOK, mapa{
 		"month":                inicio.Format("2006-01"),
 		"orders_count":         f.Orders,
@@ -372,6 +373,8 @@ func (s *Servidor) adminFinance(w http.ResponseWriter, r *http.Request) {
 		"shipping_cents":       f.ShippingCharged,
 		"discount_cents":       f.Discount,
 		"gift_wrap_cents":      f.GiftWrap,
+		"gift_wrap_cost_cents": f.GiftWrapCost,
+		"gift_wraps":           f.GiftWraps,
 		"cost_cents":           f.Cost,
 		"fees_cents":           f.Fees,
 		"packaging_cents":      f.Packaging,
