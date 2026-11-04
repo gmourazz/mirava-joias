@@ -2,7 +2,7 @@
 
 @theme {
   /* Design "Mirava v5" (decisão 19 da arquitetura; protótipo em
-     mirava-novo-design/Mirava Site v5.dc.html). DM Serif Display nos
+     Mirava Site v5.dc.html, decisão 19). DM Serif Display nos
      títulos, DM Sans no texto, Bodoni Moda só no wordmark MIRAVA.
      font-script virou o itálico do DM Serif (o <em> teal dos títulos). */
   --font-serif: "DM Serif Display", Georgia, serif;

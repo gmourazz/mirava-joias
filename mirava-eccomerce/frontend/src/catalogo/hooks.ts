@@ -9,7 +9,7 @@ import {
   listProducts, productBySlug, relatedProducts,
   type ProductFilter,
 } from "./consultas";
-import type { Metal, Product } from "./tipos";
+import type { Product } from "./tipos";
 
 interface State<T> {
   data: T;
@@ -44,44 +44,6 @@ export function useProducts(filter: ProductFilter = {}) {
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   return { ...state, retry };
-}
-
-// Cache simples em módulo: o menu abre e fecha várias vezes na mesma
-// sessão, e a lista de peças por metal não muda a ponto de justificar
-// buscar de novo toda hora — só na primeira vez que cada aba é aberta.
-const menuPreviewCache = new Map<string, Product[]>();
-
-/**
- * Peças reais pra enriquecer o dropdown do menu (prata/ouro) com foto de
- * categoria de verdade, em vez de arte estática — mais rico e sempre
- * atualizado com o catálogo. Só busca quando o menu está aberto.
- */
-export function useMenuPreview(metal: Metal | "all" | null) {
-  const cacheKey = metal ?? "";
-  const [products, setProducts] = useState<Product[]>(() =>
-    metal ? (menuPreviewCache.get(cacheKey) ?? []) : [],
-  );
-
-  useEffect(() => {
-    if (!metal) return;
-    const cached = menuPreviewCache.get(cacheKey);
-    if (cached) {
-      setProducts(cached);
-      return;
-    }
-    let active = true;
-    listProducts({ metal: metal === "all" ? undefined : metal, limit: 60 })
-      .then((data) => {
-        menuPreviewCache.set(cacheKey, data);
-        if (active) setProducts(data);
-      })
-      .catch(() => {
-        // dropdown cai pro visual estático — não é motivo pra quebrar o menu
-      });
-    return () => { active = false; };
-  }, [metal, cacheKey]);
-
-  return products;
 }
 
 export function useProduct(slug: string | undefined) {

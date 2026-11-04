@@ -131,15 +131,6 @@ export async function relatedProducts(p: Product, quantity = 4): Promise<Product
   }
 }
 
-/** Quantas peças publicadas existem por categoria — alimenta os contadores. */
-export async function countByCategory(): Promise<Record<string, number>> {
-  try {
-    return await api<Record<string, number>>("/categorias/contagem");
-  } catch {
-    return {};
-  }
-}
-
 /**
  * URL pública de uma imagem de produto.
  *

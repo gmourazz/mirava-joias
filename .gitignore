@@ -16,10 +16,6 @@ mirava-eccomerce/api/servidor
 mirava-eccomerce/api/bin/
 *.out
 
-# Supabase CLI
-mirava-eccomerce/supabase/.temp/
-mirava-eccomerce/supabase/.branches/
-
 # Sistema
 .DS_Store
 *.log

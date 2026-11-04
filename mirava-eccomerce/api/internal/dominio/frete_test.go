@@ -103,7 +103,7 @@ func TestUFAceitaMinusculaEEspaco(t *testing.T) {
 
 // Serviço inventado na requisição não pode virar frete de graça.
 func TestServicoDesconhecidoCobraOEconomico(t *testing.T) {
-	got := ShippingCost("SP", 1000, ShippingService("gratis_por_favor"))
+	got := ShippingCostFor("SP", 1000, ShippingService("gratis_por_favor"), false)
 	want := ShippingOptions("SP", 1000)[0].Cents
 	if got != want {
 		t.Fatalf("serviço inválido cobrou %v, deveria cobrar o econômico (%v)", got, want)
@@ -138,7 +138,7 @@ func TestShippingCostBateComOCardapio(t *testing.T) {
 	for _, uf := range []string{"SP", "RS", "BA"} {
 		for _, subtotal := range []Cents{1000, FreeShippingAbove} {
 			for _, o := range ShippingOptions(uf, subtotal) {
-				if got := ShippingCost(uf, subtotal, o.Service); got != o.Cents {
+				if got := ShippingCostFor(uf, subtotal, o.Service, false); got != o.Cents {
 					t.Errorf("%s/%v/%s: cardápio diz %v, cobrança diz %v",
 						uf, subtotal, o.Service, o.Cents, got)
 				}

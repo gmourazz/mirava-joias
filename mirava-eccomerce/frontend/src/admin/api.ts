@@ -552,8 +552,6 @@ export interface TeamMember {
   role: "master" | "dispatch";
 }
 
-export type AutomationKey = AutomationStatus["key"];
-
 export const lojaApi = {
   settings: () => api<StoreSettings>("/admin/loja", auth),
   saveSettings: (s: StoreSettings) => api<{ ok: boolean }>("/admin/loja", { ...auth, method: "PUT", body: s }),

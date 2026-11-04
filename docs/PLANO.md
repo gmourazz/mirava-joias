@@ -1,7 +1,7 @@
 # Plano Mirava Joias — do site atual à loja operando
 
 **Data:** 11 de agosto de 2026
-**Escopo:** `mirava-eccomerce/` — backend (`api/`), banco (`supabase/`) e front (`frontend/`)
+**Escopo:** `mirava-eccomerce/` — backend (`api/`, Go), banco (`db/`, Postgres próprio) e front (`frontend/`, React + TypeScript + Vite)
 **Perfil:** desenvolvedora júnior, orçamento inicial zero, investir só depois do primeiro lucro
 
 ---
@@ -825,7 +825,7 @@ Isso te protege sem prometer o que você não pode cumprir. **Vale passar num ad
 
 ## 15. Painel admin do design v5 — fases
 
-**Data:** 03/11/2026 · **Referência:** `mirava-novo-design/Mirava Admin.dc.html` (decisão 19 da arquitetura)
+**Data:** 03/11/2026 · **Referência:** `Mirava Admin.dc.html` (decisão 19 da arquitetura; arquivado fora do repositório, decisão 36)
 
 O protótipo tem 14 seções. Nem todas valem o mesmo: algumas são a operação do dia a dia (sem elas a loja não roda), outras são crescimento (cupom, automação, avaliação) e precisam de backend que ainda não existe. A ordem abaixo segue o princípio do resto do plano: **cada fase termina em algo que a dona usa**, e o que mexe com dinheiro vem com teste primeiro.
 

@@ -11,15 +11,21 @@ mirava/
 ├── docs/                       documentos do projeto (valem para tudo)
 │   ├── ARQUITETURA.md          COMO construir — camadas, banco, auth, fluxos
 │   ├── PLANO.md                O QUE construir e em que ordem — fases, custos, riscos
-│   └── simulador-precos.html   ferramenta: markup, desconto, margem, lote
+│   ├── simulador-precos.html   ferramenta: markup, desconto, margem, lote
+│   └── marca/                  logos e briefing da marca (não entram no build)
 │
 └── mirava-eccomerce/
     ├── api/                    BACKEND · Go · deploy no Cloud Run (ou VPS Hostinger)
     ├── db/                     BANCO · Postgres próprio, schema.sql, docker-compose.yml
-    ├── supabase/                (histórico — projeto migrou do Supabase, ver decisão 15
-    │                             em ARQUITETURA.md; mantido só como referência)
-    └── frontend/                FRONTEND · React + Vite · deploy no Cloudflare Pages
+    ├── frontend/               FRONTEND · React + TypeScript + Vite (Node) · Cloudflare Pages
+    ├── docs/                   como rodar em outra máquina
+    └── rodar.sh                sobe banco, API e front juntos
 ```
+
+**Stack:** front em React 19 + TypeScript + Vite (ferramentas em Node, `npm`),
+back em Go (`net/http` + pgx), banco Postgres próprio. O Supabase saiu
+(decisão 15) e a pasta `supabase/` com as migrations antigas foi removida do
+repositório (decisão 36) — está no histórico do git se um dia precisar.
 
 **Três projetos independentes, três deploys separados.** O front nunca importa
 código do back nem fala com o Postgres direto — conversa com a API Go por
@@ -136,9 +142,10 @@ docker exec -i mirava-postgres psql -U mirava -d mirava < schema.sql
 ```
 
 `schema.sql` é a fonte única do schema — não há migrations numeradas por
-enquanto (o histórico de migrations do Supabase fica em `supabase/`, mantido
-só como referência). Mudou o schema, edite `schema.sql` e reaplique num banco
-limpo local antes de mexer em produção.
+enquanto. Banco que já tem dados recebe as mudanças por `alter-*.sql`
+idempotentes (hoje `alter-design-v5.sql`). Mudou o schema, edite `schema.sql`
+(e o alter, se for o caso) e reaplique num banco limpo local antes de mexer em
+produção.
 
 Ver `db/README.md` para os passos completos, incluindo como se tornar admin.
 
@@ -198,8 +205,10 @@ React 19 + TypeScript + Vite + Tailwind v4 + lucide-react + react-router-dom.
   o substituto do Instagram. Não reintroduza SVG customizado para isso.
 
 **Paleta e tipografia** (decisão 19 da arquitetura, substitui a 18): o
-design de referência é `mirava-novo-design/Mirava Site v5.dc.html` (loja) e
-`Mirava Admin.dc.html` (painel) — os outros arquivos da pasta são rascunhos.
+design de referência é `Mirava Site v5.dc.html` (loja) e `Mirava Admin.dc.html`
+(painel), já migrados por inteiro. Os arquivos do protótipo saíram do
+repositório e estão arquivados em `~/Documents/projects/mirava-arquivo-design/mirava-novo-design/`
+(decisão 36).
 Primária teal `#0F6E73`, escuro `#0B4A4D`, texto `#1A2B2C`, bordas `#E6EEED`.
 Títulos em DM Serif Display, texto em DM Sans, Bodoni Moda só no logotipo.
 Conteúdo fictício do protótipo (avaliações, prova social, fotos de clientes)

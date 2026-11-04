@@ -1,4 +1,4 @@
-// Painel de gestão (design v5 — mirava-novo-design/Mirava Admin.dc.html).
+// Painel de gestão (design v5 — Mirava Admin.dc.html, decisão 19).
 //
 // Layout: sidebar teal-escura com o selo MASTER, topbar com a seção atual e o
 // conteúdo ao lado. Só aparecem as seções que já funcionam de verdade; as

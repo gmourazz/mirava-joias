@@ -10,7 +10,8 @@ import (
 // Descontos, embrulho e Mirava Club (decisão 31 da arquitetura).
 //
 // Regras: cupom (% ou valor fixo) OU pontos, nunca os dois; desconto só sobre
-// as peças, nunca sobre o frete; teto de 30% das peças em qualquer caso.
+// as peças, nunca sobre o frete; teto de 30% das peças em qualquer caso. A
+// conta do pedido inteiro (com promoção, kit e Pix) é PriceOrder.
 
 // MaxDiscountPct é o teto de desconto sobre as peças. Com markup de 200%, a
 // peça ainda paga atacado, taxa e embalagem com 30% de desconto.
@@ -136,20 +137,6 @@ func PointsEarned(piecesAfterDiscount Cents) int {
 	return int(piecesAfterDiscount / 100)
 }
 
-// PointsRedemption diz quantos pontos usar e quanto desconto eles dão: só
-// blocos inteiros de 100, e nunca acima do teto de 30% das peças.
-func PointsRedemption(balance int, subtotal Cents) (points int, discount Cents) {
-	blocos := balance / PointsPerBlock
-	maxBlocos := int(MaxDiscount(subtotal) / CentsPerBlock)
-	if blocos > maxBlocos {
-		blocos = maxBlocos
-	}
-	if blocos <= 0 {
-		return 0, 0
-	}
-	return blocos * PointsPerBlock, Cents(blocos * CentsPerBlock)
-}
-
 type ClubLevel string
 
 const (
@@ -210,46 +197,4 @@ func OrderTotal(subtotal, discount, shipping Cents, giftWrap bool) Totals {
 	}
 	t.Total = subtotal - discount + shipping + t.GiftWrap
 	return t
-}
-
-// ---------------------------------------------------------------------------
-// Escolha do desconto no checkout
-// ---------------------------------------------------------------------------
-
-type DiscountRequest struct {
-	Subtotal      Cents
-	Coupon        *Coupon // nil = sem cupom
-	CouponUses    int
-	UsePoints     bool
-	PointsBalance int
-	Now           time.Time
-}
-
-type DiscountResult struct {
-	Discount   Cents
-	CouponCode string
-	PointsUsed int
-}
-
-// ChooseDiscount aplica o cupom OU os pontos (nunca os dois) e devolve o
-// desconto, sempre limitado ao teto de 30% das peças.
-func ChooseDiscount(r DiscountRequest) (DiscountResult, error) {
-	if r.Coupon != nil && r.UsePoints {
-		return DiscountResult{}, errors.New("use o cupom ou os pontos do Mirava Club — os dois juntos não valem")
-	}
-	if r.Coupon != nil {
-		d, err := r.Coupon.Discount(r.Subtotal, r.Now, r.CouponUses)
-		if err != nil {
-			return DiscountResult{}, err
-		}
-		return DiscountResult{Discount: d, CouponCode: NormalizeCouponCode(r.Coupon.Code)}, nil
-	}
-	if r.UsePoints {
-		pts, d := PointsRedemption(r.PointsBalance, r.Subtotal)
-		if pts == 0 {
-			return DiscountResult{}, errors.New("é preciso ter pelo menos 100 pontos para trocar por desconto")
-		}
-		return DiscountResult{Discount: d, PointsUsed: pts}, nil
-	}
-	return DiscountResult{}, nil
 }

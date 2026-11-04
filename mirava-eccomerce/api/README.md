@@ -172,8 +172,9 @@ então rodar duas vezes não manda o mesmo e-mail duas vezes.
 ## Antes de aceitar dinheiro de verdade
 
 - [ ] `go test ./...` passando
-- [ ] `supabase/verificar.sql` rodou até "TUDO OK"
-- [ ] Teste de vazamento com a chave anon devolveu `[]` para `pedidos`
+- [ ] Banco de produção com `db/schema.sql` (ou `db/alter-design-v5.sql`) aplicado
+- [ ] Rotas de dado de cliente (`/pedidos`, `/conta`, `/admin/*`) testadas sem
+      token e com o token de outra cliente — devem recusar
 - [ ] Webhook testado pelo simulador do Mercado Pago
 - [ ] Webhook duplicado testado (dispare o mesmo evento duas vezes — o segundo
       deve responder "já processado")

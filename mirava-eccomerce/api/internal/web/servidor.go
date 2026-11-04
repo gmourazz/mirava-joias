@@ -64,7 +64,6 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("GET /produtos", s.listProducts)
 	mux.HandleFunc("GET /produtos/{slug}", s.productBySlug)
 	mux.HandleFunc("GET /produtos/{slug}/relacionados", s.relatedProducts)
-	mux.HandleFunc("GET /categorias/contagem", s.categoryCounts)
 
 	mux.HandleFunc("GET /enderecos", s.listAddresses)
 	mux.HandleFunc("POST /enderecos", s.createAddress)

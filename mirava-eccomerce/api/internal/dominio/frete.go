@@ -155,14 +155,11 @@ func NormalizeShippingService(s ShippingService) ShippingService {
 	return ShippingEconomic
 }
 
-// ShippingCost devolve quanto cobrar pelo serviço escolhido.
+// ShippingCostFor devolve quanto cobrar pelo serviço escolhido.
 //
 // É esta função que o checkout usa. Serviço desconhecido vira econômico em vez
 // de erro: um valor a mais no corpo da requisição não pode virar frete grátis.
-func ShippingCost(uf string, subtotal Cents, service ShippingService) Cents {
-	return ShippingCostFor(uf, subtotal, service, false)
-}
-
+// clubFree: nível Encanto do Mirava Club, PAC grátis (decisão 34).
 func ShippingCostFor(uf string, subtotal Cents, service ShippingService, clubFree bool) Cents {
 	opts := ShippingOptionsFor(uf, subtotal, clubFree)
 	for _, o := range opts {

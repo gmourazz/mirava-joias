@@ -15,7 +15,7 @@ import QuemUsaAma from "../components/QuemUsaAma";
 import GaleriaInstagram from "../components/GaleriaInstagram";
 import { NovidadesSecao } from "../components/Novidades";
 
-// Home do design v5 (mirava-novo-design/Mirava Site v5.dc.html), na mesma
+// Home do design v5 (Mirava Site v5.dc.html, decisão 19), na mesma
 // ordem do protótipo. Avaliações e Instagram só aparecem com dado real
 // (avaliação aprovada, foto enviada pelo painel — decisão 28); a seção de
 // novidades dá o BEMVINDA10 (decisão 34). O FAQ aqui mostra só as primeiras

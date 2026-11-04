@@ -1,7 +1,5 @@
 package dominio
 
-import "fmt"
-
 // Status é o estado de um pedido.
 type Status string
 
@@ -46,22 +44,6 @@ func CanGo(from, to Status) bool {
 	}
 	return false
 }
-
-// Transition valida antes de mudar. Devolve erro em vez de panic porque
-// transição inválida é condição esperada (bug de UI, corrida entre webhook e
-// admin), não catástrofe.
-func Transition(from, to Status) error {
-	if from == to {
-		return nil
-	}
-	if !CanGo(from, to) {
-		return fmt.Errorf("transição inválida: %s -> %s", from, to)
-	}
-	return nil
-}
-
-// IsFinal diz se o pedido não muda mais de estado.
-func (s Status) IsFinal() bool { return len(transitions[s]) == 0 }
 
 // CountsForRevenue exclui os estados em que o dinheiro não é seu.
 func (s Status) CountsForRevenue() bool {

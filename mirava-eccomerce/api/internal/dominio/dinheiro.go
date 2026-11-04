@@ -53,9 +53,3 @@ func ParseBRL(s string) (Cents, error) {
 	}
 	return FromReais(f), nil
 }
-
-// ApplyPercent aplica um percentual arredondando meio para cima.
-// Ex.: ApplyPercent(2300, 200) = 4600 (o acréscimo de 200%).
-func ApplyPercent(c Cents, pct float64) Cents {
-	return Cents(math.Round(float64(c) * pct / 100))
-}

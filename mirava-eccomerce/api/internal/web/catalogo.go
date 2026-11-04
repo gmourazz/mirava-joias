@@ -78,12 +78,3 @@ func (s *Servidor) relatedProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	responder(w, http.StatusOK, related)
 }
-
-func (s *Servidor) categoryCounts(w http.ResponseWriter, r *http.Request) {
-	count, err := s.db.CountByCategory(r.Context())
-	if err != nil {
-		responder(w, http.StatusOK, mapa{}) // contadores: falha calada
-		return
-	}
-	responder(w, http.StatusOK, count)
-}

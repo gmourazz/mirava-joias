@@ -296,28 +296,6 @@ func (d *DB) variantsFor(ctx context.Context, productIDs []string) (map[string][
 	return out, rows.Err()
 }
 
-// CountByCategory alimenta os contadores do menu de navegação.
-func (d *DB) CountByCategory(ctx context.Context) (map[string]int, error) {
-	rows, err := d.pool.Query(ctx, `
-		select category, count(*) from products
-		where published = true group by category`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := map[string]int{}
-	for rows.Next() {
-		var category string
-		var n int
-		if err := rows.Scan(&category, &n); err != nil {
-			return nil, err
-		}
-		out[category] = n
-	}
-	return out, rows.Err()
-}
-
 // ---------------------------------------------------------------------------
 // Checkout — preço REAL, lido do banco.
 // ---------------------------------------------------------------------------

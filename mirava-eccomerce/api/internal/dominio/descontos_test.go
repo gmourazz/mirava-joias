@@ -98,7 +98,7 @@ func TestPontosViramDesconto(t *testing.T) {
 		{0, 10000, 0, 0},
 	}
 	for _, c := range cases {
-		usar, d := PointsRedemption(c.saldo, Cents(c.subtotal))
+		usar, d := PointsRedemptionWithin(c.saldo, MaxDiscount(Cents(c.subtotal)))
 		if usar != c.usar || d != c.desconto {
 			t.Errorf("saldo %d, peças %d: usou %d (R$ %d), esperado %d (R$ %d)", c.saldo, c.subtotal, usar, d, c.usar, c.desconto)
 		}
@@ -143,33 +143,5 @@ func TestMensagemDoPresente(t *testing.T) {
 	}
 	if m, err := GiftMessage("  Feliz aniversário!  "); err != nil || m != "Feliz aniversário!" {
 		t.Errorf("veio %q (%v)", m, err)
-	}
-}
-
-// O checkout pede cupom OU pontos; nunca os dois (decisão 31).
-func TestEscolhaDoDesconto(t *testing.T) {
-	c := &Coupon{Code: "DEZ", Kind: CouponPercent, Value: 10, Active: true}
-
-	d, err := ChooseDiscount(DiscountRequest{Subtotal: 20000, Coupon: c, Now: agora})
-	if err != nil || d.Discount != 2000 || d.CouponCode != "DEZ" || d.PointsUsed != 0 {
-		t.Errorf("cupom: %+v %v", d, err)
-	}
-
-	d, err = ChooseDiscount(DiscountRequest{Subtotal: 20000, UsePoints: true, PointsBalance: 350, Now: agora})
-	if err != nil || d.Discount != 1500 || d.PointsUsed != 300 || d.CouponCode != "" {
-		t.Errorf("pontos: %+v %v", d, err)
-	}
-
-	if _, err := ChooseDiscount(DiscountRequest{Subtotal: 20000, Coupon: c, UsePoints: true, PointsBalance: 500, Now: agora}); err == nil {
-		t.Error("cupom e pontos juntos deveriam ser recusados")
-	}
-
-	if _, err := ChooseDiscount(DiscountRequest{Subtotal: 20000, UsePoints: true, PointsBalance: 50, Now: agora}); err == nil {
-		t.Error("menos de 100 pontos deveria avisar que não dá para usar")
-	}
-
-	d, err = ChooseDiscount(DiscountRequest{Subtotal: 20000, Now: agora})
-	if err != nil || d.Discount != 0 {
-		t.Errorf("sem desconto: %+v %v", d, err)
 	}
 }
