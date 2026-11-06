@@ -9,7 +9,7 @@
 // lançamentos), essas abas mostram a escolha dela, na ordem dela.
 
 import { useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flame, Sparkles, Star, Sun, Tag, type LucideIcon } from "lucide-react";
 import { useProducts } from "../catalogo/hooks";
 import type { ProductFilter } from "../catalogo/consultas";
 import { imageUrl } from "../catalogo/consultas";
@@ -24,15 +24,16 @@ interface Aba {
   filter: ProductFilter;
   maxCents?: number;
   slot?: ShowcaseSlot;
+  Icon: LucideIcon;
 }
 
 const ABAS: Aba[] = [
-  { key: "top", label: "Mais vendidos", title: "Mais vendidos", filter: { bestSellers: true, limit: 16 }, slot: "queridinhas" },
+  { key: "top", label: "Mais vendidos", title: "Mais vendidos", filter: { bestSellers: true, limit: 16 }, slot: "queridinhas", Icon: Flame },
   // Sem bestSellers a API devolve as peças mais recentes primeiro.
-  { key: "novos", label: "Lançamentos", title: "Lançamentos", filter: { limit: 16 }, slot: "lancamentos" },
-  { key: "destaques", label: "Destaques", title: "Destaques da Mirava", filter: { featured: true, limit: 16 } },
-  { key: "ate79", label: "Até R$ 79", title: "Até R$ 79", filter: { bestSellers: true, limit: 48 }, maxCents: 7990 },
-  { key: "ouro", label: "Banhados a ouro", title: "Banhados a ouro", filter: { metal: "ouro", bestSellers: true, limit: 16 } },
+  { key: "novos", label: "Lançamentos", title: "Lançamentos", filter: { limit: 16 }, slot: "lancamentos", Icon: Sparkles },
+  { key: "destaques", label: "Destaques", title: "Destaques da Mirava", filter: { featured: true, limit: 16 }, Icon: Star },
+  { key: "ate79", label: "Até R$ 79", title: "Até R$ 79", filter: { bestSellers: true, limit: 48 }, maxCents: 7990, Icon: Tag },
+  { key: "ouro", label: "Banhados a ouro", title: "Banhados a ouro", filter: { metal: "ouro", bestSellers: true, limit: 16 }, Icon: Sun },
 ];
 
 export default function MaisVendidos() {
@@ -75,10 +76,11 @@ export default function MaisVendidos() {
                 key={a.key}
                 type="button"
                 onClick={() => escolher(a)}
-                className={`cursor-pointer rounded-full border-none px-[18px] py-2.5 text-[13.5px] font-semibold transition-colors ${
+                className={`flex cursor-pointer items-center gap-1.5 rounded-full border-none px-[18px] py-2.5 text-[13.5px] font-semibold transition-colors ${
                   a.key === aba.key ? "bg-teal text-white" : "bg-chip text-text hover:bg-mist-2"
                 }`}
               >
+                <a.Icon size={15} strokeWidth={1.8} aria-hidden />
                 {a.label}
               </button>
             ))}

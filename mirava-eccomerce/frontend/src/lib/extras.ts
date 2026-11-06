@@ -212,3 +212,52 @@ export const forgotPassword = (email: string) =>
   api<{ ok: boolean; nota: string }>("/auth/esqueci", { method: "POST", body: { email } });
 export const resetPassword = (token: string, password: string) =>
   api<{ ok: boolean }>("/auth/redefinir", { method: "POST", body: { token, password } });
+
+// ---------------------------------------------------------------------------
+// Coleções (menu "Coleções", decisão 37)
+// ---------------------------------------------------------------------------
+
+export interface Colecao {
+  id: string;
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string;
+  image: string | null;
+  cover: string | null;
+  position: number;
+  active: boolean;
+  count: number;
+  total: number;
+}
+
+let colecoesCache: Colecao[] | null = null;
+let colecoesPedido: Promise<Colecao[]> | null = null;
+
+function carregarColecoes(): Promise<Colecao[]> {
+  colecoesPedido ??= api<Colecao[]>("/colecoes")
+    .then((l) => (colecoesCache = l))
+    .catch(() => {
+      colecoesPedido = null;
+      return [];
+    });
+  return colecoesPedido;
+}
+
+/** Coleções ativas com peça no ar, na ordem do painel (para o menu e a vitrine). */
+export function useColecoes(): Colecao[] {
+  const [list, setList] = useState<Colecao[]>(colecoesCache ?? []);
+  useEffect(() => {
+    let atual = true;
+    void carregarColecoes().then((l) => atual && setList(l));
+    return () => {
+      atual = false;
+    };
+  }, []);
+  return list;
+}
+
+export async function colecao(slug: string): Promise<{ collection: Colecao; products: Product[] }> {
+  const raw = await api<{ collection: Colecao; products: ProductRow[] }>(`/colecoes/${encodeURIComponent(slug)}`);
+  return { collection: raw.collection, products: listFromRows(raw.products) };
+}

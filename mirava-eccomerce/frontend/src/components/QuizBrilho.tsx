@@ -43,8 +43,8 @@ const PERGUNTAS: { q: string; opcoes: { t: string; d: string; v: Voto; sw: strin
 ];
 
 const RESULTADO = {
-  p: { titulo: "Prata", texto: "Seu brilho é frio e luminoso. As peças banhadas a prata realçam o seu tom e combinam com o seu estilo clean.", sw: SW_PRATA, rota: "/categoria/prata/todos", metal: "prata" as const },
-  o: { titulo: "Ouro 18k", texto: "Seu brilho é quente e iluminado. As peças banhadas a ouro 18k valorizam o seu tom e trazem um toque romântico.", sw: SW_OURO, rota: "/categoria/ouro/todos", metal: "ouro" as const },
+  p: { titulo: "Banhados a prata", texto: "Seu brilho é frio e luminoso. As peças banhadas a prata realçam o seu tom e combinam com o seu estilo clean.", sw: SW_PRATA, rota: "/categoria/prata/todos", metal: "prata" as const },
+  o: { titulo: "Banhados a ouro", texto: "Seu brilho é quente e iluminado. As peças banhadas a ouro 18k valorizam o seu tom e trazem um toque romântico.", sw: SW_OURO, rota: "/categoria/ouro/todos", metal: "ouro" as const },
   n: { titulo: "Prata e ouro", texto: "Sorte a sua: os dois banhos combinam com você. Misture prata e ouro sem medo, é tendência!", sw: SW_MISTO, rota: "/categoria/colecoes/todos", metal: undefined },
 };
 
@@ -67,7 +67,7 @@ export default function QuizBrilho() {
             Teste do brilho · 30 segundos
           </span>
           <h2 className="m-0 font-serif text-[clamp(30px,3.2vw,42px)] leading-[1.08] font-normal text-teal-dark">
-            Prata ou ouro 18k: qual combina com você?
+            Prata ou ouro: qual combina com você?
           </h2>
 
           {!fim ? (
@@ -144,7 +144,7 @@ export default function QuizBrilho() {
           {!fim || sugestoes.length === 0 ? (
             <>
               <Orbe label="PRATA" largura={46 + (prata - ouro) * 7} fundo="radial-gradient(circle at 32% 28%,#FFFFFF 0%,#E3E7EA 30%,#AEB5B9 70%,#8E979C 100%)" className="top-[16%] left-[4%]" />
-              <Orbe label="OURO 18K" largura={46 + (ouro - prata) * 7} fundo="radial-gradient(circle at 32% 28%,#FFF6D8 0%,#F2D98E 32%,#C9A253 72%,#A8853D 100%)" className="right-[4%] bottom-[12%]" />
+              <Orbe label="OURO" largura={46 + (ouro - prata) * 7} fundo="radial-gradient(circle at 32% 28%,#FFF6D8 0%,#F2D98E 32%,#C9A253 72%,#A8853D 100%)" className="right-[4%] bottom-[12%]" />
             </>
           ) : (
             <div className="animate-pop grid h-full grid-cols-2 content-center gap-4">

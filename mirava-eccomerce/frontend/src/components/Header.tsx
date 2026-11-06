@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  ChevronDown, Circle, Flame, Gem, Gift, Heart, HelpCircle, Layers, Link2,
-  LogOut, Menu, Moon, Package, Search, ShoppingBag, Sparkles, Sun, Tag, User, X,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronDown, Circle, Flame, Gem, Gift, Heart, HelpCircle, Layers, Link2, LogOut, Menu, Moon, Package, Search, ShoppingBag, Sparkles, Sun, Tag, User, X, type LucideIcon, Watch } from "lucide-react";
 import type { Category } from "../catalogo/tipos";
 import { useCategorias, type CategoriaLoja } from "../catalogo/categorias";
+import { useColecoes, type Colecao } from "../lib/extras";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useFavorites } from "../context/FavoritesContext";
 import SearchOverlay from "./SearchOverlay";
+import logoTurquesa from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-turquesa.svg";
 
 // Header do design v5: primeira linha com o wordmark à esquerda e os ícones
 // à direita; segunda linha com o menu centralizado, cada item com ícone e,
@@ -50,7 +48,9 @@ const categoryLinks = (cats: CategoriaLoja[], base: string): NavLink[] =>
 // categoria aplica o teto.
 const presentes = (cents: number) => `/categoria/colecoes/todos?ate=${cents}`;
 
-const buildNav = (cats: CategoriaLoja[]): NavItem[] => [
+// Relógios têm item próprio no menu (como na fornecedora) e não entram na
+// lista de "Joias"; o item só aparece quando há relógio publicado.
+const buildNav = (cats: CategoriaLoja[], colecoes: Colecao[]): NavItem[] => [
   { label: "Lançamentos", to: "/categoria/colecoes/todos?ordem=novos", Icon: Sparkles },
   {
     label: "Joias",
@@ -58,12 +58,21 @@ const buildNav = (cats: CategoriaLoja[]): NavItem[] => [
     Icon: Gem,
     items: [
       { label: "Mais vendidos", to: "/categoria/colecoes/todos", Icon: Flame },
-      ...categoryLinks(cats, "/categoria/colecoes"),
+      ...categoryLinks(cats.filter((c) => c.slug !== "relogios"), "/categoria/colecoes"),
     ],
   },
+  ...(colecoes.length > 0
+    ? [{
+        label: "Coleções",
+        to: colecoes.length === 1 ? `/colecoes/${colecoes[0].slug}` : "/colecoes",
+        Icon: Layers,
+        items: colecoes.map((c) => ({ label: c.name, to: `/colecoes/${c.slug}`, Icon: Sparkles })),
+      }]
+    : []),
   { label: "Berloques", to: "/categoria/colecoes/berloques", Icon: Link2 },
-  { label: "Prata", to: "/categoria/prata/todos", Icon: Moon, items: categoryLinks(cats, "/categoria/prata") },
-  { label: "Ouro 18k", to: "/categoria/ouro/todos", Icon: Sun, items: categoryLinks(cats, "/categoria/ouro") },
+  { label: "Banhados a prata", to: "/categoria/prata/todos", Icon: Moon, items: categoryLinks(cats, "/categoria/prata") },
+  { label: "Banhados a ouro", to: "/categoria/ouro/todos", Icon: Sun, items: categoryLinks(cats, "/categoria/ouro") },
+  ...(cats.some((c) => c.slug === "relogios") ? [{ label: "Relógios", to: "/categoria/colecoes/relogios", Icon: Watch }] : []),
   {
     label: "Presentes",
     to: presentes(20000),
@@ -86,7 +95,7 @@ function initials(name: string) {
 }
 
 export default function Header() {
-  const NAV = buildNav(useCategorias());
+  const NAV = buildNav(useCategorias(), useColecoes());
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -123,11 +132,8 @@ export default function Header() {
           <Menu size={20} strokeWidth={1.5} />
         </button>
 
-        <Link to="/" className="flex h-[72px] flex-col justify-center gap-1.5 justify-self-center text-teal-dark hover:text-teal-dark lg:h-20 lg:justify-self-start">
-          <span className="font-logo text-[24px] leading-none tracking-[0.28em] whitespace-nowrap lg:text-[30px]">MIRAVA</span>
-          <span className="hidden text-[9px] tracking-[0.42em] whitespace-nowrap text-[#5E7473] sm:block">
-            SEMIJOIAS · PRATA &amp; OURO
-          </span>
+        <Link to="/" aria-label="Mirava Semijoias — início" className="flex h-[72px] items-center justify-self-center lg:h-20 lg:justify-self-start">
+          <img src={logoTurquesa} alt="Mirava Semijoias" className="h-11 w-auto lg:h-[52px]" />
         </Link>
 
         <div className="col-start-3 flex items-center justify-end gap-1 lg:gap-3">
@@ -264,7 +270,7 @@ export default function Header() {
           />
           <aside className="animate-fade-in fixed inset-y-0 left-0 z-50 flex w-80 max-w-[85vw] flex-col overflow-y-auto bg-white lg:hidden">
             <div className="flex items-center justify-between border-b border-line px-6 py-5">
-              <span className="font-logo text-[20px] tracking-[0.28em] text-teal-dark">MIRAVA</span>
+              <img src={logoTurquesa} alt="Mirava Semijoias" className="h-10 w-auto" />
               <button type="button" aria-label="Fechar" onClick={() => setDrawerOpen(false)} className={iconButton}>
                 <X size={20} strokeWidth={1.5} />
               </button>

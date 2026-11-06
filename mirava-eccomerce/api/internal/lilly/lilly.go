@@ -17,6 +17,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -52,6 +53,35 @@ func NewClient() *Client {
 	// padrão de varredura), queremos desistir rápido e seguir — não empacar
 	// dezenas de minutos numa sequência de páginas bloqueadas.
 	return &Client{http: &http.Client{Timeout: 12 * time.Second}}
+}
+
+// ProductURL normaliza o link de uma peça colado no painel: só páginas de
+// produto de uselilly.com (https, um único trecho de caminho), sem consulta
+// nem âncora. Devolve sempre "https://www.uselilly.com/<peca>/". Página de
+// coleção ("-collection") e institucionais não entram.
+func ProductURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("link vazio")
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	u, err := neturl.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" {
+		return "", fmt.Errorf("link inválido")
+	}
+	if h := strings.ToLower(u.Hostname()); h != "www.uselilly.com" && h != "uselilly.com" {
+		return "", fmt.Errorf("só aceito links de uselilly.com")
+	}
+	slug := strings.Trim(u.Path, "/")
+	if slug == "" || strings.Contains(slug, "/") {
+		return "", fmt.Errorf("este link não é de uma peça")
+	}
+	if strings.HasSuffix(slug, "-collection") || looseCategorySlugs[slug] {
+		return "", fmt.Errorf("este link é de uma coleção ou categoria, não de uma peça")
+	}
+	return "https://www.uselilly.com/" + slug + "/", nil
 }
 
 // FetchPage faz o GET e devolve HTML já em UTF-8.
@@ -269,11 +299,11 @@ type Review struct {
 }
 
 var (
-	reScript    = regexp.MustCompile(`(?is)<script.*?</script>`)
-	reStyle     = regexp.MustCompile(`(?is)<style.*?</style>`)
-	reTag       = regexp.MustCompile(`<[^>]+>`)
-	reSpaces    = regexp.MustCompile(`[ \t]+`)
-	reLines     = regexp.MustCompile(`\n\s*\n+`)
+	reScript     = regexp.MustCompile(`(?is)<script.*?</script>`)
+	reStyle      = regexp.MustCompile(`(?is)<style.*?</style>`)
+	reTag        = regexp.MustCompile(`<[^>]+>`)
+	reSpaces     = regexp.MustCompile(`[ \t]+`)
+	reLines      = regexp.MustCompile(`\n\s*\n+`)
 	reAlsoBought = regexp.MustCompile(`(?is)Quem\s+viu.{0,40}?comprou`)
 	// Só localiza a posição do código do produto — reSKU (com grupo de
 	// captura) faz a extração de verdade depois de já termos cortado o HTML
@@ -592,6 +622,7 @@ var categoryKeywords = []struct {
 	category string
 	words    []string
 }{
+	{"relogios", []string{"relógio", "relogio"}},
 	{"conjuntos", []string{"conjunto", "kit"}},
 	{"aneis", []string{"anel"}},
 	{"colares", []string{"colar", "gargantilha", "choker"}},

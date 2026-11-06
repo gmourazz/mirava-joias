@@ -209,8 +209,8 @@ export default function Produtos() {
           onChange={(v) => setParam({ banho: v })}
           options={[
             { value: "", label: "Banho: todos" },
-            { value: "prata", label: "Prata" },
-            { value: "ouro", label: "Ouro" },
+            { value: "prata", label: "Banhado a prata" },
+            { value: "ouro", label: "Banhado a ouro" },
           ]}
         />
       </div>

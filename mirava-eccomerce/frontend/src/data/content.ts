@@ -11,36 +11,59 @@ export const ANNOUNCEMENTS = [
 // Slides do hero do v5. `em` é a palavra que sai em itálico teal no título.
 // Textos ajustados ao que a loja cumpre: o protótipo prometia garantia de 6
 // meses e peças hipoalergênicas, que ainda não estão confirmadas com a Lilly.
+// As fotos (assets/banner) são quadradas: ocupam a metade direita do banner,
+// `posicao` diz que parte da foto fica visível quando ela é recortada, e
+// `fundo` é o tom da própria foto, bem claro, atrás do texto — assim a foto
+// se funde ao fundo sem a emenda de duas cores diferentes.
 export const HERO_SLIDES = [
   {
     eyebrow: "Lançamentos",
-    title: "Joias delicadas para histórias que você quer",
-    em: "guardar",
+    title: "Joias delicadas para complementar sua",
+    em: "personalidade",
     text: "Banhadas a prata e a ouro 18k, encomendadas pra você e entregues em até 20 dias úteis.",
-    cta: { label: "Ver lançamentos", to: "/categoria/colecoes/todos" },
+    cta: { label: "Ver lançamentos", to: "/categoria/colecoes/todos?ordem=novos" },
     cta2: { label: "Mais vendidos", to: "/categoria/colecoes/todos" },
-    seed: "hero-a",
+    seed: "banner-colar-coracao",
+    posicao: "50% 60%",
+    fundo: "#F0EDEC",
     dark: false,
   },
   {
-    eyebrow: "Brincos e argolas",
-    title: "O brilho que acompanha o seu",
-    em: "dia a dia",
-    text: "Brincos e argolas banhados a prata e ouro 18k, delicados pra usar todo dia.",
-    cta: { label: "Ver brincos", to: "/categoria/colecoes/brincos" },
+    eyebrow: "Colares",
+    title: "Um colar para cada",
+    em: "momento",
+    text: "Pingentes, correntes e chokers banhados a prata e ouro 18k, para usar sozinhos ou em camadas.",
+    cta: { label: "Ver colares", to: "/categoria/colecoes/colares" },
+    cta2: { label: "Banhados a prata", to: "/categoria/prata/todos" },
+    seed: "banner-colar-verde",
+    posicao: "50% 100%",
+    zoom: false, // sem a animação de zoom: ela cortaria os pingentes
+    fundo: "#EEEEEE",
+    dark: false,
+  },
+  {
+    eyebrow: "Pulseiras e colares",
+    title: "Combine e monte o seu",
+    em: "mix",
+    text: "Pulseiras e colares que conversam entre si: delicados pra usar todo dia, juntos ou separados.",
+    cta: { label: "Ver pulseiras", to: "/categoria/colecoes/pulseiras" },
     cta2: { label: "Banhados a ouro", to: "/categoria/ouro/todos" },
-    seed: "hero-argolas",
+    seed: "banner-trevo",
+    posicao: "40% 55%",
+    fundo: "#F2EEEA",
     dark: false,
   },
   {
-    eyebrow: "Berloques",
-    title: "Monte uma pulseira que conta a sua",
-    em: "história",
-    text: "Escolha a pulseira base e combine letras, corações e pingentes do seu jeito.",
-    cta: { label: "Montar a minha", to: "/categoria/colecoes/berloques" },
+    eyebrow: "Anéis",
+    title: "Anéis que dizem muito sobre",
+    em: "você",
+    text: "Lisos, cravejados e reguláveis, banhados a prata e ouro 18k. Veja o guia de tamanhos na página da peça.",
+    cta: { label: "Ver anéis", to: "/categoria/colecoes/aneis" },
     cta2: null,
-    seed: "hero-berloques",
-    dark: true,
+    seed: "banner-aneis",
+    posicao: "50% 70%",
+    fundo: "#EEEEEE",
+    dark: false,
   },
 ];
 

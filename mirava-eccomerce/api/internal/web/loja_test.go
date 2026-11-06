@@ -35,3 +35,25 @@ func TestImagemELinkDoPainel(t *testing.T) {
 		}
 	}
 }
+
+// O endereço da coleção sai do nome: sem acento, minúsculo, hífen no lugar de
+// espaço e símbolo (é a URL pública, /colecoes/<slug>).
+func TestSlugDaColecao(t *testing.T) {
+	cases := map[string]string{
+		"It Girl Era":        "it-girl-era",
+		"  Luz Própria  ":    "luz-propria",
+		"Coração & Brilho!":  "coracao-brilho",
+		"Verão 2026 — Praia": "verao-2026-praia",
+	}
+	for in, want := range cases {
+		if got := slugFrom(in); got != want {
+			t.Errorf("slugFrom(%q) = %q, esperado %q", in, got, want)
+		}
+		if !collectionSlugRe.MatchString(want) {
+			t.Errorf("%q não é um endereço válido", want)
+		}
+	}
+	if slugFrom("!!!") != "" {
+		t.Error("nome sem letra não pode virar endereço")
+	}
+}

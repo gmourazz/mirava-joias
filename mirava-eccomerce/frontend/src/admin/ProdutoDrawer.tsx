@@ -336,8 +336,8 @@ export default function ProdutoDrawer({ id, fechar, mudou }: { id: string; fecha
                 <label className="grid gap-1.5">
                   <span className="text-[13px] font-semibold text-text-2">Banho</span>
                   <select value={metal} onChange={(e) => setMetal(e.target.value as "prata" | "ouro")} className={campo}>
-                    <option value="prata">Prata</option>
-                    <option value="ouro">Ouro 18k</option>
+                    <option value="prata">Banhado a prata</option>
+                    <option value="ouro">Banhado a ouro</option>
                   </select>
                 </label>
               </div>

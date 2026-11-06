@@ -5,9 +5,10 @@ import { FavoritesProvider } from "./context/FavoritesContext";
 import AnnouncementBar from "./components/AnnouncementBar";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import BotaoContato from "./components/BotaoContato";
 import { PopupBoasVindas } from "./components/Novidades";
 import RedefinirSenha from "./pages/RedefinirSenha";
+import Colecao from "./pages/Colecao";
+import Colecoes from "./pages/Colecoes";
 import CartDrawer from "./components/CartDrawer";
 import Home from "./pages/Home";
 import Category from "./pages/Category";
@@ -37,6 +38,8 @@ function Loja() {
         <Route path="/" element={<Home />} />
         <Route path="/categoria/:menuKey/:filter" element={<Category />} />
         <Route path="/produto/:slug" element={<Produto />} />
+        <Route path="/colecoes" element={<Colecoes />} />
+        <Route path="/colecoes/:slug" element={<Colecao />} />
         <Route path="/conta" element={<Conta />} />
         <Route path="/busca" element={<Busca />} />
         <Route path="/checkout" element={<Checkout />} />
@@ -50,7 +53,6 @@ function Loja() {
         <Route path="/politicas/:aba" element={<Politicas />} />
       </Routes>
       {moldura && <Footer />}
-      {moldura && <BotaoContato />}
       {moldura && <PopupBoasVindas />}
       <CartDrawer />
     </div>

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { AtSign, Clock, HelpCircle, Lock, Mail, Moon, Package, RefreshCw, Sparkles, Sun, Truck, Link2, Flame, type LucideIcon } from "lucide-react";
 import { LOJA } from "../config/loja";
+import logoBranco from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-branco.svg";
 
 // Rodapé do design v5: bloco teal-escuro com o topo arredondado, coluna da
 // marca e três colunas de links com ícone.
@@ -52,8 +53,8 @@ export default function Footer() {
     <footer className="mt-20 rounded-t-[40px] bg-teal-dark text-[#D9ECEA]">
       <div className="mx-auto grid max-w-[1360px] grid-cols-1 gap-8 px-[clamp(16px,3vw,40px)] pt-[60px] pb-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,minmax(0,1fr))]">
         <div className="grid content-start gap-5">
-          <div className="grid gap-1.5">
-            <span className="font-logo text-[32px] leading-none tracking-[0.28em] text-white">MIRAVA</span>
+          <div className="grid gap-2">
+            <img src={logoBranco} alt="Mirava" className="h-12 w-auto self-start" />
             <span className="text-[9px] tracking-[0.42em] text-teal-pale">SEMIJOIAS · PRATA &amp; OURO</span>
           </div>
           <p className="m-0 max-w-[34ch] text-[14px] leading-[1.7]">

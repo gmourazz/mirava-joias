@@ -264,6 +264,9 @@ func TestGuessCategory(t *testing.T) {
 		{"Berloque Coração", "berloques"},
 		{"Conjunto Colar e Brinco", "conjuntos"},
 		{"Porta-Retrato Decorativo", "outros"},
+		// Relógio vem antes dos outros: "Relógio feminino ... com pulseira" não é pulseira.
+		{"Relógio Feminino Vintage Dourado Oval", "relogios"},
+		{"Relogio Prateado Redondo - Malu", "relogios"},
 	}
 	for _, c := range cases {
 		if got := GuessCategory(c.name); got != c.want {
@@ -552,5 +555,31 @@ func TestGuessCategoryWith(t *testing.T) {
 	// Lista vazia (banco sem mapeamento): cai na regra embutida.
 	if got := GuessCategoryWith("Anel Aura", nil); got != "aneis" {
 		t.Errorf("veio %q", got)
+	}
+}
+
+// Importar peça por link: só aceita página de produto do site da Lilly. Nada
+// de outro domínio (o servidor faria a requisição por quem colou o link).
+func TestProductURL(t *testing.T) {
+	ok := map[string]string{
+		"https://www.uselilly.com/anel-prata-aro-duplo-nayla/": "https://www.uselilly.com/anel-prata-aro-duplo-nayla/",
+		"https://www.uselilly.com/anel-prata-aro-duplo-nayla":  "https://www.uselilly.com/anel-prata-aro-duplo-nayla/",
+		"  uselilly.com/colar-ponto-de-luz-mini-coracao/  ":    "https://www.uselilly.com/colar-ponto-de-luz-mini-coracao/",
+		"https://www.uselilly.com/x-y/?utm_source=insta#topo":  "https://www.uselilly.com/x-y/",
+	}
+	for in, want := range ok {
+		got, err := ProductURL(in)
+		if err != nil || got != want {
+			t.Errorf("ProductURL(%q) = %q, %v; esperado %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{
+		"", "https://evil.example/anel/", "https://www.uselilly.com.evil.example/anel/",
+		"http://127.0.0.1:8080/saude", "https://www.uselilly.com/", "https://www.uselilly.com/a/b/",
+		"javascript:alert(1)", "https://user@www.uselilly.com/anel/", "https://www.uselilly.com/it-girl-era-collection/",
+	} {
+		if got, err := ProductURL(in); err == nil {
+			t.Errorf("ProductURL(%q) deveria recusar, devolveu %q", in, got)
+		}
 	}
 }

@@ -186,6 +186,9 @@ React 19 + TypeScript + Vite + Tailwind v4 + lucide-react + react-router-dom.
   (`src/admin/api.ts`). O checkout mostra o total que `POST /checkout/previa`
   devolve — nunca calcula desconto no front. Cupom e pontos não somam; teto de
   30% das peças; embrulho R$5,00. Regras em `api/internal/dominio/descontos.go`.
+- **Coleções e Relógios** (decisão 37): `GET /colecoes`, `GET /colecoes/{slug}`
+  (loja, `src/pages/Colecao*.tsx`, `useColecoes` em `src/lib/extras.ts`) e
+  `/admin/colecoes*` + `POST /admin/importar-link` (painel, `src/admin/Colecoes.tsx`).
 - **Promoção, kit, Pix e markup em camadas** (decisões 21, 32-34): a conta do
   pedido inteiro é `dominio.PriceOrder` (`preco_pedido.go`); o catálogo devolve
   `price_cents` já com a promoção e `list_price_cents`/`promo_pct` para o preço

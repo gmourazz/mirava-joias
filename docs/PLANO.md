@@ -910,6 +910,7 @@ Feito sem regra nova de negócio:
 - [x] `db/alter-design-v5.sql` aplicado no banco local `mirava` (04/11/2026, com backup antes). Falta no banco de produção, quando existir.
 - [ ] Ligar o Resend; trocar o job de sincronização para `/tarefas/sincronizar-se-devido` (a cada hora) e criar o de `/tarefas/automacoes` (ver `api/README.md`).
 - [ ] Se for para o Cloud Run: volume para `UPLOADS_DIR` (fotos enviadas pelo painel).
+- [x] **Coleções** (menu "Coleções", painel "Coleções") e categoria **Relógios** (decisão 37). Primeira coleção criada com nome provisório "Luz Própria", 7 peças. Faltam 17 peças da coleção da Lilly que ainda não estão na base: importar pelo painel (Coleções → "Trazer peças da Lilly por link") com poucos links por vez.
 
 Ficou de fora de propósito (decisões registradas): formulário de cartão e cartão salvo (decisão 25 — pagamento no Mercado Pago), "Continuar com Google" (precisa da credencial OAuth), WhatsApp como canal (decisão 30 — atendimento por e-mail), avaliações/fotos/números inventados do protótipo (decisão 28) e a tela de QR do Pix no nosso site (o Checkout Pro mostra). O custo de cada embrulho é informado em Configurações e sai do lucro no Financeiro.
 

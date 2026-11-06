@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Clock, Gem, Heart, Minus, Plus, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlignLeft, ArrowRight, Clock, Droplets, Gem, Heart, Minus, Plus, RefreshCw, Ruler, ShieldCheck, ShoppingBag, Zap } from "lucide-react";
 import { useProduct } from "../catalogo/hooks";
 import { imageUrl } from "../catalogo/consultas";
 import { METAL_LABEL } from "../catalogo/tipos";
@@ -111,10 +111,10 @@ export default function ProdutoPage() {
     );
 
   const secoes = [
-    { t: "Descrição", d: product.description ?? `Peça ${METAL_LABEL[product.metal].toLowerCase()}, delicada e feita para o dia a dia.` },
-    { t: "Prazo de entrega", d: `Peça feita sob encomenda: a Mirava encomenda a sua joia assim que o pagamento é confirmado e entrega em ${textoPrazo()}. Você recebe o código de rastreio por e-mail.` },
-    { t: "Trocas e devoluções", d: resposta("Posso trocar") },
-    { t: "Cuidados", d: resposta("Como cuido") },
+    { t: "Descrição", Icon: AlignLeft, d: product.description ?? `Peça ${METAL_LABEL[product.metal].toLowerCase()}, delicada e feita para o dia a dia.` },
+    { t: "Prazo de entrega", Icon: Clock, d: `Peça feita sob encomenda: a Mirava encomenda a sua joia assim que o pagamento é confirmado e entrega em ${textoPrazo()}. Você recebe o código de rastreio por e-mail.` },
+    { t: "Trocas e devoluções", Icon: RefreshCw, d: resposta("Posso trocar") },
+    { t: "Cuidados", Icon: Droplets, d: resposta("Como cuido") },
   ].filter((s) => s.d);
 
   return (
@@ -240,8 +240,9 @@ export default function ProdutoPage() {
                 type="button"
                 disabled={!podeComprar}
                 onClick={adicionar}
-                className="min-w-[180px] flex-1 cursor-pointer rounded-full border-none bg-mist-2 px-6 py-[15px] text-[15px] font-semibold text-teal transition-colors hover:bg-teal hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-w-[180px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border-none bg-mist-2 px-6 py-[15px] text-[15px] font-semibold text-teal transition-colors hover:bg-teal hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
+                {needsSize ? <Ruler size={17} strokeWidth={1.8} aria-hidden /> : <ShoppingBag size={17} strokeWidth={1.8} aria-hidden />}
                 {needsSize ? `Escolha ${(product.variantLabel ?? "o tamanho").toLowerCase()}` : "Adicionar à sacola"}
               </button>
               <button
@@ -252,9 +253,11 @@ export default function ProdutoPage() {
                   closeCart();
                   navigate("/checkout");
                 }}
-                className="min-w-[160px] flex-1 cursor-pointer rounded-full border-none bg-teal px-6 py-[15px] text-[15px] font-semibold text-white transition-colors hover:bg-teal-dark disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-w-[160px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border-none bg-teal px-6 py-[15px] text-[15px] font-semibold text-white transition-colors hover:bg-teal-dark disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Comprar agora →
+                <Zap size={17} strokeWidth={1.8} aria-hidden />
+                Comprar agora
+                <ArrowRight size={16} strokeWidth={1.8} aria-hidden />
               </button>
             </div>
           )}
@@ -281,7 +284,10 @@ export default function ProdutoPage() {
                     aria-expanded={ativo}
                     className="flex w-full cursor-pointer items-center justify-between gap-4 border-none bg-transparent px-5 py-4 text-left text-[15px] font-semibold text-text"
                   >
-                    {s.t}
+                    <span className="flex items-center gap-3">
+                      <s.Icon size={18} strokeWidth={1.7} aria-hidden className="shrink-0 text-teal" />
+                      {s.t}
+                    </span>
                     <span className={`grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-mist text-teal transition-transform duration-300 ${ativo ? "rotate-45" : ""}`}>
                       <Plus size={15} strokeWidth={2} />
                     </span>

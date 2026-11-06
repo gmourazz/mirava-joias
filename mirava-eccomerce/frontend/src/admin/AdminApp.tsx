@@ -10,7 +10,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { Activity, Bell, Box, ExternalLink, LayoutGrid, Lock, LogOut, Menu, RefreshCw, Repeat, Search, Settings, ShoppingBag, Ticket, Users, Wallet, X, Sparkles, Zap, Megaphone, Image, type LucideIcon } from "lucide-react";
+import { Activity, Bell, Box, ExternalLink, LayoutGrid, Lock, LogOut, Menu, RefreshCw, Repeat, Search, Settings, ShoppingBag, Ticket, Users, Wallet, X, Sparkles, Zap, Megaphone, Image, type LucideIcon, Layers } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../lib/api";
 import { adminApi, type Summary } from "./api";
@@ -25,6 +25,7 @@ import Configuracoes from "./Configuracoes";
 import Cupons from "./Cupons";
 import Marketing from "./Marketing";
 import Conteudo from "./Conteudo";
+import Colecoes from "./Colecoes";
 import Trocas from "./Trocas";
 import Vitrine from "./Vitrine";
 import Automacoes from "./Automacoes";
@@ -34,6 +35,7 @@ const NAV: { to: string; label: string; Icon: LucideIcon; despacho?: boolean }[]
   { to: "/admin", label: "Visão geral", Icon: LayoutGrid },
   { to: "/admin/produtos", label: "Produtos", Icon: Box },
   { to: "/admin/vitrine", label: "Vitrine da loja", Icon: Sparkles },
+  { to: "/admin/colecoes", label: "Coleções", Icon: Layers },
   { to: "/admin/sincronizacao", label: "Sincronização", Icon: RefreshCw },
   { to: "/admin/automacoes", label: "Automações", Icon: Zap },
   { to: "/admin/pedidos", label: "Pedidos", Icon: ShoppingBag, despacho: true },
@@ -87,6 +89,7 @@ export default function AdminApp() {
         <Route path="clientes" element={<Clientes />} />
         <Route path="trocas" element={<Trocas />} />
         <Route path="vitrine" element={<Vitrine />} />
+        <Route path="colecoes" element={<Colecoes />} />
         <Route path="cupons" element={<Cupons />} />
         <Route path="marketing" element={<Marketing />} />
         <Route path="conteudo" element={<Conteudo />} />

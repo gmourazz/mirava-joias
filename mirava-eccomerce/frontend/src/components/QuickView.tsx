@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { Gem, Heart, Minus, Plus, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { Gem, Heart, Minus, Plus, RefreshCw, Ruler, ShieldCheck, ShoppingBag, X } from "lucide-react";
 import type { Product } from "../catalogo/tipos";
 import { METAL_LABEL } from "../catalogo/tipos";
 import { imageUrl } from "../catalogo/consultas";
@@ -114,8 +114,9 @@ export default function QuickView({ product, fechar }: { product: Product; fecha
                   addItem({ productId: product.id, slug: product.slug, name: product.name, image: fotos[0] ?? null, priceCents: price, size }, qty);
                   fechar();
                 }}
-                className="min-w-[180px] flex-1 cursor-pointer rounded-full border-none bg-teal px-6 py-[15px] text-[15px] font-semibold text-white hover:bg-teal-dark disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-w-[180px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border-none bg-teal px-6 py-[15px] text-[15px] font-semibold text-white hover:bg-teal-dark disabled:cursor-not-allowed disabled:opacity-50"
               >
+                {precisaEscolher ? <Ruler size={17} strokeWidth={1.8} aria-hidden /> : <ShoppingBag size={17} strokeWidth={1.8} aria-hidden />}
                 {precisaEscolher ? `Escolha ${(product.variantLabel ?? "o tamanho").toLowerCase()}` : "Adicionar à sacola"}
               </button>
               <button

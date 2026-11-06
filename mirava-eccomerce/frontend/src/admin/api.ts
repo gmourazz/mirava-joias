@@ -555,7 +555,31 @@ export interface TeamMember {
   role: "master" | "dispatch";
 }
 
+export interface AdminCollection {
+  id: string;
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string;
+  image: string | null;
+  cover: string | null;
+  position: number;
+  active: boolean;
+  count: number;
+  total: number;
+}
+
 export const lojaApi = {
+  collections: () => api<AdminCollection[]>("/admin/colecoes", auth),
+  collection: (slug: string) => api<{ collection: AdminCollection; products: AdminProduct[] }>(`/admin/colecoes/${slug}`, auth),
+  createCollection: (name: string) => api<{ ok: boolean; id: string; slug: string }>("/admin/colecoes", { ...auth, method: "POST", body: { name } }),
+  updateCollection: (id: string, c: Pick<AdminCollection, "name" | "tagline" | "description" | "image" | "position" | "active">) =>
+    api<{ ok: boolean }>(`/admin/colecoes/${id}`, { ...auth, method: "PUT", body: c }),
+  deleteCollection: (id: string) => api<{ ok: boolean }>(`/admin/colecoes/${id}`, { ...auth, method: "DELETE" }),
+  setCollectionProducts: (id: string, productIds: string[]) =>
+    api<{ ok: boolean }>(`/admin/colecoes/${id}/pecas`, { ...auth, method: "PUT", body: { product_ids: productIds } }),
+  importLink: (url: string) => api<{ product_id: string; created: boolean; name?: string }>("/admin/importar-link", { ...auth, method: "POST", body: { url } }),
+
   settings: () => api<StoreSettings>("/admin/loja", auth),
   saveSettings: (s: StoreSettings) => api<{ ok: boolean }>("/admin/loja", { ...auth, method: "PUT", body: s }),
   recalculate: () => api<{ ok: boolean; updated: number }>("/admin/precos/recalcular", { ...auth, method: "POST" }),

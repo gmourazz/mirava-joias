@@ -96,8 +96,8 @@ export default function NovoProduto({ cats, fechar, criado }: { cats: AdminCateg
             ))}
           </select>
           <select value={metal} onChange={(e) => setMetal(e.target.value as "prata" | "ouro")} className={campo}>
-            <option value="prata">Banho: prata</option>
-            <option value="ouro">Banho: ouro 18k</option>
+            <option value="prata">Banho: banhado a prata</option>
+            <option value="ouro">Banho: banhado a ouro</option>
           </select>
         </div>
         <div className="grid grid-cols-2 gap-3">

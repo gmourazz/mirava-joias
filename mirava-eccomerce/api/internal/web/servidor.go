@@ -83,6 +83,8 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("GET /categorias", s.categories)
 	mux.HandleFunc("GET /banners", s.banners)
 	mux.HandleFunc("GET /galeria", s.gallery)
+	mux.HandleFunc("GET /colecoes", s.collections)
+	mux.HandleFunc("GET /colecoes/{slug}", s.collection)
 	mux.HandleFunc("GET /avaliacoes/recentes", s.recentReviews)
 	mux.HandleFunc("POST /novidades", s.subscribe)
 	mux.HandleFunc("GET /cupons", s.myCoupons)
@@ -185,6 +187,13 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("POST /admin/equipe", s.requireAdmin(s.adminAddTeam))
 	mux.HandleFunc("DELETE /admin/equipe/{id}", s.requireAdmin(s.adminRemoveTeam))
 	mux.HandleFunc("GET /admin/pedidos/{id}/avisos", s.requireAdmin(s.adminOrderNotices))
+	mux.HandleFunc("GET /admin/colecoes", s.requireAdmin(s.adminCollections))
+	mux.HandleFunc("POST /admin/colecoes", s.requireAdmin(s.adminCreateCollection))
+	mux.HandleFunc("GET /admin/colecoes/{slug}", s.requireAdmin(s.adminCollection))
+	mux.HandleFunc("PUT /admin/colecoes/{id}", s.requireAdmin(s.adminUpdateCollection))
+	mux.HandleFunc("DELETE /admin/colecoes/{id}", s.requireAdmin(s.adminDeleteCollection))
+	mux.HandleFunc("PUT /admin/colecoes/{id}/pecas", s.requireAdmin(s.adminSetCollectionProducts))
+	mux.HandleFunc("POST /admin/importar-link", s.requireAdmin(s.adminImportLink))
 	return s.comCORS(s.comLog(mux))
 }
 

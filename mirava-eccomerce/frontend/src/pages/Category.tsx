@@ -74,7 +74,7 @@ export default function CategoryPage() {
       : metal === "prata"
         ? "Banhados a prata"
         : metal === "ouro"
-          ? "Banhados a ouro 18k"
+          ? "Banhados a ouro"
           : "Todas as joias";
 
   const qs = params.toString() ? `?${params}` : "";
@@ -134,8 +134,8 @@ export default function CategoryPage() {
           active={Boolean(metal)}
           options={[
             { value: "", label: "Banho: todos" },
-            { value: "prata", label: "Banhado a prata" },
-            { value: "ouro", label: "Banhado a ouro 18k" },
+            { value: "prata", label: "Banhados a prata" },
+            { value: "ouro", label: "Banhados a ouro" },
           ]}
         />
         <Select

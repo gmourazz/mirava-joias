@@ -965,3 +965,153 @@ func (d *DB) FeesByMethod(ctx context.Context, start, end time.Time) ([]FeeByMet
 	}
 	return out, rows.Err()
 }
+
+// ---------------------------------------------------------------------------
+// Coleções (menu "Coleções")
+// ---------------------------------------------------------------------------
+
+type Collection struct {
+	ID          string  `json:"id"`
+	Slug        string  `json:"slug"`
+	Name        string  `json:"name"`
+	Tagline     string  `json:"tagline"`
+	Description string  `json:"description"`
+	Image       *string `json:"image"`
+	Position    int     `json:"position"`
+	Active      bool    `json:"active"`
+	// Peças publicadas da coleção (a loja só mostra estas) e, no painel, o total.
+	Count int `json:"count"`
+	Total int `json:"total"`
+	// Foto de capa: a escolhida ou, sem ela, a primeira peça da coleção.
+	Cover *string `json:"cover"`
+}
+
+const collectionSelect = `
+	select c.id::text, c.slug, c.name, c.tagline, c.description, c.image, c.position, c.active,
+	       (select count(*) from collection_items i join products p on p.id = i.product_id
+	         where i.collection_id = c.id and p.published)::int,
+	       (select count(*) from collection_items i where i.collection_id = c.id)::int,
+	       coalesce(c.image, (select p.images[1] from collection_items i join products p on p.id = i.product_id
+	         where i.collection_id = c.id and p.published and cardinality(p.images) > 0
+	         order by i.position limit 1))
+	from collections c`
+
+func scanCollection(row pgx.Row, c *Collection) error {
+	return row.Scan(&c.ID, &c.Slug, &c.Name, &c.Tagline, &c.Description, &c.Image, &c.Position, &c.Active,
+		&c.Count, &c.Total, &c.Cover)
+}
+
+// Collections: onlyActive = loja (só ativas e com peça no ar); senão, painel.
+func (d *DB) Collections(ctx context.Context, onlyActive bool) ([]Collection, error) {
+	rows, err := d.pool.Query(ctx, collectionSelect+`
+		where not $1 or c.active order by c.position, c.created_at`, onlyActive)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Collection{}
+	for rows.Next() {
+		var c Collection
+		if err := scanCollection(rows, &c); err != nil {
+			return nil, err
+		}
+		if onlyActive && c.Count == 0 {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) CollectionBySlug(ctx context.Context, slug string, onlyActive bool) (*Collection, error) {
+	var c Collection
+	err := scanCollection(d.pool.QueryRow(ctx, collectionSelect+` where c.slug = $1 and (not $2 or c.active)`, slug, onlyActive), &c)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &c, err
+}
+
+// CollectionProductIDs na ordem da coleção; onlyPublished para a loja.
+func (d *DB) CollectionProductIDs(ctx context.Context, id string, onlyPublished bool) ([]string, error) {
+	rows, err := d.pool.Query(ctx, `
+		select i.product_id::text from collection_items i join products p on p.id = i.product_id
+		where i.collection_id = $1 and (not $2 or p.published) order by i.position`, id, onlyPublished)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) CreateCollection(ctx context.Context, slug, name string) (string, error) {
+	var id string
+	err := d.pool.QueryRow(ctx, `
+		insert into collections (slug, name, position)
+		values ($1, $2, coalesce((select max(position) from collections), 0) + 1) returning id::text`, slug, name).Scan(&id)
+	if isDuplicate(err) {
+		return "", ErrDuplicate
+	}
+	return id, err
+}
+
+type CollectionUpdate struct {
+	Name        string  `json:"name"`
+	Tagline     string  `json:"tagline"`
+	Description string  `json:"description"`
+	Image       *string `json:"image"`
+	Position    int     `json:"position"`
+	Active      bool    `json:"active"`
+}
+
+func (d *DB) UpdateCollection(ctx context.Context, id string, u CollectionUpdate) (bool, error) {
+	tag, err := d.pool.Exec(ctx, `
+		update collections set name = $2, tagline = $3, description = $4, image = nullif($5, ''), position = $6, active = $7
+		where id = $1`, id, u.Name, u.Tagline, u.Description, u.Image, u.Position, u.Active)
+	return tag.RowsAffected() > 0, err
+}
+
+func (d *DB) DeleteCollection(ctx context.Context, id string) (bool, error) {
+	tag, err := d.pool.Exec(ctx, `delete from collections where id = $1`, id)
+	return tag.RowsAffected() > 0, err
+}
+
+// SetCollectionProducts troca a lista inteira, na ordem dada.
+func (d *DB) SetCollectionProducts(ctx context.Context, id string, productIDs []string) error {
+	tx, err := d.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `delete from collection_items where collection_id = $1`, id); err != nil {
+		return err
+	}
+	for i, pid := range productIDs {
+		if _, err := tx.Exec(ctx, `insert into collection_items (collection_id, product_id, position)
+			values ($1, $2, $3) on conflict do nothing`, id, pid, i); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+// ProductIDBySupplierURL: peça da loja que veio de uma página da Lilly (vazio
+// se ainda não foi importada).
+func (d *DB) ProductIDBySupplierURL(ctx context.Context, url string) (string, error) {
+	var id string
+	err := d.pool.QueryRow(ctx, `
+		select p.id::text from supplier_products sp join products p on p.supplier_product_id = sp.id
+		where sp.url = $1`, url).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}

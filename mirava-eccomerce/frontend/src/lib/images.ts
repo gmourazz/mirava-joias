@@ -1,6 +1,7 @@
-import heroA from "../assets/images/hero-a.webp";
-import heroArgolas from "../assets/images/hero-argolas.webp";
-import heroBerloques from "../assets/images/hero-berloques.webp";
+import bannerColarCoracao from "../assets/banner/banner-colar-coracao.webp";
+import bannerColarVerde from "../assets/banner/banner-colar-verde.webp";
+import bannerTrevo from "../assets/banner/banner-trevo.webp";
+import bannerAneis from "../assets/banner/banner-aneis.webp";
 import catAneis from "../assets/images/cat-aneis.webp";
 import catColares from "../assets/images/cat-colares.webp";
 import catPulseiras from "../assets/images/cat-pulseiras.webp";
@@ -9,9 +10,10 @@ import jw1 from "../assets/images/jw1.webp";
 import cartItem from "../assets/images/cart-item.webp";
 
 const POOL: Record<string, string> = {
-  "hero-a": heroA,
-  "hero-argolas": heroArgolas,
-  "hero-berloques": heroBerloques,
+  "banner-colar-coracao": bannerColarCoracao,
+  "banner-colar-verde": bannerColarVerde,
+  "banner-trevo": bannerTrevo,
+  "banner-aneis": bannerAneis,
   "cat-aneis": catAneis,
   "cat-colares": catColares,
   "cat-pulseiras": catPulseiras,

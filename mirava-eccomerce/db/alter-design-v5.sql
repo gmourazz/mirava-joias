@@ -429,6 +429,35 @@ insert into public.category_mappings (keyword, category, position) values
   ('pingente avulso', 'berloques', 10), ('charm', 'berloques', 11), ('brinco', 'brincos', 12)
 on conflict do nothing;
 
+-- Relógios: a fornecedora também vende (decisão 37). Categoria e palavras do
+-- mapeamento, para a sincronização e a importação por link classificarem certo.
+insert into public.categories (slug, label, position) values ('relogios', 'Relógios', 8) on conflict do nothing;
+insert into public.category_mappings (keyword, category, position) values
+  ('relógio', 'relogios', 0), ('relogio', 'relogios', 0)
+on conflict do nothing;
+
+-- Coleções da Mirava (menu "Coleções"): grupos de peças escolhidos e ordenados
+-- pela dona, como as coleções da fornecedora (ex.: "It Girl Era"). A peça pode
+-- estar em mais de uma. Só peças publicadas aparecem na loja.
+create table if not exists public.collections (
+  id          uuid primary key default gen_random_uuid(),
+  slug        text not null unique check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  name        text not null check (length(name) between 2 and 60),
+  tagline     text not null default '' check (length(tagline) <= 90),
+  description text not null default '' check (length(description) <= 600),
+  image       text,
+  position    integer not null default 0,
+  active      boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+create table if not exists public.collection_items (
+  collection_id uuid not null references public.collections(id) on delete cascade,
+  product_id    uuid not null references public.products(id) on delete cascade,
+  position      integer not null default 0,
+  primary key (collection_id, product_id)
+);
+create index if not exists ix_collection_items_product on public.collection_items (product_id);
+
 -- Papéis do painel (decisão 27): master vê tudo; despacho só pedidos e lote.
 alter table public.admins add column if not exists role text not null default 'master' check (role in ('master','dispatch'));
 

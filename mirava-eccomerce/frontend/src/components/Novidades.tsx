@@ -5,7 +5,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
-import { Check, Copy, Sparkles, X } from "lucide-react";
+import { Check, Copy, Sparkles, Ticket, X } from "lucide-react";
 import { ApiError } from "../lib/api";
 import { subscribe } from "../lib/extras";
 import { useAuth } from "../context/AuthContext";
@@ -99,7 +99,8 @@ export function NovidadesSecao() {
                 placeholder="Seu e-mail"
                 className="min-w-[200px] flex-1 rounded-full border-none bg-white px-5 py-4 text-[14.5px] text-text outline-none"
               />
-              <button type="submit" disabled={c.enviando} className="cursor-pointer rounded-full border-none bg-teal-dark px-7 py-4 text-[14px] font-semibold text-white hover:bg-[#08393C] disabled:opacity-60">
+              <button type="submit" disabled={c.enviando} className="flex cursor-pointer items-center justify-center gap-2 rounded-full border-none bg-teal-dark px-7 py-4 text-[14px] font-semibold text-white hover:bg-[#08393C] disabled:opacity-60">
+                {!c.enviando && <Ticket size={17} strokeWidth={1.8} />}
                 {c.enviando ? "Enviando…" : "Quero meu cupom"}
               </button>
             </div>
@@ -166,7 +167,8 @@ export function PopupBoasVindas() {
               className="rounded-full border-[1.5px] border-line px-5 py-3.5 text-[14.5px] outline-none focus:border-teal"
             />
             {c.erro && <span className="text-[13px] text-[#B4443C]">{c.erro}</span>}
-            <button type="submit" disabled={c.enviando} className="cursor-pointer rounded-full border-none bg-teal px-6 py-4 text-[14px] font-semibold text-white hover:bg-teal-dark disabled:opacity-60">
+            <button type="submit" disabled={c.enviando} className="flex cursor-pointer items-center justify-center gap-2 rounded-full border-none bg-teal px-6 py-4 text-[14px] font-semibold text-white hover:bg-teal-dark disabled:opacity-60">
+              {!c.enviando && <Ticket size={17} strokeWidth={1.8} />}
               {c.enviando ? "Enviando…" : "Quero meu cupom"}
             </button>
             <button type="button" onClick={fechar} className="cursor-pointer border-none bg-transparent text-[13px] text-muted hover:text-teal">
