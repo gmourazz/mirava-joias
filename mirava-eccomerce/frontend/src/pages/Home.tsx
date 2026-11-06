@@ -21,14 +21,14 @@ import { NovidadesSecao } from "../components/Novidades";
 // novidades dá o BEMVINDA10 (decisão 34). O FAQ aqui mostra só as primeiras
 // perguntas e leva à página completa.
 export default function Home() {
-  const { hash } = useLocation();
+  const { hash, key } = useLocation();
 
   // Links "/#duvidas" apontam para a âncora nesta página. useNavigate não
   // rola sozinho até o #id — fazemos na mão.
   useEffect(() => {
     if (!hash) return;
     document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
-  }, [hash]);
+  }, [hash, key]);
 
   return (
     <div>

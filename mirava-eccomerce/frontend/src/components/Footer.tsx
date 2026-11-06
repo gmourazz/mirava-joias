@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { AtSign, Clock, HelpCircle, Lock, Mail, Moon, Package, RefreshCw, Sparkles, Sun, Truck, Link2, Flame, type LucideIcon } from "lucide-react";
+import { AtSign, Clock, Heart, HelpCircle, Lock, Mail, Moon, Package, RefreshCw, Sparkles, Sun, Truck, Link2, Flame, type LucideIcon } from "lucide-react";
 import { LOJA } from "../config/loja";
 import logoBranco from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-branco.svg";
 
@@ -27,6 +27,7 @@ const COLS: { title: string; links: FooterLink[] }[] = [
   {
     title: "AJUDA",
     links: [
+      { label: "Sobre nós", to: "/sobre-nos", Icon: Heart },
       { label: "Acompanhar pedido", to: "/rastreio", Icon: Truck },
       { label: "Meus pedidos", to: "/conta?aba=pedidos", Icon: Package },
       { label: "Perguntas frequentes", to: "/perguntas-frequentes", Icon: HelpCircle },

@@ -66,6 +66,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   berloques: "Berloques",
   brincos: "Brincos",
   conjuntos: "Conjuntos",
+  relogios: "Relógios",
   outros: "Outros",
 };
 

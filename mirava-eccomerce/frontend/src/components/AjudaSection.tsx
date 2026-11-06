@@ -19,7 +19,7 @@ const cardClass =
 
 export default function AjudaSection() {
   return (
-    <section className="mx-auto max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-20">
+    <section id="ajuda" className="mx-auto max-w-[1360px] scroll-mt-32 px-[clamp(16px,3vw,40px)] pt-20">
       <SectionHeading eyebrow="Precisa de ajuda?" title="Estamos aqui por você" />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {CARDS.map(({ Icon, t, d, cta, to, href }) => {

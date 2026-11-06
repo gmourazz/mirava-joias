@@ -19,6 +19,7 @@ import Checkout from "./pages/Checkout";
 import Pedido from "./pages/Pedido";
 import PerguntasFrequentes from "./pages/PerguntasFrequentes";
 import Politicas from "./pages/Politicas";
+import SobreNos from "./pages/SobreNos";
 import AdminApp from "./admin/AdminApp";
 import Rastreio from "./pages/Rastreio";
 
@@ -49,6 +50,7 @@ function Loja() {
         <Route path="/gestao" element={<Navigate to="/admin/pedidos" replace />} />
         <Route path="/admin/*" element={<AdminApp />} />
         <Route path="/perguntas-frequentes" element={<PerguntasFrequentes />} />
+        <Route path="/sobre-nos" element={<SobreNos />} />
         <Route path="/politicas" element={<Politicas />} />
         <Route path="/politicas/:aba" element={<Politicas />} />
       </Routes>

@@ -47,8 +47,10 @@ export default function CategoryPage() {
   const cats = useCategorias();
   // Qualquer categoria do banco vale na URL (são editáveis no painel); as de
   // fábrica valem mesmo antes de a lista chegar.
+  // Relógios está sempre no menu, mesmo sem peça publicada: a página existe e
+  // mostra o aviso, em vez de cair em "todas as joias".
   const category: Category | undefined =
-    filter !== "todos" && (cats.some((c) => c.slug === filter) || MENU_CATEGORIES.includes(filter)) ? filter : undefined;
+    filter !== "todos" && (filter === "relogios" || cats.some((c) => c.slug === filter) || MENU_CATEGORIES.includes(filter)) ? filter : undefined;
 
   const ate = Number(params.get("ate")) || 0;
   const de = Number(params.get("de")) || 0;
@@ -164,8 +166,24 @@ export default function CategoryPage() {
         {!loading && error && <CatalogError message={error} onRetry={retry} />}
         {!loading && !error && products.length === 0 && (
           <div className="col-span-full flex flex-col items-center gap-4 py-16 text-center">
-            <p className="m-0 font-serif text-[24px] text-teal-dark">Nenhuma peça com esses filtros</p>
-            {filtrosAtivos && (
+            <p className="m-0 font-serif text-[24px] text-teal-dark">
+              {category === "relogios" && !metal && !ate && !de ? "Nossos relógios chegam em breve" : "Nenhuma peça com esses filtros"}
+            </p>
+            {category === "relogios" && !metal && !ate && !de && (
+              <p className="m-0 max-w-md text-[14.5px] leading-relaxed text-text-2">
+                Estamos escolhendo os modelos para a loja. Enquanto isso, veja as joias.
+              </p>
+            )}
+            {category === "relogios" && !metal && !ate && !de && (
+              <button
+                type="button"
+                onClick={() => navigate("/categoria/colecoes/todos")}
+                className="cursor-pointer rounded-full border-none bg-teal px-6 py-3.5 text-[14px] font-semibold text-white hover:bg-teal-dark"
+              >
+                Ver as joias
+              </button>
+            )}
+            {filtrosAtivos && category !== "relogios" && (
               <button
                 type="button"
                 onClick={() => navigate("/categoria/colecoes/todos")}

@@ -24,3 +24,7 @@ mirava-eccomerce/api/bin/
 # Configuração local do Claude Code — às vezes acumula segredo em "permissions.allow"
 .claude/settings.local.json
 .claude/settings.json
+
+# Originais das fotos da página Sobre nós (a página usa só as .webp)
+mirava-eccomerce/frontend/src/assets/socias/*.png
+mirava-eccomerce/frontend/src/assets/socias/*.jpeg

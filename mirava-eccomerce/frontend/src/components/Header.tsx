@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronDown, Circle, Flame, Gem, Gift, Heart, HelpCircle, Layers, Link2, LogOut, Menu, Moon, Package, Search, ShoppingBag, Sparkles, Sun, Tag, User, X, type LucideIcon, Watch } from "lucide-react";
+import { ChevronDown, Circle, Flame, Gem, Gift, Heart, HelpCircle, Layers, Link2, LogOut, Menu, MoreHorizontal, Moon, Package, Search, ShoppingBag, Sparkles, Sun, User, X, type LucideIcon, Watch } from "lucide-react";
 import type { Category } from "../catalogo/tipos";
 import { useCategorias, type CategoriaLoja } from "../catalogo/categorias";
 import { useColecoes, type Colecao } from "../lib/extras";
@@ -23,6 +23,8 @@ interface NavLink {
 interface NavItem extends NavLink {
   /** Itens do dropdown. Sem itens, o item é só um link. */
   items?: NavLink[];
+  /** Item que só abre o dropdown (sem página própria): o clique não navega. */
+  menuOnly?: boolean;
 }
 
 const CATEGORY_ICON: Record<Category, LucideIcon | undefined> = {
@@ -48,8 +50,9 @@ const categoryLinks = (cats: CategoriaLoja[], base: string): NavLink[] =>
 // categoria aplica o teto.
 const presentes = (cents: number) => `/categoria/colecoes/todos?ate=${cents}`;
 
-// Relógios têm item próprio no menu (como na fornecedora) e não entram na
-// lista de "Joias"; o item só aparece quando há relógio publicado.
+// Relógios têm item próprio no menu (como na fornecedora), sempre visível, e
+// não entram na lista de "Joias". Sem relógio publicado, a página avisa que
+// eles chegam em breve.
 const buildNav = (cats: CategoriaLoja[], colecoes: Colecao[]): NavItem[] => [
   { label: "Lançamentos", to: "/categoria/colecoes/todos?ordem=novos", Icon: Sparkles },
   {
@@ -72,18 +75,20 @@ const buildNav = (cats: CategoriaLoja[], colecoes: Colecao[]): NavItem[] => [
   { label: "Berloques", to: "/categoria/colecoes/berloques", Icon: Link2 },
   { label: "Banhados a prata", to: "/categoria/prata/todos", Icon: Moon, items: categoryLinks(cats, "/categoria/prata") },
   { label: "Banhados a ouro", to: "/categoria/ouro/todos", Icon: Sun, items: categoryLinks(cats, "/categoria/ouro") },
-  ...(cats.some((c) => c.slug === "relogios") ? [{ label: "Relógios", to: "/categoria/colecoes/relogios", Icon: Watch }] : []),
+  { label: "Relógios", to: "/categoria/colecoes/relogios", Icon: Watch },
   {
-    label: "Presentes",
-    to: presentes(20000),
-    Icon: Gift,
+    label: "Mais",
+    to: "",
+    Icon: MoreHorizontal,
+    menuOnly: true,
     items: [
-      { label: "Até R$ 50", to: presentes(5000), Icon: Tag },
-      { label: "Até R$ 80", to: presentes(8000), Icon: Tag },
-      { label: "Até R$ 120", to: presentes(12000), Icon: Tag },
+      // Presentes: a escolha por faixa de preço (até R$ 50, 80, 120…) fica no
+      // filtro "Preço" da página.
+      { label: "Presentes", to: presentes(20000), Icon: Gift },
+      { label: "Sobre nós", to: "/sobre-nos", Icon: Heart },
+      { label: "Ajuda", to: "/perguntas-frequentes", Icon: HelpCircle },
     ],
   },
-  { label: "Ajuda", to: "/perguntas-frequentes", Icon: HelpCircle },
 ];
 
 const iconButton =
@@ -219,7 +224,7 @@ export default function Header() {
               <div key={item.label} className="relative" onMouseEnter={() => setOpenMenu(item.items ? item.label : null)}>
                 <button
                   type="button"
-                  onClick={() => go(item.to)}
+                  onClick={() => (item.menuOnly ? setOpenMenu(open ? null : item.label) : go(item.to))}
                   aria-expanded={item.items ? open : undefined}
                   className={`flex h-[46px] cursor-pointer items-center gap-2 border-0 border-b-[1.5px] bg-transparent px-0 text-[11px] font-medium tracking-[0.16em] whitespace-nowrap uppercase transition-colors hover:border-teal hover:text-teal ${
                     open ? "border-teal text-teal" : "border-transparent text-[#141A19]"
@@ -245,13 +250,15 @@ export default function Header() {
                         {sub.label}
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      onClick={() => go(item.to)}
-                      className="mx-3 mt-1.5 mb-1 w-[calc(100%-24px)] cursor-pointer rounded-[10px] border-none bg-mist px-3 py-[11px] text-left text-[11px] font-semibold tracking-[0.14em] text-teal uppercase"
-                    >
-                      Ver tudo →
-                    </button>
+                    {!item.menuOnly && (
+                      <button
+                        type="button"
+                        onClick={() => go(item.to)}
+                        className="mx-3 mt-1.5 mb-1 w-[calc(100%-24px)] cursor-pointer rounded-[10px] border-none bg-mist px-3 py-[11px] text-left text-[11px] font-semibold tracking-[0.14em] text-teal uppercase"
+                      >
+                        Ver tudo →
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -280,7 +287,7 @@ export default function Header() {
                 <div key={item.label} className="grid">
                   <button
                     type="button"
-                    onClick={() => go(item.to)}
+                    onClick={() => !item.menuOnly && go(item.to)}
                     className="flex cursor-pointer items-center gap-3 rounded-xl border-none bg-transparent px-3 py-3 text-left text-[12px] font-medium tracking-[0.14em] text-text uppercase hover:bg-mist"
                   >
                     <item.Icon size={16} strokeWidth={1.6} className="text-teal" />
