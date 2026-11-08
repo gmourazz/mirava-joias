@@ -26,12 +26,13 @@ var (
 // prazoEstorno limita a espera pelo Mercado Pago com o pedido travado.
 const prazoEstorno = 25 * time.Second
 
-func (s *Servidor) encerrarPedido(ctx context.Context, orderID, userID, origem string, permitido func(dominio.Status) bool, destino func(dominio.Status) dominio.Status) (dominio.Status, error) {
+func (s *Servidor) encerrarPedido(ctx context.Context, orderID, userID, origem string, permitido func(dominio.Status) bool, destino func(dominio.Status) dominio.Status, antes *dominio.Status) (dominio.Status, error) {
 	// A cliente fechar a aba não pode cortar um estorno no meio.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), prazoEstorno)
 	defer cancel()
 
 	return s.db.CloseOrder(ctx, orderID, userID, origem, func(st dominio.Status, pagamento string) (dominio.Status, error) {
+		*antes = st
 		if !permitido(st) {
 			return "", errNaoPermitido
 		}
@@ -82,15 +83,26 @@ func (s *Servidor) cancelOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	to, err := s.encerrarPedido(r.Context(), id, user.ID, "customer", dominio.CustomerCanCancel, dominio.CustomerCancelTarget)
+	var antes dominio.Status
+	to, err := s.encerrarPedido(r.Context(), id, user.ID, "customer", dominio.CustomerCanCancel, dominio.CustomerCancelTarget, &antes)
 	s.responderEncerramento(w, r, id, to, err, "Este pedido não pode mais ser cancelado.")
+	// Pedido pago cancelado: a dona precisa saber antes de comprar o lote,
+	// e se a peça já foi comprada, que ela fica no estoque.
+	if err == nil && to == dominio.Refunded {
+		extra := ""
+		if antes == dominio.PurchasedFromSupplier || antes == dominio.ReceivedByOwner {
+			extra = "A peça já tinha sido comprada na Lilly e fica com você."
+		}
+		s.avisarDona(r.Context(), id, notificacao.DonaPedidoCancelado, etapaParaDona(antes), extra)
+	}
 }
 
 // adminRefund: a dona devolve o pagamento em qualquer etapa depois de pago.
 func (s *Servidor) adminRefund(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	var antes dominio.Status
 	to, err := s.encerrarPedido(r.Context(), id, "", "admin", dominio.CanRefund,
-		func(dominio.Status) dominio.Status { return dominio.Refunded })
+		func(dominio.Status) dominio.Status { return dominio.Refunded }, &antes)
 	s.responderEncerramento(w, r, id, to, err, "Este pedido não pode ser reembolsado.")
 }
 
@@ -104,4 +116,19 @@ func (s *Servidor) estornarPagamentoTardio(ctx context.Context, orderID, pagamen
 	}
 	s.log.Info("pagamento tardio estornado", "pedido", numero)
 	_ = s.db.RegisterAlert(ctx, orderID, "Pagamento chegou depois do cancelamento e foi estornado automaticamente.")
+}
+
+// etapaParaDona descreve onde o pedido estava, nas palavras do painel.
+func etapaParaDona(st dominio.Status) string {
+	switch dominio.AdminStageOf(st) {
+	case dominio.AdminToBuy:
+		return "comprar na Lilly"
+	case dominio.AdminAtSupplier:
+		return "comprado, esperando chegar"
+	case dominio.AdminToShip:
+		return "para despachar"
+	case dominio.AdminProblem:
+		return "sem estoque na Lilly"
+	}
+	return string(st)
 }

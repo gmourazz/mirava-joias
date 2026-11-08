@@ -101,11 +101,42 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 	}
 
 	var res db.SyncResult
+	// Leitura incremental: só o que é novo, mudou ou está velho, até o teto
+	// da rodada (dominio.PlanSync).
+	known, err := s.db.SyncURLs(ctx, supplierID)
+	if err != nil {
+		s.log.Error("não consegui ler o histórico de páginas", "erro", err)
+		s.finishSync(ctx, syncID, db.SyncResult{Status: dominio.SyncError, Error: "histórico de páginas ilegível"})
+		return
+	}
+	skuPorURL, err := s.db.MirrorSKUsByURL(ctx, supplierID)
+	if err != nil {
+		s.log.Error("não consegui ler o espelho", "erro", err)
+		s.finishSync(ctx, syncID, db.SyncResult{Status: dominio.SyncError, Error: "espelho ilegível"})
+		return
+	}
+	plano := make([]dominio.SyncEntry, len(entries))
+	lastmod := make(map[string]string, len(entries))
+	for i, e := range entries {
+		plano[i] = dominio.SyncEntry{URL: e.URL, Lastmod: e.Lastmod}
+		lastmod[e.URL] = e.Lastmod
+	}
+	ler := dominio.PlanSync(plano, known, time.Now(), dominio.MaxPagesPerSync)
+	s.log.Info("páginas desta rodada", "ler", len(ler), "no_sitemap", len(entries))
+
+	// "Visto" é estar no sitemap: peça que continua lá não sumiu, mesmo sem ser
+	// relida nesta rodada. As novas entram conforme são lidas.
 	seen := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if sku, ok := skuPorURL[e.URL]; ok {
+			seen = append(seen, sku)
+		}
+	}
 	consecutiveFailures := 0
 	blockedInARow := 0
 
-	for _, e := range entries {
+	for _, url := range ler {
+		e := lilly.SitemapEntry{URL: url, Lastmod: lastmod[url]}
 		select {
 		case <-ctx.Done():
 			// ctx já morreu — não dá pra usar ele de novo pra gravar o
@@ -163,6 +194,7 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 		if p == nil {
 			if !lilly.LooksBlocked(html) {
 				blockedInARow = 0
+				s.marcarLida(itemCtx, supplierID, e)
 				cancelItem()
 				continue // página de categoria ou institucional, não é falha
 			}
@@ -250,13 +282,14 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 		} else {
 			s.log.Warn("produto sem foto baixada — não publicado", "sku", p.SKU)
 		}
+		s.marcarLida(itemCtx, supplierID, e)
 		cancelItem()
 
 		seen = append(seen, p.SKU)
 
 		if res.Processed%50 == 0 {
 			s.log.Info("sincronização em andamento",
-				"processados", res.Processed, "de", len(entries),
+				"processados", res.Processed, "de", len(ler),
 				"novos", res.Created, "atualizados", res.Updated, "falhas", res.Failed)
 			if err := s.db.UpdateSyncProgress(ctx, syncID, res); err != nil {
 				s.log.Warn("não consegui gravar o progresso da sincronização", "erro", err)
@@ -264,14 +297,14 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 		}
 	}
 
-	known, err := s.db.CountKnownMirror(ctx, supplierID)
-	safe := err == nil && dominio.SafeToMarkVanished(len(seen), known)
+	noEspelho, err := s.db.CountKnownMirror(ctx, supplierID)
+	safe := err == nil && dominio.SafeToMarkVanished(len(seen), noEspelho)
 	if safe {
 		if vanished, err := s.db.MarkVanished(ctx, supplierID, seen); err == nil {
 			res.Vanished = int(vanished)
 		}
 	} else {
-		s.log.Error("peças sumidas não marcadas: a leitura viu poucas peças", "vistas", len(seen), "conhecidas", known, "erro", err)
+		s.log.Error("peças sumidas não marcadas: a leitura viu poucas peças", "vistas", len(seen), "conhecidas", noEspelho, "erro", err)
 	}
 
 	// Mais vendidos, no fim e sem poder derrubar nada: é enfeite de vitrine,
@@ -293,6 +326,15 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 	s.log.Info("sincronização concluída",
 		"novos", res.Created, "atualizados", res.Updated,
 		"falhas", res.Failed, "travados", res.LockedPrices, "sumidos", res.Vanished)
+}
+
+// marcarLida guarda que a página foi lida com o lastmod do sitemap, para a
+// próxima rodada saber que pode pular. Falhar aqui só faz a página ser lida de
+// novo — não derruba a rodada.
+func (s *Servidor) marcarLida(ctx context.Context, supplierID string, e lilly.SitemapEntry) {
+	if err := s.db.MarkURLChecked(ctx, supplierID, e.URL, e.Lastmod); err != nil {
+		s.log.Warn("não consegui marcar a página como lida", "url", e.URL, "erro", err)
+	}
 }
 
 // finishSync grava o fim da leitura. Nunca ignore o erro daqui: foi um

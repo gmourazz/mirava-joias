@@ -37,7 +37,9 @@ const (
 	// isso nos identificamos como um navegador comum — não é engano malicioso,
 	// é a única forma de ler uma página pública que o robots.txt já autoriza.
 	UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-	PageDelay = 1500 * time.Millisecond
+	// Pausa entre páginas. Com a leitura incremental a rodada lê no máximo
+	// dominio.MaxPagesPerSync páginas, então dá para ser mais lenta.
+	PageDelay = 3 * time.Second
 	// DefaultWholesaleRatio: confirmada em 5 amostras (PL46, PL20, PL82, PL103,
 	// PL269) — o atacado é 70% do varejo. Usada só quando a página não exibe
 	// o preço de atacado, o que acontece em peças de coleção nova.

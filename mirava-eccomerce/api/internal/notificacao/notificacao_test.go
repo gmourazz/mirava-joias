@@ -62,3 +62,14 @@ func TestTextoPersonalizadoEscapadoNoHTML(t *testing.T) {
 		t.Error("HTML do texto personalizado não foi escapado")
 	}
 }
+
+func TestAvisosDaDona(t *testing.T) {
+	p := Pedido{Numero: 42, Nome: "Marina", Total: 12990, Etapa: "comprado, esperando chegar", Produto: "A peça já tinha sido comprada na Lilly e fica com você."}
+	if a := Assunto(DonaPedidoPago, p); !strings.Contains(a, "#42") || !strings.Contains(a, "129,90") {
+		t.Errorf("assunto do pedido pago: %q", a)
+	}
+	m := corpoTexto(DonaPedidoCancelado, p)
+	if !strings.Contains(m, "Marina") || !strings.Contains(m, "comprado, esperando chegar") || !strings.Contains(m, "fica com você") {
+		t.Errorf("miolo do cancelamento: %q", m)
+	}
+}

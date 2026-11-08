@@ -20,6 +20,9 @@ type FinanceInput struct {
 	Fees             Cents // taxas reais do Mercado Pago (payments.fee_cents)
 	PackagingEach    Cents // embalagem Mirava por pedido (EMBALAGEM_CENTAVOS)
 	BatchFreight     Cents // frete pago à Lilly nos lotes comprados abaixo da meta
+	// Atacado de peças já compradas na Lilly cujo pedido foi estornado no mês
+	// (decisão 43): a cliente recebeu o dinheiro de volta e a peça ficou.
+	CanceledCost Cents
 }
 
 type Finance struct {
@@ -28,7 +31,7 @@ type Finance struct {
 	Packaging    Cents   // embalagem × pedidos
 	GiftWrapCost Cents   // custo dos embrulhos vendidos
 	GrossProfit  Cents   // peças − desconto − atacado + embrulho
-	NetProfit    Cents   // bruto − taxas − embalagem − custo dos embrulhos − frete dos lotes
+	NetProfit    Cents   // bruto − taxas − embalagem − custo dos embrulhos − frete dos lotes − peças canceladas
 	NetMarginPct float64 // líquido sobre a venda das peças, já com desconto
 }
 
@@ -45,7 +48,7 @@ func MonthlyFinance(in FinanceInput) Finance {
 	pieces := in.Subtotal - in.Discount
 	gross := pieces - in.Cost + in.GiftWrap
 	giftCost := in.GiftWrapCostEach * Cents(in.GiftWraps)
-	net := gross - in.Fees - packaging - giftCost - in.BatchFreight
+	net := gross - in.Fees - packaging - giftCost - in.BatchFreight - in.CanceledCost
 
 	var margin float64
 	if pieces > 0 {

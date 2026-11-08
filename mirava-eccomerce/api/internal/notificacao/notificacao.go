@@ -37,6 +37,10 @@ const (
 	// PedidoEnviado leva o código de rastreio dos Correios.
 	PedidoEnviado Evento = "pedido_enviado"
 
+	// Avisos para a dona, no e-mail da loja (Configurações → Dados da loja).
+	DonaPedidoPago      Evento = "dona_pedido_pago"      // entrou dinheiro: pedido novo para comprar
+	DonaPedidoCancelado Evento = "dona_pedido_cancelado" // a cliente cancelou pela conta
+
 	// Cancelamento e reembolso (decisão 43).
 	PedidoCancelado Evento = "pedido_cancelado" // cancelado sem ter sido pago
 	PedidoEstornado Evento = "pedido_estornado" // cancelado com o valor devolvido
@@ -180,6 +184,10 @@ func Assunto(e Evento, p Pedido) string {
 		return fmt.Sprintf("Pedido #%d confirmado · Mirava", p.Numero)
 	case PagamentoFalhou:
 		return fmt.Sprintf("Não conseguimos confirmar o pagamento do pedido #%d", p.Numero)
+	case DonaPedidoPago:
+		return fmt.Sprintf("Novo pedido pago #%d · %s", p.Numero, p.Total.String())
+	case DonaPedidoCancelado:
+		return fmt.Sprintf("Pedido #%d cancelado pela cliente", p.Numero)
 	case PedidoCancelado:
 		return fmt.Sprintf("Pedido #%d cancelado", p.Numero)
 	case PedidoEstornado:
@@ -235,6 +243,14 @@ func corpoTexto(e Evento, p Pedido) string {
 				"Se ainda quiser a peça, é só refazer o pedido. Dá pra tentar "+
 				"com Pix, que costuma cair na hora.",
 			p.Numero)
+	case DonaPedidoPago:
+		miolo = fmt.Sprintf("O pedido #%d de %s foi pago: %s. Ele já está na lista de compras da Lilly.",
+			p.Numero, p.Nome, p.Total.String())
+	case DonaPedidoCancelado:
+		miolo = fmt.Sprintf("%s cancelou o pedido #%d pela conta, na etapa \"%s\".", p.Nome, p.Numero, p.Etapa)
+		if p.Produto != "" {
+			miolo += "\n\n" + p.Produto
+		}
 	case PedidoCancelado:
 		miolo = fmt.Sprintf("Seu pedido #%d foi cancelado. Nada foi cobrado.", p.Numero)
 	case PedidoEstornado:

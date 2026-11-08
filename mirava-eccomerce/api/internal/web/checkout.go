@@ -84,6 +84,7 @@ type cartPricing struct {
 }
 
 func (s *Servidor) priceCart(ctx context.Context, user *auth.User, req checkoutRequest, needAddress bool) (*cartPricing, *httpErr) {
+	req.GiftWrap = dominio.GiftWrapApplies(req.GiftWrap)
 	if len(req.Items) == 0 {
 		return nil, &httpErr{http.StatusBadRequest, "Carrinho vazio"}
 	}
@@ -372,7 +373,7 @@ func (s *Servidor) createPayment(w http.ResponseWriter, r *http.Request) {
 		Engraving:      req.Engraving, Items: p.items,
 		CouponCode: p.pricing.CouponCode, PointsUsed: p.pricing.PointsUsed,
 		PointsEarned: p.earned,
-		GiftWrap:     req.GiftWrap, GiftMessage: p.giftMsg, GiftWrapCents: p.totals.GiftWrap,
+		GiftWrap:     p.totals.GiftWrap > 0, GiftMessage: p.giftMsg, GiftWrapCents: p.totals.GiftWrap,
 		KitDiscount: p.pricing.KitDiscount, PixDiscount: p.pricing.PixDiscount,
 		PaymentChoice:         p.choice,
 		CouponFirstOrderOnly:  p.coupon != nil && p.coupon.FirstOrderOnly && p.pricing.CouponCode != "",

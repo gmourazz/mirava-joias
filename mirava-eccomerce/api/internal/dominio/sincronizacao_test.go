@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Bug real (agosto/2026): o código gravava "sucesso"/"parcial" depois que as
@@ -72,5 +73,49 @@ func TestSafeToMarkVanished(t *testing.T) {
 		if got := SafeToMarkVanished(c.seen, c.known); got != c.want {
 			t.Errorf("%s: SafeToMarkVanished(%d, %d) = %v, quero %v", c.name, c.seen, c.known, got, c.want)
 		}
+	}
+}
+
+func TestPlanSync(t *testing.T) {
+	agora := time.Date(2026, 11, 8, 10, 0, 0, 0, time.UTC)
+	recente := agora.Add(-24 * time.Hour)
+	antigo := agora.Add(-10 * 24 * time.Hour)
+	maisAntigo := agora.Add(-20 * 24 * time.Hour)
+
+	entradas := []SyncEntry{
+		{URL: "/nova", Lastmod: "2026-11-08"},      // nunca lida
+		{URL: "/mudou", Lastmod: "2026-11-07"},     // lastmod diferente
+		{URL: "/igual", Lastmod: "2026-10-01"},     // igual e lida ontem
+		{URL: "/velha", Lastmod: "2026-10-01"},     // igual, mas lida há 10 dias
+		{URL: "/mais-velha", Lastmod: ""},          // sem lastmod, lida há 20 dias
+		{URL: "/sem-lastmod-recente", Lastmod: ""}, // sem lastmod, lida ontem
+		{URL: "/semeada", Lastmod: "2026-11-01"},   // conhecida sem lastmod guardado
+	}
+	conhecidas := map[string]SyncKnown{
+		"/mudou":               {Lastmod: "2026-10-01", CheckedAt: recente},
+		"/igual":               {Lastmod: "2026-10-01", CheckedAt: recente},
+		"/velha":               {Lastmod: "2026-10-01", CheckedAt: antigo},
+		"/mais-velha":          {CheckedAt: maisAntigo},
+		"/sem-lastmod-recente": {CheckedAt: recente},
+		"/semeada":             {CheckedAt: recente},
+	}
+
+	ler := PlanSync(entradas, conhecidas, agora, 10)
+	quero := []string{"/nova", "/mudou", "/mais-velha", "/velha"}
+	if len(ler) != len(quero) {
+		t.Fatalf("leria %v, quero %v", ler, quero)
+	}
+	for i := range quero {
+		if ler[i] != quero[i] {
+			t.Fatalf("ordem %v, quero %v (novas e mudadas antes, depois as mais antigas)", ler, quero)
+		}
+	}
+
+	// Teto por rodada: as novas e mudadas têm prioridade.
+	if ler := PlanSync(entradas, conhecidas, agora, 3); len(ler) != 3 || ler[2] != "/mais-velha" {
+		t.Errorf("com teto 3 leu %v", ler)
+	}
+	if ler := PlanSync(entradas, conhecidas, agora, 1); len(ler) != 1 || ler[0] != "/nova" {
+		t.Errorf("com teto 1 leu %v", ler)
 	}
 }

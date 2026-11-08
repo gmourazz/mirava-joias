@@ -1014,6 +1014,55 @@ func (d *DB) ApplyCost(ctx context.Context, mirrorID string, cost dominio.Cents)
 	return result, err
 }
 
+// SyncURLs devolve o que se sabe de cada página do sitemap da fornecedora:
+// o lastmod da última leitura e quando ela foi lida.
+func (d *DB) SyncURLs(ctx context.Context, supplierID string) (map[string]dominio.SyncKnown, error) {
+	rows, err := d.pool.Query(ctx, `
+		select url, coalesce(lastmod, ''), checked_at from sync_urls where supplier_id = $1`, supplierID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]dominio.SyncKnown{}
+	for rows.Next() {
+		var url string
+		var k dominio.SyncKnown
+		if err := rows.Scan(&url, &k.Lastmod, &k.CheckedAt); err != nil {
+			return nil, err
+		}
+		out[url] = k
+	}
+	return out, rows.Err()
+}
+
+// MarkURLChecked registra a leitura de uma página com o lastmod do sitemap.
+func (d *DB) MarkURLChecked(ctx context.Context, supplierID, url, lastmod string) error {
+	_, err := d.pool.Exec(ctx, `
+		insert into sync_urls (supplier_id, url, lastmod, checked_at) values ($1, $2, nullif($3, ''), now())
+		on conflict (supplier_id, url) do update set lastmod = excluded.lastmod, checked_at = now()`,
+		supplierID, url, lastmod)
+	return err
+}
+
+// MirrorSKUsByURL liga a página da fornecedora ao SKU do espelho.
+func (d *DB) MirrorSKUsByURL(ctx context.Context, supplierID string) (map[string]string, error) {
+	rows, err := d.pool.Query(ctx, `
+		select url, sku from supplier_products where supplier_id = $1 and url is not null`, supplierID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var url, sku string
+		if err := rows.Scan(&url, &sku); err != nil {
+			return nil, err
+		}
+		out[url] = sku
+	}
+	return out, rows.Err()
+}
+
 // MarkVanished despublica o que sumiu do site da Lilly.
 // Não apaga: pedidos antigos referenciam esses produtos.
 func (d *DB) MarkVanished(ctx context.Context, supplierID string, seen []string) (int64, error) {

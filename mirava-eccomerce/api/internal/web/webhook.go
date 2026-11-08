@@ -160,6 +160,7 @@ func (s *Servidor) webhookMP(w http.ResponseWriter, r *http.Request) {
 			// reenvia webhook do mesmo pagamento; sem esse "changed" a cliente
 			// receberia o mesmo e-mail de confirmação várias vezes.
 			s.avisar(ctx, order.ID, notificacao.PedidoPago)
+			s.avisarDona(ctx, order.ID, notificacao.DonaPedidoPago, "", "")
 		}
 
 	case payment.Status == "refunded" || payment.Status == "charged_back":

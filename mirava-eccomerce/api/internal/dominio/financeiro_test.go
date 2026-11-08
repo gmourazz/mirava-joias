@@ -85,3 +85,15 @@ func TestCustoDoEmbrulho(t *testing.T) {
 		t.Errorf("lucro líquido = %d, esperado 13400", f.NetProfit)
 	}
 }
+
+// Cliente cancelou depois da compra na Lilly (decisão 43): o dinheiro voltou
+// para ela, mas o atacado já foi pago. Esse custo sai do lucro do mês.
+func TestCustoDePecaCanceladaDepoisDaCompra(t *testing.T) {
+	f := MonthlyFinance(FinanceInput{Orders: 1, Subtotal: 20000, Cost: 7000, CanceledCost: 2300})
+	if f.NetProfit != 20000-7000-2300 {
+		t.Errorf("lucro líquido = %d, esperado %d", f.NetProfit, 20000-7000-2300)
+	}
+	if f.Revenue != 20000 {
+		t.Errorf("faturamento não muda com o cancelamento: %d", f.Revenue)
+	}
+}

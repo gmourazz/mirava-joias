@@ -35,6 +35,30 @@ func (s *Servidor) avisar(ctx context.Context, orderID string, ev notificacao.Ev
 	s.registrarAviso(ctx, orderID, ev)
 }
 
+// avisarDona manda o aviso para o e-mail da loja (Configurações → Dados da
+// loja). Não entra na lista de avisos da cliente. `etapa` e `extra` só servem
+// ao cancelamento.
+func (s *Servidor) avisarDona(ctx context.Context, orderID string, ev notificacao.Evento, etapa, extra string) {
+	if s.notif == nil {
+		return
+	}
+	cfg, err := s.db.Settings(ctx)
+	if err != nil || cfg.StoreEmail == "" {
+		return
+	}
+	o, err := s.db.OrderForNotification(ctx, orderID)
+	if err != nil || o == nil {
+		return
+	}
+	p := s.paraNotificacao(o)
+	p.Email = cfg.StoreEmail
+	p.Etapa = etapa
+	p.Produto = extra
+	p.URLAcao = s.cfg.SiteURL + "/admin/pedidos"
+	p.TextoAcao = "Abrir no painel"
+	s.notif.Avisar(ctx, ev, p)
+}
+
 // registrarAviso guarda que o aviso saiu (lista "Avisos para a cliente" no
 // drawer do pedido). Sem e-mail configurado, nada saiu — nada é registrado.
 func (s *Servidor) registrarAviso(ctx context.Context, orderID string, ev notificacao.Evento) {

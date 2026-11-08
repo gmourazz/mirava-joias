@@ -169,6 +169,16 @@ func ClubLevelFor(earned int) ClubLevel {
 // GiftWrapCents é o preço do embrulho para presente com cartão.
 const GiftWrapCents Cents = 500
 
+// GiftWrapOffered: a loja oferece embrulho? Desligado por enquanto (decisão
+// 41). A mesma escolha existe no front, em LOJA.embrulhoAtivo
+// (frontend/src/config/loja.ts): religar é mudar os dois.
+const GiftWrapOffered = false
+
+// GiftWrapApplies decide se o embrulho pedido entra no pedido.
+func GiftWrapApplies(requested bool) bool {
+	return requested && GiftWrapOffered
+}
+
 const MaxGiftMessage = 200
 
 // GiftMessage limpa e valida a mensagem do cartão.

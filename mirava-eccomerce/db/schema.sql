@@ -204,6 +204,17 @@ create table public.supplier_products (
   constraint uq_supplier_sku unique (supplier_id, sku)
 );
 
+-- Leitura incremental da Lilly (plano de ação, etapa 2): o lastmod do sitemap
+-- e quando cada página foi lida, para a sincronização pular o que não mudou.
+create table if not exists public.sync_urls (
+  supplier_id  uuid not null references public.suppliers(id) on delete cascade,
+  url          text not null,
+  lastmod      text,
+  checked_at   timestamptz not null default now(),
+  primary key (supplier_id, url)
+);
+
+
 create index ix_sp_available  on public.supplier_products (supplier_id, available);
 create index ix_sp_last_seen  on public.supplier_products (last_seen_at desc);
 

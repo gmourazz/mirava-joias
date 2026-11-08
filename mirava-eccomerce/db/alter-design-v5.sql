@@ -540,3 +540,20 @@ as $$
     else false
   end;
 $$;
+
+-- Leitura incremental da Lilly (plano de ação, etapa 2): o lastmod do sitemap
+-- e quando cada página foi lida, para a sincronização pular o que não mudou.
+create table if not exists public.sync_urls (
+  supplier_id  uuid not null references public.suppliers(id) on delete cascade,
+  url          text not null,
+  lastmod      text,
+  checked_at   timestamptz not null default now(),
+  primary key (supplier_id, url)
+);
+
+-- Páginas já lidas antes desta tabela entram sem lastmod: a primeira rodada
+-- não relê tudo de uma vez, renova as mais antigas aos poucos.
+insert into public.sync_urls (supplier_id, url, checked_at)
+select supplier_id, url, last_seen_at from public.supplier_products
+where url is not null
+on conflict do nothing;

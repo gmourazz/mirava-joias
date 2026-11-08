@@ -99,6 +99,9 @@ export default function Financeiro() {
             )}
             <Kpi label="Embalagem" valor={-dados.packaging_cents} nota={`${formatarBRL(dados.packaging_each_cents)} por pedido`} />
             <Kpi label="Frete dos lotes" valor={-dados.batch_freight_cents} nota="pago à Lilly em lote abaixo da meta" />
+            {dados.canceled_cost_cents > 0 && (
+              <Kpi label="Peças canceladas" valor={-dados.canceled_cost_cents} nota="compradas na Lilly e estornadas: a peça ficou com você" />
+            )}
             <div className="col-span-full grid gap-1 rounded-[20px] bg-teal p-5 text-white">
               <span className="text-[13px] text-[#BFE3DF]">Lucro líquido do mês</span>
               <span className="font-serif text-[clamp(28px,3vw,38px)] leading-none">{formatarBRL(dados.net_profit_cents)}</span>
@@ -155,7 +158,7 @@ function ParaOndeVai({ dados }: { dados: FinanceMonth }) {
   const base = dados.subtotal_cents - dados.discount_cents + dados.gift_wrap_cents;
   const fatias = [
     { label: "Lucro líquido", v: Math.max(0, dados.net_profit_cents), cor: "#0F6E73" },
-    { label: "Custo Lilly", v: dados.cost_cents, cor: "#9FDCD5" },
+    { label: "Custo Lilly", v: dados.cost_cents + dados.canceled_cost_cents, cor: "#9FDCD5" },
     { label: "Embalagem, embrulhos e frete dos lotes", v: dados.packaging_cents + dados.gift_wrap_cost_cents + dados.batch_freight_cents, cor: "#CFE6E4" },
     { label: "Taxas", v: dados.fees_cents, cor: "#E8B4AE" },
   ];
@@ -267,6 +270,7 @@ function exportar(d: FinanceMonth) {
     ["Taxas Mercado Pago", reaisCSV(d.fees_cents)],
     ["Embalagem", reaisCSV(d.packaging_cents)],
     ["Frete dos lotes", reaisCSV(d.batch_freight_cents)],
+    ["Peças canceladas depois da compra", reaisCSV(d.canceled_cost_cents)],
     ["Lucro líquido", reaisCSV(d.net_profit_cents)],
   ]);
 }

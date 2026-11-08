@@ -145,3 +145,17 @@ func TestMensagemDoPresente(t *testing.T) {
 		t.Errorf("veio %q (%v)", m, err)
 	}
 }
+
+// Embrulho desligado (decisão 41): pedido feito direto na API não cobra nem
+// promete embrulho.
+func TestEmbrulhoDesligado(t *testing.T) {
+	if GiftWrapOffered {
+		t.Skip("embrulho religado: o teste vale só com ele desligado")
+	}
+	if GiftWrapApplies(true) {
+		t.Error("embrulho desligado não pode entrar no pedido")
+	}
+	if tot := OrderTotal(10000, 0, 0, GiftWrapApplies(true)); tot.GiftWrap != 0 {
+		t.Errorf("cobrou embrulho desligado: %d", tot.GiftWrap)
+	}
+}

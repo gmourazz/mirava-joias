@@ -946,10 +946,10 @@ Fica para quando a loja estiver vendendo, porque cada item precisa de tabela e r
 
 ### Etapa 2 · O que falta no back
 
-- [ ] Sincronização incremental: ler só as páginas que mudaram (`lastmod` do sitemap) e com pausas maiores. Hoje ela relê 2.272 páginas a cada vez, o que deve ser o que faz a Lilly bloquear · Claude
-- [ ] Avisar a dona quando entra pedido pago e quando uma cliente cancela · Claude
-- [ ] Financeiro: mostrar o custo das peças compradas na Lilly e canceladas depois (hoje somem do relatório) · Claude
-- [ ] Recusar embrulho no servidor enquanto ele estiver desligado no site (decisão 41) · Claude
+- [x] Sincronização incremental: ler só as páginas que mudaram (`lastmod` do sitemap) e com pausas maiores. Hoje ela relê 2.272 páginas a cada vez, o que deve ser o que faz a Lilly bloquear · Claude
+- [x] Avisar a dona quando entra pedido pago e quando uma cliente cancela · Claude
+- [x] Financeiro: mostrar o custo das peças compradas na Lilly e canceladas depois (hoje somem do relatório) · Claude
+- [x] Recusar embrulho no servidor enquanto ele estiver desligado no site (decisão 41) · Claude
 - [ ] Decidir se o BEMVINDA10 pode ficar em dois pedidos ainda não pagos ao mesmo tempo (hoje pode, caso raro) · Você decide
 - [ ] Trazer os 3 relógios: por link quando a Lilly liberar, ou cadastro manual em Produtos → Novo produto · Você
 

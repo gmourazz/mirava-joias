@@ -380,6 +380,7 @@ func (s *Servidor) adminFinance(w http.ResponseWriter, r *http.Request) {
 		"packaging_cents":      f.Packaging,
 		"packaging_each_cents": f.PackagingEach,
 		"batch_freight_cents":  f.BatchFreight,
+		"canceled_cost_cents":  f.CanceledCost,
 		"gross_profit_cents":   f.GrossProfit,
 		"net_profit_cents":     f.NetProfit,
 		"net_margin_pct":       f.NetMarginPct,

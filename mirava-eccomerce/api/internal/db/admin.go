@@ -930,6 +930,16 @@ func (d *DB) FinanceMonth(ctx context.Context, start, end time.Time, packagingEa
 		where purchased_at >= $1 and purchased_at < $2`, start, end).Scan(&in.BatchFreight); err != nil {
 		return nil, err
 	}
+	// Peças compradas na Lilly e depois estornadas: conta no mês do estorno.
+	if err := d.pool.QueryRow(ctx, `
+		select coalesce(sum(i.unit_cost_cents * i.quantity), 0)
+		from order_items i join orders o on o.id = i.order_id
+		where o.status = 'refunded'
+		  and exists (select 1 from order_events e where e.order_id = o.id and e.to_status = 'purchased_from_supplier')
+		  and exists (select 1 from order_events e where e.order_id = o.id and e.to_status = 'refunded'
+		              and e.created_at >= $1 and e.created_at < $2)`, start, end).Scan(&in.CanceledCost); err != nil {
+		return nil, err
+	}
 	out.Input = in
 
 	group := func(sql string) ([]FinanceGroup, error) {

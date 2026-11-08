@@ -230,6 +230,7 @@ export interface FinanceMonth {
   packaging_cents: number;
   packaging_each_cents: number;
   batch_freight_cents: number;
+  canceled_cost_cents: number;
   gross_profit_cents: number;
   net_profit_cents: number;
   net_margin_pct: number;
