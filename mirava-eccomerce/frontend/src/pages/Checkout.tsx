@@ -7,8 +7,10 @@
 // Se os dois divergirem, quem manda é o servidor — e é assim que tem que ser.
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useLogin } from "../context/LoginContext";
+import logoTurquesa from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-turquesa.svg";
 import { Link } from "react-router-dom";
-import { Barcode, Check, CreditCard, Gift, Loader2, Lock, Percent, Plus, QrCode, Sparkles, Ticket, Trash2, X } from "lucide-react";
+import { ArrowRight, Barcode, Check, CreditCard, Gift, Loader2, Lock, Plus, QrCode, Sparkles, Ticket, Trash2, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { api, ApiError } from "../lib/api";
@@ -30,7 +32,7 @@ import {
 } from "../lib/frete";
 import { formatarBRL, temDescontoPix, textoParcelas, textoPrazo } from "../lib/dinheiro";
 import { LOJA } from "../config/loja";
-import { checkoutPreview, type CheckoutPreview, type PaymentChoice } from "../lib/extras";
+import { checkoutPreview, type CheckoutPreview, type PaymentChoice, myCoupons } from "../lib/extras";
 
 const EMPTY_ADDRESS: NewAddress = {
   label: "Casa",
@@ -56,6 +58,7 @@ interface CheckoutResponse {
 
 export default function Checkout() {
   const { user, loading: loadingUser } = useAuth();
+  const { abrirLogin } = useLogin();
   const { items, subtotalCents, giftWrap: embrulhoSacola, setGiftWrap: setEmbrulhoSacola } = useCart();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -79,7 +82,7 @@ export default function Checkout() {
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState("");
   const [usePoints, setUsePoints] = useState(false);
-  const giftWrap = embrulhoSacola;
+  const giftWrap = LOJA.embrulhoAtivo && embrulhoSacola;
   const setGiftWrap = setEmbrulhoSacola;
   const [giftMessage, setGiftMessage] = useState("");
   // Forma de pagamento escolhida aqui (decisão 33). O Mercado Pago abre só
@@ -152,6 +155,19 @@ export default function Checkout() {
   const somenteTeste = items.length > 0 && items.every((i) => i.slug === "peca-de-teste-mirava");
 
   const chosen = shippingOptions.find((o) => o.service === shipping);
+
+  // Primeira compra: o cupom de boas-vindas já vem aplicado (decisão 42). Roda
+  // uma vez só: se a cliente tirar o cupom, ele não volta sozinho.
+  const boasVindasVista = useRef(false);
+  useEffect(() => {
+    if (!user || boasVindasVista.current) return;
+    boasVindasVista.current = true;
+    myCoupons()
+      .then((lista) => {
+        if (lista.some((c) => c.code === LOJA.cupomBoasVindas && c.usable)) setCoupon((atual) => atual || LOJA.cupomBoasVindas);
+      })
+      .catch(() => {});
+  }, [user]);
 
   // Prévia do servidor: subtotal, desconto, frete, embrulho e total saem da
   // mesma conta que vai ser cobrada. A conta local abaixo só cobre o instante
@@ -309,9 +325,9 @@ export default function Checkout() {
           A conta guarda seu endereço e o histórico dos pedidos, e é como a
           gente te avisa quando a peça for despachada.
         </p>
-        <Link to="/conta?voltar=/checkout" className={botaoPrimario}>
+        <button type="button" onClick={() => abrirLogin()} className={`${botaoPrimario} cursor-pointer border-none`}>
           Entrar ou criar conta
-        </Link>
+        </button>
       </Aviso>
     );
   }
@@ -451,33 +467,35 @@ export default function Checkout() {
           )}
 
           {/* Embrulho para presente */}
-          <div className="rounded-3xl border border-line bg-white p-[22px]">
-            <label className="flex cursor-pointer items-start gap-3">
-              <input type="checkbox" checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)} className="sr-only" />
-              <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border-[1.5px] ${giftWrap ? "border-teal bg-teal text-white" : "border-line-strong bg-white"}`}>
-                {giftWrap && <Check size={13} strokeWidth={3} />}
-              </span>
-              <span className="flex-1">
-                <span className="flex items-center gap-2 text-[15px] font-semibold text-text">
-                  <Gift size={17} strokeWidth={1.7} className="text-teal" /> Embrulhar para presente
-                  <span className="ml-auto text-[14px] font-bold text-text">+ {formatarBRL(LOJA.embrulhoCentavos)}</span>
+          {LOJA.embrulhoAtivo && (
+            <div className="rounded-3xl border border-line bg-white p-[22px]">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input type="checkbox" checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)} className="sr-only" />
+                <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border-[1.5px] ${giftWrap ? "border-teal bg-teal text-white" : "border-line-strong bg-white"}`}>
+                  {giftWrap && <Check size={13} strokeWidth={3} />}
                 </span>
-                <span className="text-[13px] text-muted">Caixinha com laço e um cartão escrito à mão com a sua mensagem.</span>
-              </span>
-            </label>
-            {giftWrap && (
-              <div className="animate-fade-in mt-3.5">
-                <textarea
-                  value={giftMessage}
-                  onChange={(e) => setGiftMessage(e.target.value.slice(0, 200))}
-                  rows={3}
-                  placeholder="Mensagem do cartão (opcional)"
-                  className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[14px] text-text outline-none focus:border-teal"
-                />
-                <span className="block text-right text-[12px] text-muted">{giftMessage.length}/200</span>
-              </div>
-            )}
-          </div>
+                <span className="flex-1">
+                  <span className="flex items-center gap-2 text-[15px] font-semibold text-text">
+                    <Gift size={17} strokeWidth={1.7} className="text-teal" /> Embrulhar para presente
+                    <span className="ml-auto text-[14px] font-bold text-text">+ {formatarBRL(LOJA.embrulhoCentavos)}</span>
+                  </span>
+                  <span className="text-[13px] text-muted">Caixinha com laço e um cartão escrito à mão com a sua mensagem.</span>
+                </span>
+              </label>
+              {giftWrap && (
+                <div className="animate-fade-in mt-3.5">
+                  <textarea
+                    value={giftMessage}
+                    onChange={(e) => setGiftMessage(e.target.value.slice(0, 200))}
+                    rows={3}
+                    placeholder="Mensagem do cartão (opcional)"
+                    className="w-full resize-none rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-3 text-[14px] text-text outline-none focus:border-teal"
+                  />
+                  <span className="block text-right text-[12px] text-muted">{giftMessage.length}/200</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 3 · Contato */}
           <Cartao numero={3} titulo="Contato">
@@ -496,7 +514,7 @@ export default function Checkout() {
           {/* 4 · Pagamento — escolhido na tela do Mercado Pago (Checkout Pro,
               decisão 25): nenhum dado de cartão passa pelo nosso site. */}
           <Cartao numero={4} titulo="Pagamento">
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <div className="grid gap-2.5">
               <Tile ativo={payment === "pix"} onClick={() => setPayment("pix")} icone={<QrCode size={20} strokeWidth={1.6} />} titulo="Pix" texto={temDescontoPix ? `${LOJA.descontoPixPct}% de desconto · aprovação na hora` : "aprovação na hora"} />
               <Tile ativo={payment === "card"} onClick={() => setPayment("card")} icone={<CreditCard size={20} strokeWidth={1.6} />} titulo="Cartão de crédito" texto={`até ${LOJA.parcelasSemJuros}x sem juros`} />
               <Tile ativo={payment === "boleto"} onClick={() => setPayment("boleto")} icone={<Barcode size={20} strokeWidth={1.6} />} titulo="Boleto" texto="a encomenda começa depois da compensação (até 3 dias úteis)" />
@@ -506,7 +524,7 @@ export default function Checkout() {
               {payment === "pix"
                 ? "Na próxima tela, segura, do Mercado Pago, aparecem o QR Code e o código copia e cola."
                 : payment === "card"
-                  ? "Você digita os dados do cartão na próxima tela, segura, do Mercado Pago — nada de cartão passa pelo nosso site."
+                  ? "Você digita os dados do cartão na próxima tela, segura, do Mercado Pago. Nada de cartão passa pelo nosso site."
                   : "O boleto é gerado na próxima tela, segura, do Mercado Pago. Ele vence em 2 dias úteis."}
             </p>
           </Cartao>
@@ -648,7 +666,11 @@ export default function Checkout() {
                   Abrindo pagamento…
                 </>
               ) : (
-                <>Ir para o pagamento →</>
+                <>
+                  <Lock size={17} strokeWidth={1.9} />
+                  Ir para o pagamento
+                  <ArrowRight size={17} strokeWidth={1.9} />
+                </>
               )}
             </button>
 
@@ -751,8 +773,8 @@ function BarraCheckout() {
   return (
     <header className="flex h-[76px] items-center border-b border-line bg-white">
       <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-4 px-[clamp(16px,3vw,40px)]">
-        <Link to="/" className="font-logo text-[26px] tracking-[0.28em] text-teal-dark hover:text-teal-dark">
-          MIRAVA
+        <Link to="/" aria-label="Mirava Semijoias, início" className="block">
+          <img src={logoTurquesa} alt="Mirava" className="h-11 w-auto" />
         </Link>
         <ol className="m-0 hidden list-none items-center gap-5 p-0 md:flex">
           {passos.map((p) => (
@@ -805,13 +827,10 @@ function Tile({ icone, titulo, texto, ativo, onClick }: { icone: React.ReactNode
       aria-pressed={ativo}
       className={`flex cursor-pointer items-center gap-3 rounded-[18px] border-[1.5px] p-4 text-left transition-colors ${ativo ? "border-teal bg-[#F1F8F7]" : "border-line bg-white hover:border-teal"}`}
     >
-      <span className="grid h-10 w-10 place-items-center rounded-full bg-mist text-teal">{icone}</span>
-      <span className="grid">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-mist text-teal">{icone}</span>
+      <span className="grid min-w-0">
         <span className="text-[14.5px] font-semibold text-text">{titulo}</span>
-        <span className="flex items-center gap-1 text-[12.5px] text-muted">
-          {titulo === "Pix" && temDescontoPix && <Percent size={12} strokeWidth={2} />}
-          {texto}
-        </span>
+        <span className="text-[13px] text-muted">{texto}</span>
       </span>
     </button>
   );

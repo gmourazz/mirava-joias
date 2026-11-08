@@ -22,7 +22,7 @@ export const HERO_SLIDES = [
     em: "personalidade",
     text: "Banhadas a prata e a ouro 18k, encomendadas pra você e entregues em até 20 dias úteis.",
     cta: { label: "Ver lançamentos", to: "/categoria/colecoes/todos?ordem=novos" },
-    cta2: { label: "Mais vendidos", to: "/categoria/colecoes/todos" },
+    cta2: { label: "Mais vendidos", to: "/categoria/colecoes/todos?ordem=vendidos" },
     seed: "banner-colar-coracao",
     posicao: "50% 60%",
     fundo: "#F0EDEC",

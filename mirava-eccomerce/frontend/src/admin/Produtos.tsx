@@ -178,7 +178,7 @@ export default function Produtos() {
           options={[
             { value: "", label: "Preço: todos" },
             { value: "ate60", label: "Até R$ 60" },
-            { value: "60a100", label: "R$ 60–100" },
+            { value: "60a100", label: "R$ 60 a 100" },
             { value: "acima100", label: "+ R$ 100" },
           ]}
         />

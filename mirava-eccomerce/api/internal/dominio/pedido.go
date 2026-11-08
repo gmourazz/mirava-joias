@@ -25,11 +25,11 @@ const (
 var transitions = map[Status][]Status{
 	AwaitingPayment:       {Paid, Cancelled},
 	Paid:                  {InBatch, Refunded, OutOfStock},
-	InBatch:               {PurchasedFromSupplier, OutOfStock, Paid},
-	PurchasedFromSupplier: {ReceivedByOwner, OutOfStock},
-	ReceivedByOwner:       {Shipped},
-	Shipped:               {Delivered},
-	Delivered:             {},
+	InBatch:               {PurchasedFromSupplier, OutOfStock, Paid, Refunded},
+	PurchasedFromSupplier: {ReceivedByOwner, OutOfStock, Refunded},
+	ReceivedByOwner:       {Shipped, Refunded},
+	Shipped:               {Delivered, Refunded},
+	Delivered:             {Refunded},
 	Cancelled:             {},
 	Refunded:              {},
 	OutOfStock:            {Refunded, InBatch},
@@ -43,6 +43,32 @@ func CanGo(from, to Status) bool {
 		}
 	}
 	return false
+}
+
+// CanRefund diz se o pedido pode ter o pagamento devolvido pelo painel.
+func CanRefund(s Status) bool {
+	return CanGo(s, Refunded)
+}
+
+// CustomerCanCancel diz se a própria cliente pode cancelar: vale até o pedido
+// ser despachado (decisão 43), mesmo com a peça já comprada na fornecedora.
+// A mesma lista existe no front, em podeCancelar (lib/pedidos.ts); o servidor
+// é quem decide.
+func CustomerCanCancel(s Status) bool {
+	switch s {
+	case AwaitingPayment, Paid, InBatch, PurchasedFromSupplier, ReceivedByOwner, OutOfStock:
+		return true
+	}
+	return false
+}
+
+// CustomerCancelTarget é onde o pedido termina quando a cliente cancela: sem
+// pagamento é só cancelado; com pagamento, estornado.
+func CustomerCancelTarget(s Status) Status {
+	if s == AwaitingPayment {
+		return Cancelled
+	}
+	return Refunded
 }
 
 // CountsForRevenue exclui os estados em que o dinheiro não é seu.

@@ -31,6 +31,12 @@ export const LOJA = {
    */
   descontoPixPct: 5 as number,
 
+  /**
+   * Oferecer embrulho para presente (decisão 41). Desligado por enquanto: some
+   * da sacola, do checkout e dos textos da loja. Religar é trocar para true.
+   */
+  embrulhoAtivo: false,
+
   /** Embrulho para presente (decisão 31) — exibição; quem cobra é o servidor. */
   embrulhoCentavos: 500,
 
@@ -46,6 +52,13 @@ export const LOJA = {
 
   /** URL da API Go. Em produção, aponta para o Cloud Run. */
   apiUrl: import.meta.env.VITE_API_URL ?? "http://localhost:8080",
+
+  /**
+   * Cupom aplicado sozinho no checkout da primeira compra (decisão 42). Quem
+   * diz se a cliente pode usar é o servidor; se trocar aqui, troque também
+   * WelcomeCoupon em api/internal/web/loja.go.
+   */
+  cupomBoasVindas: "BEMVINDA10",
 
   /** Canal de atendimento. É o único contato publicado no site. */
   email: "miravajoias@gmail.com",

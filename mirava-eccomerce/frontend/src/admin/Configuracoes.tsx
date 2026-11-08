@@ -33,13 +33,13 @@ export default function Configuracoes() {
 
       <p className="m-0 rounded-2xl bg-mist px-5 py-4 text-[13.5px] leading-relaxed text-text-2">
         As regras abaixo ficam no código, com teste, e não num formulário: são elas que decidem preço e prazo. Para mudar uma, peça a alteração no
-        arquivo indicado — assim nenhuma venda sai com regra errada por um clique.
+        arquivo indicado. Assim nenhuma venda sai com regra errada por um clique.
       </p>
 
       <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-2">
         <Bloco titulo="Integrações">
-          <Status ok={c.payment_ready} rotulo="Mercado Pago" detalhe={c.payment_ready ? (c.payment_test_mode ? "credenciais de TESTE" : "produção") : "sem credenciais — checkout recusa"} />
-          <Status ok={c.email_ready} rotulo="E-mails às clientes" detalhe={c.email_ready ? "ativos" : "RESEND_API_KEY não configurada — pedidos saem sem aviso"} />
+          <Status ok={c.payment_ready} rotulo="Mercado Pago" detalhe={c.payment_ready ? (c.payment_test_mode ? "credenciais de TESTE" : "produção") : "sem credenciais: o checkout recusa"} />
+          <Status ok={c.email_ready} rotulo="E-mails às clientes" detalhe={c.email_ready ? "ativos" : "RESEND_API_KEY não configurada: pedidos saem sem aviso"} />
           <Linha rotulo="Endereço do site" valor={c.site_url || "—"} />
           <Linha rotulo="Atendimento" valor={LOJA.email} />
         </Bloco>
@@ -154,7 +154,7 @@ function DadosDaLoja() {
         <Rotulo t="Faturamento (R$)"><input inputMode="decimal" defaultValue={reais(st.goal_revenue_cents)} onBlur={(e) => set("goal_revenue_cents", centavos(e.target.value))} className={campo} /></Rotulo>
         <Rotulo t="Pedidos"><input inputMode="numeric" value={st.goal_orders || ""} onChange={(e) => set("goal_orders", Number(onlyDigits(e.target.value)) || 0)} className={campo} /></Rotulo>
         <Rotulo t="Lucro líquido (R$)"><input inputMode="decimal" defaultValue={reais(st.goal_profit_cents)} onBlur={(e) => set("goal_profit_cents", centavos(e.target.value))} className={campo} /></Rotulo>
-        <Rotulo t="Custo de cada embrulho (R$) — caixinha, laço e cartão">
+        <Rotulo t="Custo de cada embrulho (R$): caixinha, laço e cartão">
           <input inputMode="decimal" defaultValue={reais(st.gift_wrap_cost_cents)} onBlur={(e) => set("gift_wrap_cost_cents", centavos(e.target.value))} placeholder="0,00" className={campo} />
         </Rotulo>
       </Bloco>

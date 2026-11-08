@@ -130,7 +130,7 @@ function Lote({ lote, depois }: { lote: Batch; depois: () => void }) {
             <span className="block h-full rounded-full bg-teal transition-[width] duration-500" style={{ width: `${meta}%` }} />
           </span>
           {tetoBatido && falta > 0 && (
-            <span className="text-[12.5px] text-[#C4483D]">Passou do teto de dias: compre mesmo sem a meta e pague o frete — atraso custa mais.</span>
+            <span className="text-[12.5px] text-[#C4483D]">Passou do teto de dias: compre mesmo sem a meta e pague o frete: atraso custa mais.</span>
           )}
         </div>
       )}

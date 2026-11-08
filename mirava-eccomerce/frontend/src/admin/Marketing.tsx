@@ -12,6 +12,7 @@ import BuscaProduto from "./BuscaProduto";
 import Toggle from "./Toggle";
 import { baixarCSV } from "./csv";
 import { lojaApi, type AdminCart, type AdminCategory, type AdminKit, type AdminProduct, type Promotion } from "./api";
+import Select from "../components/Select";
 
 const ABAS = [
   { key: "carrinhos", label: "Carrinhos abandonados", Icon: ShoppingCart },
@@ -230,11 +231,7 @@ function Promocoes({ rascunho, limpar }: { rascunho: Partial<Promotion> | null; 
             </button>
           ))}
           {escopo === "category" && (
-            <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className={campo}>
-              {cats.map((c) => (
-                <option key={c.slug} value={c.slug}>{c.label}</option>
-              ))}
-            </select>
+            <Select ariaLabel="Categoria" value={categoria} onChange={setCategoria} options={cats.map((c) => ({ value: c.slug, label: c.label }))} />
           )}
         </div>
         {escopo === "products" && (

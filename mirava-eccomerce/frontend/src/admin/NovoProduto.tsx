@@ -8,6 +8,7 @@ import { ImagePlus, X } from "lucide-react";
 import { imageUrl } from "../catalogo/consultas";
 import { formatarBRL } from "../lib/dinheiro";
 import { lojaApi, uploadImage, type AdminCategory } from "./api";
+import Select from "../components/Select";
 
 export default function NovoProduto({ cats, fechar, criado }: { cats: AdminCategory[]; fechar: () => void; criado: (id: string) => void }) {
   const [nome, setNome] = useState("");
@@ -85,20 +86,19 @@ export default function NovoProduto({ cats, fechar, criado }: { cats: AdminCateg
               }}
             />
           </div>
-          <span className="text-[12px] text-muted">Produtos da Lilly já vêm com as fotos sincronizadas — use "Importar da Lilly" para eles.</span>
+          <span className="text-[12px] text-muted">Produtos da Lilly já vêm com as fotos sincronizadas: use "Importar da Lilly" para eles.</span>
         </div>
 
         <input required minLength={3} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome" className={campo} />
         <div className="grid grid-cols-2 gap-3">
-          <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className={campo}>
-            {cats.map((c) => (
-              <option key={c.slug} value={c.slug}>{c.label}</option>
-            ))}
-          </select>
-          <select value={metal} onChange={(e) => setMetal(e.target.value as "prata" | "ouro")} className={campo}>
-            <option value="prata">Banho: banhado a prata</option>
-            <option value="ouro">Banho: banhado a ouro</option>
-          </select>
+          <Select variant="field" ariaLabel="Categoria" value={categoria} onChange={setCategoria} options={cats.map((c) => ({ value: c.slug, label: c.label }))} />
+          <Select
+            variant="field"
+            ariaLabel="Banho"
+            value={metal}
+            onChange={(v) => setMetal(v as "prata" | "ouro")}
+            options={[{ value: "prata", label: "Banho: banhado a prata" }, { value: "ouro", label: "Banho: banhado a ouro" }]}
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="grid gap-1 text-[12.5px] font-semibold text-text-2">
@@ -124,7 +124,7 @@ export default function NovoProduto({ cats, fechar, criado }: { cats: AdminCateg
         <label className="flex cursor-pointer items-center gap-2.5 text-[14px] text-text">
           <input type="checkbox" checked={publicar} onChange={(e) => setPublicar(e.target.checked)} className="h-4 w-4 accent-teal" />
           <span>
-            Publicar na loja agora <span className="text-[12.5px] text-muted">— senão, fica salvo como rascunho</span>
+            Publicar na loja agora <span className="text-[12.5px] text-muted">(senão, fica salvo como rascunho)</span>
           </span>
         </label>
         {erro && <p className="m-0 rounded-2xl bg-[#FDECEC] px-4 py-3 text-[13px] text-[#B4443C]">{erro}</p>}

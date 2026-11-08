@@ -51,6 +51,16 @@ export function getOrder(id: string): Promise<Order> {
   return api<Order>(`/pedidos/${id}`, { authenticated: true });
 }
 
+/** A cliente cancela até o pedido ser despachado. Só decide se o botão aparece:
+ *  a regra de verdade é dominio.CustomerCanCancel, no Go. */
+export function podeCancelar(status: OrderStatus): boolean {
+  return !["shipped", "delivered", "cancelled", "refunded"].includes(status);
+}
+
+export function cancelOrder(id: string): Promise<{ ok: boolean; status: OrderStatus }> {
+  return api(`/pedidos/${id}/cancelar`, { authenticated: true, method: "POST" });
+}
+
 /** As quatro etapas que a cliente acompanha.
  *
  *  Os estados internos entre o pagamento e a postagem (lote, comprado na

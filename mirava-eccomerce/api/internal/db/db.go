@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -125,8 +126,7 @@ type ProductFilter struct {
 	Category string
 	Metal    string
 	Featured bool
-	// BestSellers ordena pela venda da Mirava e, como desempate, pela posição
-	// na vitrine da fornecedora. Ver a coluna units_sold no schema.
+	// BestSellers traz só a lista da fornecedora, na ordem dela (decisão 39).
 	BestSellers bool
 	Search      string
 	Limit       int
@@ -166,12 +166,11 @@ func (d *DB) ListProducts(ctx context.Context, f ProductFilter) ([]CatalogProduc
 		sql += " and p.name ilike " + arg("%"+f.Search+"%")
 	}
 	if f.BestSellers {
-		// Só entra quem tem algum sinal: sem isso a lista completaria com peça
-		// qualquer e "mais vendidos" viraria "catálogo em outra ordem".
-		sql += " and (p.units_sold > 0 or p.supplier_rank is not null)"
-		sql += " order by p.units_sold desc, p.supplier_rank asc nulls last, p.created_at desc"
+		// A lista é a da Lilly, na ordem dela (decisão 39). Peça fora da lista
+		// não entra: senão "mais vendidos" viraria "catálogo em outra ordem".
+		sql += " and p.supplier_rank is not null order by coalesce(sp.available, true) desc, p.supplier_rank asc"
 	} else {
-		sql += " order by p.created_at desc"
+		sql += " order by coalesce(sp.available, true) desc, p.created_at desc"
 	}
 	sql += " limit " + arg(limit)
 
@@ -247,6 +246,14 @@ func (d *DB) ProductBySlug(ctx context.Context, slug string) (*CatalogProduct, e
 	}
 	p.Variants = variantsByProduct[p.ID]
 	return &p, nil
+}
+
+// availableFirst põe as peças indisponíveis no fim sem mexer na ordem de cada
+// grupo (posição na coleção, ordem da vitrine). Decisão 40.
+func availableFirst(products []CatalogProduct) {
+	sort.SliceStable(products, func(i, j int) bool {
+		return products[i].Available && !products[j].Available
+	})
 }
 
 // RelatedProducts: mesma categoria, exclui a própria peça.
@@ -708,17 +715,76 @@ type PaymentRecord struct {
 // O Mercado Pago reenvia o mesmo evento várias vezes — é o comportamento
 // normal dele, e o unique em mp_payment_id transforma a repetição num no-op.
 func (d *DB) RegisterPayment(ctx context.Context, r PaymentRecord) error {
-	_, err := d.pool.Exec(ctx, `
+	tag, err := d.pool.Exec(ctx, `
 		insert into payments (order_id, mp_payment_id, status, method,
 			installments, amount_cents, fee_cents, net_cents, payload)
-		values ($1,$2,$3,nullif($4,''),nullif($5,0),$6,nullif($7,0),nullif($8,0),$9)`,
+		values ($1,$2,$3,nullif($4,''),nullif($5,0),$6,nullif($7,0),nullif($8,0),$9)
+		on conflict (mp_payment_id) do update set
+			status = excluded.status, method = excluded.method,
+			installments = excluded.installments, amount_cents = excluded.amount_cents,
+			fee_cents = excluded.fee_cents, net_cents = excluded.net_cents,
+			payload = excluded.payload
+		where payments.status is distinct from excluded.status`,
 		r.OrderID, r.MPPaymentID, r.Status, r.Method, r.Installments,
 		r.Amount, r.Fee, r.Net, r.Payload)
-
-	if isDuplicate(err) {
+	if err != nil {
+		return err
+	}
+	// O mesmo pagamento muda de status (pendente → aprovado → estornado): só
+	// é repetição quando o status é o mesmo já gravado.
+	if tag.RowsAffected() == 0 {
 		return ErrDuplicate
 	}
-	return err
+	return nil
+}
+
+// ErrOrderNotFound: o pedido não existe ou é de outra cliente.
+var ErrOrderNotFound = errors.New("pedido não encontrado")
+
+// CloseOrder encerra um pedido com a linha travada. `decide` recebe o status e
+// o pagamento aprovado, faz o que for preciso fora do banco (o estorno) e diz
+// o status final. A trava vale até o fim: o despacho ou um webhook que chegar
+// no meio espera, em vez de agir sobre um pedido que está sendo estornado.
+// userID vazio é o painel; com valor, filtra pela dona do pedido.
+func (d *DB) CloseOrder(ctx context.Context, orderID, userID, origin string, decide func(dominio.Status, string) (dominio.Status, error)) (dominio.Status, error) {
+	tx, err := d.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `select set_config('app.origin', $1, true)`, origin); err != nil {
+		return "", err
+	}
+	var status dominio.Status
+	err = tx.QueryRow(ctx, `
+		select status from orders
+		where id::text = $1 and ($2 = '' or user_id::text = $2)
+		for update`, orderID, userID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrOrderNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+
+	var paymentID string
+	err = tx.QueryRow(ctx, `
+		select mp_payment_id from payments
+		where order_id::text = $1 and status = 'approved'
+		order by created_at desc limit 1`, orderID).Scan(&paymentID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	to, err := decide(status, paymentID)
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.Exec(ctx, `update orders set status = $2 where id::text = $1`, orderID, to); err != nil {
+		return "", err
+	}
+	return to, tx.Commit(ctx)
 }
 
 // MarkPaid só age se o pedido ainda estiver aguardando: a cláusula extra
@@ -960,6 +1026,15 @@ func (d *DB) MarkVanished(ctx context.Context, supplierID string, seen []string)
 		return 0, err
 	}
 	return tag.RowsAffected(), nil
+}
+
+// CountKnownMirror conta as peças do espelho ainda não marcadas como sumidas.
+func (d *DB) CountKnownMirror(ctx context.Context, supplierID string) (int, error) {
+	var n int
+	err := d.pool.QueryRow(ctx, `
+		select count(*) from supplier_products
+		where supplier_id = $1 and vanished_at is null`, supplierID).Scan(&n)
+	return n, err
 }
 
 func (d *DB) ActiveSupplier(ctx context.Context) (id, sitemap string, ratio float64, err error) {

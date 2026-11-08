@@ -206,10 +206,12 @@ export default function CartDrawer() {
               <span className="text-muted">{textoParcelas(subtotalCents)}</span>
               {temDescontoPix && <span className="font-semibold text-teal">{textoPix(subtotalCents)}</span>}
             </div>
-            <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-[13.5px] text-text-2">
-              <input type="checkbox" checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)} className="h-4 w-4 accent-teal" />
-              Embrulhar para presente com cartão (+ {formatarBRL(LOJA.embrulhoCentavos)})
-            </label>
+            {LOJA.embrulhoAtivo && (
+              <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-[13.5px] text-text-2">
+                <input type="checkbox" checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)} className="h-4 w-4 accent-teal" />
+                Embrulhar para presente com cartão (+ {formatarBRL(LOJA.embrulhoCentavos)})
+              </label>
+            )}
             <p className="m-0 mt-2 text-[12px] text-muted">Frete calculado pelo CEP na finalização.</p>
 
             <button

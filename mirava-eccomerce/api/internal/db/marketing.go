@@ -384,6 +384,7 @@ func (d *DB) ProductsByIDs(ctx context.Context, ids []string) ([]CatalogProduct,
 			out = append(out, *p)
 		}
 	}
+	availableFirst(out)
 	return out, nil
 }
 

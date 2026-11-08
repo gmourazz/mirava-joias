@@ -25,7 +25,7 @@ export default function CompraSegura() {
   return (
     <section className="mx-auto max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-20">
       <div className="grid gap-10 rounded-[36px] bg-teal-dark p-[clamp(24px,4vw,56px)] text-white">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
           <SectionHeading
             tone="light"
             eyebrow="Compra tranquila"

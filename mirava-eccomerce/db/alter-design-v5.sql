@@ -426,7 +426,7 @@ insert into public.category_mappings (keyword, category, position) values
   ('conjunto', 'conjuntos', 1), ('kit', 'conjuntos', 2), ('anel', 'aneis', 3),
   ('colar', 'colares', 4), ('gargantilha', 'colares', 5), ('choker', 'colares', 6),
   ('pulseira', 'pulseiras', 7), ('bracelete', 'pulseiras', 8), ('berloque', 'berloques', 9),
-  ('pingente avulso', 'berloques', 10), ('charm', 'berloques', 11), ('brinco', 'brincos', 12)
+  ('pingente avulso', 'berloques', 10), ('argola', 'brincos', 10), ('charm', 'berloques', 11), ('brinco', 'brincos', 12)
 on conflict do nothing;
 
 -- Relógios: a fornecedora também vende (decisão 37). Categoria e palavras do
@@ -517,4 +517,26 @@ begin
 
   return 'preço atualizado';
 end;
+$$;
+
+-- Reembolso e cancelamento pela cliente (decisão 43): o pedido pode ser
+-- estornado em qualquer etapa depois de pago. Mesma tabela de dominio/pedido.go.
+create or replace function public.valid_transition(from_status text, to_status text)
+returns boolean
+language sql
+immutable
+as $$
+  select case from_status
+    when 'awaiting_payment'         then to_status in ('paid','cancelled')
+    when 'paid'                     then to_status in ('in_batch','refunded','out_of_stock')
+    when 'in_batch'                 then to_status in ('purchased_from_supplier','out_of_stock','paid','refunded')
+    when 'purchased_from_supplier'  then to_status in ('received_by_owner','out_of_stock','refunded')
+    when 'received_by_owner'        then to_status in ('shipped','refunded')
+    when 'shipped'                  then to_status in ('delivered','refunded')
+    when 'delivered'                then to_status in ('refunded')
+    when 'cancelled'                then false
+    when 'refunded'                 then false
+    when 'out_of_stock'             then to_status in ('refunded','in_batch')
+    else false
+  end;
 $$;

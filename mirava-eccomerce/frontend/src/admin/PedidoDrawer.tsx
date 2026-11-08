@@ -28,7 +28,6 @@ const STATUS_LABEL: Record<string, string> = {
 // Ações que mexem com dinheiro ou encerram o pedido pedem confirmação.
 const CONFIRMAR: Partial<Record<OrderStatus, string>> = {
   cancelled: "Cancelar este pedido? A cliente não será cobrada.",
-  refunded: "Marcar como estornado? Faça o estorno no painel do Mercado Pago antes.",
   out_of_stock: "Marcar como sem estoque na Lilly? Fale com a cliente sobre troca ou estorno.",
 };
 
@@ -38,6 +37,7 @@ export default function PedidoDrawer({ id, fechar, mudou }: { id: string; fechar
   const [rastreio, setRastreio] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [confirmar, setConfirmar] = useState<OrderStatus | null>(null);
+  const [confirmarReembolso, setConfirmarReembolso] = useState(false);
   const [etiqueta, setEtiqueta] = useState(false);
 
   const [avisos, setAvisos] = useState<{ kind: string; channel: string; sent_at: string }[]>([]);
@@ -76,6 +76,16 @@ export default function PedidoDrawer({ id, fechar, mudou }: { id: string; fechar
       return;
     }
     void executar(() => adminApi.transition(pedido.id, pedido.status, to));
+  };
+
+  const reembolsar = () => {
+    if (!pedido) return;
+    if (confirmarReembolso) {
+      setConfirmarReembolso(false);
+      void executar(() => adminApi.refund(pedido.id));
+    } else {
+      setConfirmarReembolso(true);
+    }
   };
 
   const rastreioLimpo = rastreio.replace(/\s/g, "").toUpperCase();
@@ -245,7 +255,7 @@ export default function PedidoDrawer({ id, fechar, mudou }: { id: string; fechar
                         <span className="font-medium text-text">{STATUS_LABEL[e.to_status] ?? e.to_status}</span>
                         <span className="text-[12px] text-muted">
                           {new Date(e.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                          {e.origin === "admin" && " · pelo painel"}
+                          {e.origin === "customer" && " · pela cliente"}{e.origin === "admin" && " · pelo painel"}
                           {e.to_status === "shipped" && pedido.tracking_code && ` · ${pedido.tracking_code}`}
                         </span>
                       </span>
@@ -298,8 +308,13 @@ export default function PedidoDrawer({ id, fechar, mudou }: { id: string; fechar
           )}
         </div>
 
-        {pedido && pedido.actions.length > 0 && (
+        {pedido && (pedido.actions.length > 0 || pedido.can_refund) && (
           <div className="flex flex-wrap gap-2 border-t border-line px-6 py-4">
+            {confirmarReembolso && (
+              <p className="m-0 w-full rounded-[14px] bg-[#FDECEC] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#B4443C]">
+                O Mercado Pago vai devolver {formatarBRL(pedido.total_cents)} à cliente e o pedido será encerrado. Isso não pode ser desfeito.
+              </p>
+            )}
             {pedido.actions.map((to) => {
               const perigosa = Boolean(CONFIRMAR[to]);
               return (
@@ -318,6 +333,18 @@ export default function PedidoDrawer({ id, fechar, mudou }: { id: string; fechar
                 </button>
               );
             })}
+            {pedido.can_refund && (
+              <button
+                type="button"
+                disabled={salvando}
+                onClick={reembolsar}
+                className={`flex-1 cursor-pointer rounded-full border-[1.5px] px-4 py-3 text-[13.5px] font-semibold whitespace-nowrap disabled:opacity-50 ${
+                  confirmarReembolso ? "border-[#B4443C] bg-[#B4443C] text-white" : "border-[#F3C9C4] bg-white text-[#B4443C]"
+                }`}
+              >
+                {confirmarReembolso ? "Confirmar reembolso" : `Reembolsar ${formatarBRL(pedido.total_cents)}`}
+              </button>
+            )}
           </div>
         )}
       </aside>
@@ -349,6 +376,8 @@ function MiniCaixa({ label, valor, verde = false }: { label: string; valor: stri
 const AVISO_LABEL: Record<string, string> = {
   pedido_pago: "Pedido confirmado",
   pagamento_falhou: "Pagamento não concluído",
+  pedido_cancelado: "Pedido cancelado",
+  pedido_estornado: "Valor estornado",
   peca_comprada: "Peça encomendada",
   pedido_enviado: "Pedido a caminho (rastreio)",
   pagamento_pendente: "Lembrete de pagamento",

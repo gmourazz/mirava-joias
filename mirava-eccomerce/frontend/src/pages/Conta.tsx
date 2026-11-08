@@ -1,14 +1,16 @@
-// Minha conta (v5): topo próprio, faixa teal com a cliente e os números da
-// conta, menu lateral e o conteúdo da aba ao lado. A aba vai na URL
+// Minha conta: dentro da moldura da loja (faixa, menu e rodapé), com o menu
+// lateral agrupado e o conteúdo da aba ao lado. A visão geral traz o resumo da
+// cliente, os pedidos e, na direita, atendimento e favoritos. A aba vai na URL
 // (?aba=pedidos), para o "Meus pedidos" do header cair direto nela.
 //
 // Pagamentos (cartão salvo) ficou de fora: o pagamento é no Mercado Pago
 // (decisão 25), nenhum cartão passa por aqui.
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useLogin } from "../context/LoginContext";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ChevronRight, CreditCard, Gift, Heart, HelpCircle, Home as HomeIcon, LayoutGrid, LogOut, MapPin, Package,
+  ChevronRight, CreditCard, Gift, Heart, HelpCircle, LayoutGrid, LogOut, Mail, MapPin, Package,
   Copy, Plus, RefreshCw, Sparkles, Star, Ticket, Trash2, Truck, User, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -22,7 +24,6 @@ import {
   createAddress, deleteAddress, formatZip, listAddresses, lookupZip, onlyDigits,
   type Address, type NewAddress,
 } from "../lib/enderecos";
-import EntrarCadastro from "../components/EntrarCadastro";
 import ProductCard from "../components/ProductCard";
 import { useProducts } from "../catalogo/hooks";
 import { listFavorites } from "../lib/favoritos";
@@ -33,19 +34,21 @@ import {
   RETURN_STAGES, clubStatus, createReturn, createReview, forgotPassword, myCoupons, myReturns, reviewables,
   type ClubStatus, type MyCoupon, type ReturnRequest, type Reviewable,
 } from "../lib/extras";
+import Select from "../components/Select";
+import CancelarPedido from "../components/CancelarPedido";
 
 type Aba = "geral" | "pedidos" | "favoritos" | "cupons" | "clube" | "avaliar" | "enderecos" | "dados" | "trocas";
 
-const ABAS: { key: Aba; label: string; Icon: LucideIcon }[] = [
+const ABAS: { key: Aba; label: string; Icon: LucideIcon; grupo?: string }[] = [
   { key: "geral", label: "Visão geral", Icon: LayoutGrid },
-  { key: "pedidos", label: "Meus pedidos", Icon: Package },
-  { key: "favoritos", label: "Favoritos", Icon: Heart },
-  { key: "cupons", label: "Meus cupons", Icon: Ticket },
-  { key: "clube", label: "Mirava Club", Icon: Sparkles },
-  { key: "avaliar", label: "Avaliar compras", Icon: Star },
-  { key: "enderecos", label: "Endereços", Icon: MapPin },
-  { key: "dados", label: "Meus dados", Icon: User },
-  { key: "trocas", label: "Trocas e devoluções", Icon: RefreshCw },
+  { key: "pedidos", label: "Meus pedidos", Icon: Package, grupo: "Minhas compras" },
+  { key: "trocas", label: "Trocas e devoluções", Icon: RefreshCw, grupo: "Minhas compras" },
+  { key: "avaliar", label: "Avaliar compras", Icon: Star, grupo: "Minhas compras" },
+  { key: "clube", label: "Mirava Club", Icon: Sparkles, grupo: "Meus benefícios" },
+  { key: "cupons", label: "Meus cupons", Icon: Ticket, grupo: "Meus benefícios" },
+  { key: "favoritos", label: "Favoritos", Icon: Heart, grupo: "Meus benefícios" },
+  { key: "dados", label: "Meus dados", Icon: User, grupo: "Meu cadastro" },
+  { key: "enderecos", label: "Endereços", Icon: MapPin, grupo: "Meu cadastro" },
 ];
 
 function iniciais(nome: string) {
@@ -55,6 +58,8 @@ function iniciais(nome: string) {
 
 export default function Conta() {
   const { user, loading, logout } = useAuth();
+  const { abrirLogin } = useLogin();
+  const saindo = useRef(false);
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const aba = (ABAS.some((a) => a.key === params.get("aba")) ? params.get("aba") : "geral") as Aba;
@@ -85,90 +90,72 @@ export default function Conta() {
     if (user && voltar?.startsWith("/") && !voltar.startsWith("//")) navigate(voltar, { replace: true });
   }, [user, voltar, navigate]);
 
-  if (loading) return null;
-  if (!user) return <EntrarCadastro />;
+  // Sem conta não há página aqui: volta para a loja com a janela de login, e
+  // depois de entrar a cliente cai onde queria ir.
+  useEffect(() => {
+    if (loading || user || saindo.current) return;
+    abrirLogin(voltar ?? `${window.location.pathname}${window.location.search}`);
+    navigate("/", { replace: true });
+  }, [loading, user, voltar, abrirLogin, navigate]);
+
+  if (loading || !user) return null;
 
   const irPara = (a: Aba) => setParams(a === "geral" ? {} : { aba: a });
+  const recarregarPedidos = () => {
+    listOrders().then(setOrders).catch(() => {});
+    clubStatus().then(setClub).catch(() => {});
+  };
   const sair = () => {
+    saindo.current = true;
     logout();
     navigate("/");
   };
 
   return (
-    <div className="min-h-screen bg-snow">
-      <header className="sticky top-0 z-30 border-b border-line bg-white/97 backdrop-blur-[10px]">
-        <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between gap-4 px-[clamp(16px,3vw,40px)]">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="font-logo text-[24px] tracking-[0.28em] text-teal-dark hover:text-teal-dark">
-              MIRAVA
-            </Link>
-            <span className="hidden h-6 w-px bg-line sm:block" />
-            <span className="hidden items-center gap-1.5 text-[11px] font-semibold tracking-[0.16em] text-muted sm:flex">
-              <User size={14} strokeWidth={1.8} />
-              MINHA CONTA
-            </span>
-          </div>
-          <Link to="/" className="flex items-center gap-2 text-[13.5px] font-semibold text-teal hover:text-teal-dark">
-            <HomeIcon size={16} strokeWidth={1.8} />
-            Voltar para a loja
-          </Link>
-        </div>
-      </header>
+    <div className="bg-snow">
+      <div className="mx-auto max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-5 pb-16">
+        <nav className="mb-5 flex flex-wrap items-center gap-2 text-[13.5px] text-text-2">
+          <Link to="/" className="text-text-2 hover:text-teal">Início</Link>
+          <ChevronRight size={14} strokeWidth={1.6} className="text-teal" />
+          {aba === "geral" ? (
+            <span className="font-medium text-teal">Minha conta</span>
+          ) : (
+            <>
+              <button type="button" onClick={() => irPara("geral")} className="cursor-pointer border-none bg-transparent p-0 text-text-2 hover:text-teal">Minha conta</button>
+              <ChevronRight size={14} strokeWidth={1.6} className="text-teal" />
+              <span className="font-medium text-teal">{ABAS.find((a) => a.key === aba)?.label}</span>
+            </>
+          )}
+        </nav>
 
-      <div className="mx-auto max-w-[1280px] px-[clamp(16px,3vw,40px)] pt-6 pb-16">
-        <div className="flex flex-wrap items-center justify-between gap-6 rounded-[28px] bg-teal p-[clamp(20px,3vw,32px)] text-white">
-          <div className="flex items-center gap-4">
-            <span className="grid h-[84px] w-[84px] place-items-center rounded-full bg-white font-logo text-[32px] text-teal">
-              {iniciais(user.name || user.email)}
-            </span>
-            <div className="grid gap-1">
-              <span className="font-serif text-[clamp(26px,3vw,34px)] leading-none">Olá, {user.name.split(" ")[0] || "cliente"}</span>
-              <span className="text-[14px] text-[#BFE3DF]">
-                {user.email}
-                {desde && ` · cliente desde ${desde}`}
-              </span>
-              {club && (
-                <button type="button" onClick={() => irPara("clube")} className="mt-1 flex w-fit cursor-pointer items-center gap-2 rounded-full border-none bg-white/12 px-3 py-1 text-[11px] font-bold tracking-[0.14em] text-white">
-                  <Sparkles size={12} /> NÍVEL {NIVEL[club.level].toUpperCase()} · {club.balance} PONTOS
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2.5">
-            <Numero label="PEDIDOS" valor={orders?.length} onClick={() => irPara("pedidos")} />
-            <Numero label="PONTOS" valor={club?.balance} onClick={() => irPara("clube")} />
-            <Numero label="ENDEREÇOS" valor={addresses?.length} onClick={() => irPara("enderecos")} />
-          </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(210px,250px)_1fr]">
-          <nav className="h-fit rounded-3xl border border-line bg-white p-2.5 lg:sticky lg:top-24">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
+          <nav className="h-fit rounded-3xl border border-line bg-white p-3 lg:sticky lg:top-[144px]">
             <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] lg:grid">
-              {ABAS.map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => irPara(key)}
-                  className={`flex shrink-0 cursor-pointer items-center gap-3 rounded-[14px] border-none px-3.5 py-3 text-left text-[14px] transition-colors ${
-                    aba === key ? "bg-mist font-semibold text-teal" : "bg-transparent text-text hover:bg-fog"
-                  }`}
-                >
-                  <Icon size={17} strokeWidth={1.7} />
-                  {label}
-                  {key === "pedidos" && orders && orders.length > 0 && (
-                    <span className="ml-auto rounded-full bg-teal px-2 py-0.5 text-[11px] font-bold text-white">{orders.length}</span>
+              {ABAS.map(({ key, label, Icon, grupo }, i) => (
+                <div key={key} className="contents">
+                  {grupo && grupo !== ABAS[i - 1].grupo && (
+                    <span className="mt-3 hidden px-3.5 pb-1 text-[11.5px] font-bold tracking-[0.12em] text-muted uppercase lg:block">{grupo}</span>
                   )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => irPara(key)}
+                    className={`flex shrink-0 cursor-pointer items-center gap-3 rounded-[14px] border-none px-3.5 py-2.5 text-left text-[14px] transition-colors ${
+                      aba === key ? "bg-mist font-semibold text-teal" : "bg-transparent text-text hover:bg-fog"
+                    }`}
+                  >
+                    <Icon size={17} strokeWidth={1.7} />
+                    {label}
+                    {key === "pedidos" && orders && orders.length > 0 && (
+                      <span className="ml-auto rounded-full bg-teal px-2 py-0.5 text-[11px] font-bold text-white">{orders.length}</span>
+                    )}
+                  </button>
+                </div>
               ))}
-              <Link to="/perguntas-frequentes" className="flex shrink-0 items-center gap-3 rounded-[14px] px-3.5 py-3 text-[14px] text-text hover:bg-fog hover:text-text">
-                <HelpCircle size={17} strokeWidth={1.7} />
-                Ajuda
-              </Link>
-              <span className="my-1 hidden h-px bg-line lg:block" />
+              <span className="my-2 hidden h-px bg-line lg:block" />
               <button
                 type="button"
                 onClick={sair}
-                className="flex shrink-0 cursor-pointer items-center gap-3 rounded-[14px] border-none bg-transparent px-3.5 py-3 text-left text-[14px] text-muted hover:bg-fog"
+                className="flex shrink-0 cursor-pointer items-center gap-3 rounded-[14px] border-none bg-transparent px-3.5 py-2.5 text-left text-[14px] text-muted hover:bg-fog"
               >
                 <LogOut size={17} strokeWidth={1.7} />
                 Sair
@@ -177,8 +164,19 @@ export default function Conta() {
           </nav>
 
           <main key={aba} className="animate-fade-in grid min-w-0 content-start gap-5">
-            {aba === "geral" && <VisaoGeral orders={orders} irPara={irPara} />}
-            {aba === "pedidos" && <MeusPedidos orders={orders} />}
+            {aba === "geral" && (
+              <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="grid min-w-0 gap-5">
+                  <Resumo nome={user.name} email={user.email} desde={desde} club={club} orders={orders} addresses={addresses} irPara={irPara} />
+                  <VisaoGeral orders={orders} irPara={irPara} recarregar={recarregarPedidos} />
+                </div>
+                <div className="grid gap-5">
+                  <Atendimento />
+                  <FavoritosResumo irPara={irPara} />
+                </div>
+              </div>
+            )}
+            {aba === "pedidos" && <MeusPedidos orders={orders} recarregar={recarregarPedidos} />}
             {aba === "favoritos" && <Favoritos />}
             {aba === "enderecos" && <Enderecos addresses={addresses} setAddresses={setAddresses} />}
             {aba === "dados" && <MeusDados />}
@@ -193,12 +191,118 @@ export default function Conta() {
   );
 }
 
-function Numero({ label, valor, onClick }: { label: string; valor: number | undefined; onClick: () => void }) {
+function Resumo({ nome, email, desde, club, orders, addresses, irPara }: {
+  nome: string;
+  email: string;
+  desde: string;
+  club: ClubStatus | null;
+  orders: Order[] | null;
+  addresses: Address[] | null;
+  irPara: (a: Aba) => void;
+}) {
+  const { ids } = useFavorites();
+  const numeros: { label: string; valor: number | undefined; aba: Aba }[] = [
+    { label: "Pedidos", valor: orders?.length, aba: "pedidos" },
+    { label: "Pontos", valor: club?.balance, aba: "clube" },
+    { label: "Favoritos", valor: ids.size, aba: "favoritos" },
+    { label: "Endereços", valor: addresses?.length, aba: "enderecos" },
+  ];
   return (
-    <button type="button" onClick={onClick} className="grid min-w-[120px] cursor-pointer gap-1 rounded-[20px] border-none bg-white/10 px-5 py-3.5 text-left text-white hover:bg-white/15">
-      <span className="font-serif text-[26px] leading-none">{valor ?? "–"}</span>
-      <span className="text-[11px] font-semibold tracking-[0.14em] text-teal-pale">{label}</span>
-    </button>
+    <section className="grid gap-5 rounded-3xl border border-line bg-white p-6">
+      <div className="flex items-center gap-4">
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-mist font-logo text-[20px] text-teal">
+          {iniciais(nome || email)}
+        </span>
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <span className="font-serif text-[26px] leading-tight text-teal-dark">Oi, {nome.split(" ")[0] || "cliente"}</span>
+          <span className="truncate text-[13.5px] text-muted">
+            {email}
+            {desde && ` · cliente desde ${desde}`}
+          </span>
+        </div>
+        <button type="button" onClick={() => irPara("dados")} className="hidden shrink-0 cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-[13.5px] font-semibold text-teal sm:flex">
+          Meus dados
+          <ChevronRight size={15} strokeWidth={1.8} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {numeros.map((n) => (
+          <button key={n.label} type="button" onClick={() => irPara(n.aba)} className="grid cursor-pointer justify-items-center gap-1 rounded-2xl border-none bg-transparent p-2 transition-colors hover:bg-fog">
+            <span className="font-serif text-[26px] leading-none text-teal">{n.valor ?? "–"}</span>
+            <span className="text-[13.5px] text-text-2">{n.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {club && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-mist px-5 py-4">
+          <div className="grid gap-0.5">
+            <span className="flex items-center gap-2 text-[14.5px] font-semibold text-teal-dark">
+              <Sparkles size={16} strokeWidth={1.7} className="text-teal" />
+              Mirava Club · Nível {NIVEL[club.level]}
+            </span>
+            <span className="text-[13.5px] text-text-2">
+              {club.points_per_block} pontos valem {formatarBRL(club.cents_per_block)} de desconto nas peças.
+            </span>
+          </div>
+          <button type="button" onClick={() => irPara("clube")} className="cursor-pointer rounded-full border-none bg-teal px-5 py-2.5 text-[13.5px] font-semibold text-white hover:bg-teal-dark">
+            Ver meu Club
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Atendimento() {
+  const item = "grid cursor-pointer justify-items-center gap-2 rounded-2xl p-2 text-center text-[13px] text-text-2 transition-colors hover:bg-fog hover:text-teal";
+  const icone = "grid h-11 w-11 place-items-center rounded-full bg-mist text-teal";
+  return (
+    <section className="rounded-3xl border border-line bg-white p-5">
+      <h2 className="m-0 mb-3 font-serif text-[20px] font-normal text-teal-dark">Atendimento</h2>
+      <div className="grid grid-cols-2 gap-2">
+        <a href={`mailto:${LOJA.email}`} className={item}>
+          <span className={icone}><Mail size={19} strokeWidth={1.6} /></span>
+          Enviar e-mail
+        </a>
+        <Link to="/perguntas-frequentes" className={item}>
+          <span className={icone}><HelpCircle size={19} strokeWidth={1.6} /></span>
+          Dúvidas
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function FavoritosResumo({ irPara }: { irPara: (a: Aba) => void }) {
+  const [lista, setLista] = useState<Product[] | null>(null);
+  const { ids } = useFavorites();
+  const chave = [...ids].sort().join(",");
+  useEffect(() => {
+    listFavorites().then(setLista).catch(() => setLista([]));
+  }, [chave]);
+
+  return (
+    <section className="rounded-3xl border border-line bg-white p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="m-0 font-serif text-[20px] font-normal text-teal-dark">Favoritos</h2>
+        <button type="button" onClick={() => irPara("favoritos")} className="flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-[13px] font-semibold text-teal">
+          Ver todos
+          <ChevronRight size={14} strokeWidth={1.8} />
+        </button>
+      </div>
+      {lista && lista.length === 0 && <p className="m-0 text-[13.5px] leading-relaxed text-muted">Toque no coração de uma peça para guardar aqui.</p>}
+      {lista && lista.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {lista.slice(0, 3).map((p) => (
+            <Link key={p.id} to={`/produto/${p.slug}`} aria-label={p.name} className="aspect-square overflow-hidden rounded-[14px] bg-mist-3">
+              {imageUrl(p.images[0]) && <img src={imageUrl(p.images[0]) ?? ""} alt="" className="h-full w-full object-cover" />}
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -223,7 +327,7 @@ const STATUS: { stage: Stage; label: string; Icon: LucideIcon }[] = [
   { stage: "entregue", label: "Entregues", Icon: Gift },
 ];
 
-function VisaoGeral({ orders, irPara }: { orders: Order[] | null; irPara: (a: Aba) => void }) {
+function VisaoGeral({ orders, irPara, recarregar }: { orders: Order[] | null; irPara: (a: Aba) => void; recarregar: () => void }) {
   const andamento = orders?.find((o) => ["preparacao", "enviado"].includes(stageOf(o.status)));
   return (
     <>
@@ -258,7 +362,7 @@ function VisaoGeral({ orders, irPara }: { orders: Order[] | null; irPara: (a: Ab
         </div>
       </Cartao>
 
-      {andamento && <CartaoPedido order={andamento} />}
+      {andamento && <CartaoPedido order={andamento} onMudou={recarregar} />}
 
       {orders && orders.length === 0 && <SemPedidos />}
 
@@ -295,7 +399,7 @@ const FILTROS: { key: Stage | "todos"; label: string }[] = [
   { key: "entregue", label: "Entregues" },
 ];
 
-function MeusPedidos({ orders }: { orders: Order[] | null }) {
+function MeusPedidos({ orders, recarregar }: { orders: Order[] | null; recarregar: () => void }) {
   const [filtro, setFiltro] = useState<Stage | "todos">("todos");
   if (!orders) return <p className="m-0 text-[14px] text-muted">Carregando seus pedidos…</p>;
   if (orders.length === 0) return <SemPedidos />;
@@ -326,13 +430,13 @@ function MeusPedidos({ orders }: { orders: Order[] | null }) {
           <p className="m-0 mt-1 text-[14px] text-muted">Quando houver pedidos com esse status, eles aparecem aqui.</p>
         </div>
       ) : (
-        lista.map((o) => <CartaoPedido key={o.id} order={o} />)
+        lista.map((o) => <CartaoPedido key={o.id} order={o} onMudou={recarregar} />)
       )}
     </>
   );
 }
 
-function CartaoPedido({ order }: { order: Order }) {
+function CartaoPedido({ order, onMudou }: { order: Order; onMudou: () => void }) {
   const stage = stageOf(order.status);
   const pecas = order.items.reduce((s, i) => s + i.quantity, 0);
   return (
@@ -365,7 +469,8 @@ function CartaoPedido({ order }: { order: Order }) {
         <span className="text-[14px] text-muted">
           {pecas} {pecas === 1 ? "peça" : "peças"} · <strong className="text-text">{formatarBRL(order.total_cents)}</strong>
         </span>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <CancelarPedido order={order} onCancelado={onMudou} />
           <a href={supportURL(order.number)} className="rounded-full border-[1.5px] border-line-strong bg-white px-4 py-2 text-[13px] font-semibold text-teal hover:border-teal">
             Ajuda
           </a>
@@ -711,19 +816,16 @@ function Trocas({ orders }: { orders: Order[] | null }) {
           <form onSubmit={enviar} className="grid gap-3.5">
             <label className="grid gap-1.5">
               <span className="text-[12.5px] font-semibold text-text-2">Pedido</span>
-              <select
+              <Select
                 required
+                variant="field"
                 value={orderId}
-                onChange={(e) => setOrderId(e.target.value)}
-                className="rounded-[14px] border-[1.5px] border-line bg-white px-3.5 py-[13px] text-[14.5px] text-text outline-none focus:border-teal"
-              >
-                <option value="">Escolha o pedido</option>
-                {elegiveis.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    #{o.number} · {o.items.map((i) => i.name).join(", ")}
-                  </option>
-                ))}
-              </select>
+                onChange={setOrderId}
+                options={[
+                  { value: "", label: "Escolha o pedido" },
+                  ...elegiveis.map((o) => ({ value: o.id, label: `#${o.number} · ${o.items.map((i) => i.name).join(", ")}` })),
+                ]}
+              />
             </label>
             <div className="flex flex-wrap gap-2">
               {(["troca", "reembolso"] as const).map((k) => (
@@ -882,7 +984,7 @@ function Clube() {
         <ul className="m-0 grid gap-2.5 pl-5 text-[14px] leading-[1.7] text-text-2">
           <li>Cada R$ 1 em peças vira 1 ponto, creditado quando o pedido é entregue.</li>
           <li>
-            Cada {club.points_per_block} pontos valem {formatarBRL(club.cents_per_block)} de desconto nas peças — é só marcar
+            Cada {club.points_per_block} pontos valem {formatarBRL(club.cents_per_block)} de desconto nas peças. É só marcar
             "usar meus pontos" no checkout.
           </li>
           <li>Pontos e cupom não se somam no mesmo pedido, e o desconto vai até 30% do valor das peças.</li>

@@ -159,11 +159,13 @@ type querier interface {
 }
 
 // customerCouponContext: quantos pedidos pagos a cliente já tem e se ela já
-// usou o cupom num pedido que conta (não cancelado nem estornado).
+// usou o cupom num pedido pago que conta (não cancelado nem estornado). Pedido
+// esperando pagamento não gasta o cupom: quem desiste no Mercado Pago ou tem o
+// pagamento recusado precisa poder tentar de novo.
 func customerCouponContext(ctx context.Context, q querier, userID, code string) (prior int, used bool, err error) {
 	err = q.QueryRow(ctx, `
 		select count(*) filter (where paid_at is not null and status not in ('cancelled','refunded')),
-		       coalesce(bool_or(coupon_code = $2 and status not in ('cancelled','refunded')), false)
+		       coalesce(bool_or(coupon_code = $2 and paid_at is not null and status not in ('cancelled','refunded')), false)
 		from orders where user_id = $1`, userID, code).Scan(&prior, &used)
 	return
 }

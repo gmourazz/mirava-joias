@@ -18,11 +18,14 @@ import "time"
 //   - "postado" exige código de rastreio e dispara aviso à cliente, então tem
 //     rota própria (despachar), não a transição genérica.
 //   - "pago" → "no lote" acontece ao comprar o lote inteiro.
+//   - "estornado" tem rota própria (reembolsar), que devolve o dinheiro no
+//     Mercado Pago antes de mudar o status. Marcar à mão deixaria o pedido
+//     como estornado sem a cliente receber nada.
 func ManualTransitionAllowed(from, to Status) bool {
 	if to == Paid && from != InBatch {
 		return false
 	}
-	if to == Shipped {
+	if to == Shipped || to == Refunded {
 		return false
 	}
 	// Pago → no lote é efeito de comprar o lote (PurchaseBatch), não um

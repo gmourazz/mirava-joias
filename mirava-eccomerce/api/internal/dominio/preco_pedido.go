@@ -157,7 +157,7 @@ func PriceOrder(in OrderPricingInput) OrderPricing {
 
 func couponOrPoints(out *OrderPricing, in OrderPricingInput, base, room Cents) error {
 	if in.Coupon != nil && in.UsePoints {
-		return errors.New("use o cupom ou os pontos do Mirava Club — os dois juntos não valem")
+		return errors.New("use o cupom ou os pontos do Mirava Club: os dois juntos não valem")
 	}
 	if in.Coupon != nil {
 		if err := in.Coupon.Eligible(in.CouponCtx); err != nil {
@@ -177,7 +177,7 @@ func couponOrPoints(out *OrderPricing, in OrderPricingInput, base, room Cents) e
 			if in.PointsBalance < PointsPerBlock {
 				return errors.New("é preciso ter pelo menos 100 pontos para trocar por desconto")
 			}
-			return errors.New("este pedido já está com o desconto máximo — os pontos ficam para a próxima")
+			return errors.New("este pedido já está com o desconto máximo: os pontos ficam para a próxima")
 		}
 		out.CouponDiscount, out.PointsUsed = d, pts
 	}

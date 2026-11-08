@@ -16,9 +16,8 @@ interface Peca {
 }
 
 const ESPACOS: { slot: ShowcaseSlot; titulo: string; texto: string; limite: number }[] = [
-  { slot: "queridinhas", titulo: "As queridinhas", texto: "Aba “Mais vendidos” da home. Vazio = ordem de vendas.", limite: 8 },
+  { slot: "queridinhas", titulo: "As queridinhas", texto: "Aba “Mais vendidos” da home. Vazio = lista da Lilly.", limite: 8 },
   { slot: "lancamentos", titulo: "Lançamentos", texto: "Aba “Lançamentos” da home. Vazio = peças mais recentes.", limite: 6 },
-  { slot: "presentes", titulo: "Presentes", texto: "Peças sugeridas na seção “Presentear é com a gente”. Vazio = só os atalhos de preço.", limite: 6 },
 ];
 
 export default function Vitrine() {

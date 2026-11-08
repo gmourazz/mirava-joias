@@ -6,6 +6,7 @@ import catAneis from "../assets/images/cat-aneis.webp";
 import catColares from "../assets/images/cat-colares.webp";
 import catPulseiras from "../assets/images/cat-pulseiras.webp";
 import catBerloques from "../assets/images/cat-berloques.webp";
+import significadoAneis from "../assets/images/significado-aneis.webp";
 import jw1 from "../assets/images/jw1.webp";
 import cartItem from "../assets/images/cart-item.webp";
 
@@ -18,6 +19,7 @@ const POOL: Record<string, string> = {
   "cat-colares": catColares,
   "cat-pulseiras": catPulseiras,
   "cat-berloques": catBerloques,
+  "significado-aneis": significadoAneis,
   jw1,
   "cart-item": cartItem,
 };

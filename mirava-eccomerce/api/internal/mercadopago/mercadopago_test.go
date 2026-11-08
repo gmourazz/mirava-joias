@@ -1,11 +1,14 @@
 package mercadopago
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -115,8 +118,15 @@ func TestTiposExcluidosPorForma(t *testing.T) {
 		return false
 	}
 	pix := ExcludedPaymentTypes("pix")
-	if has(pix, "bank_transfer") || !has(pix, "credit_card") || !has(pix, "ticket") || !has(pix, "account_money") {
+	if has(pix, "bank_transfer") || !has(pix, "credit_card") || !has(pix, "ticket") {
 		t.Errorf("pix: %v", pix)
+	}
+	// O Mercado Pago recusa a preferência inteira com 400 ("account_money
+	// cannot be excluded"): nenhuma escolha pode tirar o saldo em conta.
+	for _, choice := range []string{"pix", "card", "boleto", ""} {
+		if has(ExcludedPaymentTypes(choice), "account_money") {
+			t.Errorf("%q exclui account_money", choice)
+		}
 	}
 	card := ExcludedPaymentTypes("card")
 	if has(card, "credit_card") || !has(card, "bank_transfer") || !has(card, "ticket") {
@@ -128,5 +138,50 @@ func TestTiposExcluidosPorForma(t *testing.T) {
 	}
 	if def := ExcludedPaymentTypes(""); !has(def, "ticket") || has(def, "credit_card") {
 		t.Errorf("sem escolha mantém o antigo (sem boleto): %v", def)
+	}
+}
+
+type transporte func(*http.Request) (*http.Response, error)
+
+func (f transporte) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func resposta(status int, corpo string) *http.Response {
+	return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(corpo)), Header: http.Header{}}
+}
+
+func TestRefundPayment(t *testing.T) {
+	c := New("token", "segredo")
+	var pedido *http.Request
+	c.http = &http.Client{Transport: transporte(func(r *http.Request) (*http.Response, error) {
+		pedido = r
+		return resposta(201, `{"id":99,"status":"approved","amount":129.79}`), nil
+	})}
+
+	ref, err := c.RefundPayment(context.Background(), "123", "reembolso-pedido-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ref.ID != 99 {
+		t.Errorf("id do estorno: %d", ref.ID)
+	}
+	if pedido.Method != http.MethodPost || !strings.HasSuffix(pedido.URL.Path, "/v1/payments/123/refunds") {
+		t.Errorf("chamada errada: %s %s", pedido.Method, pedido.URL)
+	}
+	// A mesma chave em toda tentativa: clique duplo não devolve o dinheiro duas vezes.
+	if pedido.Header.Get("X-Idempotency-Key") != "reembolso-pedido-1" {
+		t.Errorf("sem chave de idempotência: %v", pedido.Header)
+	}
+	if pedido.Header.Get("Authorization") != "Bearer token" {
+		t.Errorf("sem autorização")
+	}
+}
+
+func TestRefundPaymentRecusado(t *testing.T) {
+	c := New("token", "segredo")
+	c.http = &http.Client{Transport: transporte(func(*http.Request) (*http.Response, error) {
+		return resposta(400, `{"message":"insufficient_amount"}`), nil
+	})}
+	if _, err := c.RefundPayment(context.Background(), "123", "chave"); err == nil {
+		t.Fatal("recusa do Mercado Pago precisa virar erro: o pedido não pode ficar como estornado")
 	}
 }

@@ -10,6 +10,7 @@ import { imageUrl } from "../catalogo/consultas";
 import { rotuloCategoria } from "../catalogo/categorias";
 import { lojaApi, productApi, type AdminCategory, type AdminProduct, type QueueItem, type StoreSettings } from "./api";
 import Toggle from "./Toggle";
+import Select from "../components/Select";
 
 const card = "grid gap-3 rounded-[20px] border border-line bg-white p-[22px]";
 const botao = "flex cursor-pointer items-center gap-1.5 rounded-full border-none bg-teal px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-teal-dark disabled:opacity-50";
@@ -237,7 +238,7 @@ export function NovosNaLilly() {
           <button
             type="button"
             className={botaoClaro}
-            onClick={() => void lojaApi.importAll().then((r) => setMsg(`Importando ${r.queued} peças em segundo plano — atualize a página em alguns minutos.`))}
+            onClick={() => void lojaApi.importAll().then((r) => setMsg(`Importando ${r.queued} peças em segundo plano. Atualize a página em alguns minutos.`))}
           >
             Importar todos →
           </button>
@@ -299,7 +300,7 @@ export function Mapeamento() {
           type="button"
           disabled={salvo}
           className={botao}
-          onClick={() => void lojaApi.setMappings(lista).then(() => { setSalvo(true); setMsg("Mapeamento salvo — vale a partir da próxima sincronização."); }).catch((e: Error) => setMsg(e.message))}
+          onClick={() => void lojaApi.setMappings(lista).then(() => { setSalvo(true); setMsg("Mapeamento salvo. Vale a partir da próxima sincronização."); }).catch((e: Error) => setMsg(e.message))}
         >
           {salvo ? "Salvo" : "Salvar mapeamento"}
         </button>
@@ -315,15 +316,14 @@ export function Mapeamento() {
               className="w-28 rounded-lg border-none bg-white px-2 py-1 outline-none"
             />
             <span className="text-muted">→</span>
-            <select
+            <Select
+              variant="field"
+              ariaLabel="Categoria"
+              className="flex-1"
               value={m.category}
-              onChange={(e) => mudar(lista.map((x, j) => (j === i ? { ...x, category: e.target.value } : x)))}
-              className="min-w-0 flex-1 rounded-lg border-none bg-white px-2 py-1 outline-none"
-            >
-              {cats.map((c) => (
-                <option key={c.slug} value={c.slug}>{c.label}</option>
-              ))}
-            </select>
+              onChange={(v) => mudar(lista.map((x, j) => (j === i ? { ...x, category: v } : x)))}
+              options={cats.map((c) => ({ value: c.slug, label: c.label }))}
+            />
             <button type="button" aria-label="Tirar" onClick={() => mudar(lista.filter((_, j) => j !== i))} className="cursor-pointer border-none bg-transparent p-1 text-muted hover:text-[#B4443C]">
               <Trash2 size={14} />
             </button>

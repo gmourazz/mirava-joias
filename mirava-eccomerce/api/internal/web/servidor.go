@@ -99,6 +99,7 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("GET /avisos", s.announcements)
 	mux.HandleFunc("PUT /carrinho", s.saveCart)
 	mux.HandleFunc("GET /pedidos/{id}", s.orderByID)
+	mux.HandleFunc("POST /pedidos/{id}/cancelar", s.cancelOrder)
 
 	mux.HandleFunc("POST /checkout", s.createPayment)
 	mux.HandleFunc("POST /checkout/previa", s.checkoutPreview)
@@ -116,6 +117,7 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("GET /admin/pedidos/{id}", s.requireAdmin(s.adminOrder))
 	mux.HandleFunc("POST /admin/pedidos/{id}/transicao", s.requireAdmin(s.adminTransition))
 	mux.HandleFunc("POST /admin/pedidos/{id}/despachar", s.requireAdmin(s.shipOrder))
+	mux.HandleFunc("POST /admin/pedidos/{id}/reembolsar", s.requireAdmin(s.adminRefund))
 	mux.HandleFunc("GET /admin/lotes", s.requireAdmin(s.adminBatches))
 	mux.HandleFunc("POST /admin/lotes/{id}/comprar", s.requireAdmin(s.adminPurchaseBatch))
 	mux.HandleFunc("POST /admin/lotes/{id}/receber", s.requireAdmin(s.adminReceiveBatch))

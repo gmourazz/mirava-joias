@@ -77,8 +77,8 @@ export interface ProductFilter {
   category?: Category;
   metal?: Metal;
   featured?: boolean;
-  /** Mais vendidos: a API ordena pela venda da Mirava e, no desempate, pela
-   *  posição na vitrine da fornecedora. Ver a coluna units_sold no schema. */
+  /** Mais vendidos: só as peças da lista da fornecedora, na ordem dela
+   *  (coluna supplier_rank, decisão 39). */
   bestSellers?: boolean;
   search?: string;
   limit?: number;

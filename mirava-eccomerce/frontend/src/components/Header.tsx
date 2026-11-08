@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronDown, Circle, Flame, Gem, Gift, Heart, HelpCircle, Layers, Link2, LogOut, Menu, MoreHorizontal, Moon, Package, Search, ShoppingBag, Sparkles, Sun, User, X, type LucideIcon, Watch } from "lucide-react";
+import { Cherry, ChevronDown, Circle, Flame, Gem, Gift, Heart, HelpCircle, Layers, Link2, LogOut, Menu, MoreHorizontal, Moon, Package, Search, ShoppingBag, Sparkles, Sun, User, X, type LucideIcon, Watch } from "lucide-react";
 import type { Category } from "../catalogo/tipos";
 import { useCategorias, type CategoriaLoja } from "../catalogo/categorias";
 import { useColecoes, type Colecao } from "../lib/extras";
+import { useLogin } from "../context/LoginContext";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useFavorites } from "../context/FavoritesContext";
@@ -31,7 +32,7 @@ const CATEGORY_ICON: Record<Category, LucideIcon | undefined> = {
   aneis: Circle,
   colares: Heart,
   pulseiras: Link2,
-  berloques: Link2,
+  berloques: Cherry,
   brincos: Sparkles,
   conjuntos: Layers,
   outros: Gem,
@@ -60,19 +61,14 @@ const buildNav = (cats: CategoriaLoja[], colecoes: Colecao[]): NavItem[] => [
     to: "/categoria/colecoes/todos",
     Icon: Gem,
     items: [
-      { label: "Mais vendidos", to: "/categoria/colecoes/todos", Icon: Flame },
+      { label: "Mais vendidos", to: "/categoria/colecoes/todos?ordem=vendidos", Icon: Flame },
       ...categoryLinks(cats.filter((c) => c.slug !== "relogios"), "/categoria/colecoes"),
     ],
   },
-  ...(colecoes.length > 0
-    ? [{
-        label: "Coleções",
-        to: colecoes.length === 1 ? `/colecoes/${colecoes[0].slug}` : "/colecoes",
-        Icon: Layers,
-        items: colecoes.map((c) => ({ label: c.name, to: `/colecoes/${c.slug}`, Icon: Sparkles })),
-      }]
-    : []),
-  { label: "Berloques", to: "/categoria/colecoes/berloques", Icon: Link2 },
+  // Como no exemplo da ASIO: "Coleções" leva sempre à página com as capas,
+  // sem submenu — as coleções em si são escolhidas pela capa.
+  ...(colecoes.length > 0 ? [{ label: "Coleções", to: "/colecoes", Icon: Layers }] : []),
+  { label: "Berloques", to: "/categoria/colecoes/berloques", Icon: Cherry },
   { label: "Banhados a prata", to: "/categoria/prata/todos", Icon: Moon, items: categoryLinks(cats, "/categoria/prata") },
   { label: "Banhados a ouro", to: "/categoria/ouro/todos", Icon: Sun, items: categoryLinks(cats, "/categoria/ouro") },
   { label: "Relógios", to: "/categoria/colecoes/relogios", Icon: Watch },
@@ -109,6 +105,7 @@ export default function Header() {
   const { openCart, itemCount } = useCart();
   const { ids: favoritos } = useFavorites();
   const { user, logout } = useAuth();
+  const { abrirLogin } = useLogin();
 
   // A sacola dá um pulinho quando entra peça nova — feedback de que deu certo.
   const [bump, setBump] = useState(false);
@@ -127,7 +124,8 @@ export default function Header() {
     setOpenMenu(null);
     setDrawerOpen(false);
     setUserMenuOpen(false);
-    navigate(to);
+    if (!user && to.startsWith("/conta")) abrirLogin(to);
+    else navigate(to);
   };
 
   return (
@@ -137,12 +135,18 @@ export default function Header() {
           <Menu size={20} strokeWidth={1.5} />
         </button>
 
-        <Link to="/" aria-label="Mirava Semijoias — início" className="flex h-[72px] items-center justify-self-center lg:h-20 lg:justify-self-start">
+        <Link to="/" aria-label="Mirava Semijoias, início" className="col-start-2 row-start-1 flex h-[72px] items-center justify-self-center lg:h-20 lg:justify-self-start">
           <img src={logoTurquesa} alt="Mirava Semijoias" className="h-11 w-auto lg:h-[52px]" />
         </Link>
 
-        <div className="col-start-3 flex items-center justify-end gap-1 lg:gap-3">
-          <button type="button" aria-label="Buscar" onClick={() => setSearchOpen(true)} className={iconButton}>
+        <div className="col-start-3 row-start-1 flex items-center justify-end gap-1 lg:gap-3">
+          <button
+            type="button"
+            aria-label="Buscar"
+            aria-expanded={searchOpen}
+            onClick={() => setSearchOpen((v) => !v)}
+            className={`${iconButton} ${searchOpen ? "text-teal" : ""}`}
+          >
             <Search size={20} strokeWidth={1.5} />
           </button>
 
@@ -214,6 +218,8 @@ export default function Header() {
             )}
           </button>
         </div>
+
+        {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
       </div>
 
       <nav className="hidden justify-center border-t border-[#EEF3F2] lg:flex">
@@ -314,7 +320,6 @@ export default function Header() {
         </>
       )}
 
-      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
     </header>
   );
 }

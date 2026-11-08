@@ -7,6 +7,7 @@ import { Plus, X } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
 import { growthApi, type AdminCoupon, type NewCoupon } from "./api";
 import Toggle from "./Toggle";
+import Select from "../components/Select";
 
 const VAZIO = { code: "", kind: "percent" as "percent" | "fixed", value: "", min: "", maxUses: "", starts: "", ends: "", description: "" };
 
@@ -117,13 +118,15 @@ export default function Cupons() {
           </label>
           <label className="grid gap-1 text-[12.5px] font-semibold text-text-2">
             Tipo
-            <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as "percent" | "fixed", value: "" })} className={input}>
-              <option value="percent">Porcentagem</option>
-              <option value="fixed">Valor fixo</option>
-            </select>
+            <Select
+              variant="field"
+              value={form.kind}
+              onChange={(v) => setForm({ ...form, kind: v as "percent" | "fixed", value: "" })}
+              options={[{ value: "percent", label: "Porcentagem" }, { value: "fixed", label: "Valor fixo" }]}
+            />
           </label>
           <label className="grid gap-1 text-[12.5px] font-semibold text-text-2">
-            {form.kind === "percent" ? "Desconto (%) — até 30" : "Desconto (R$)"}
+            {form.kind === "percent" ? "Desconto (%), até 30" : "Desconto (R$)"}
             <input required inputMode="decimal" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} className={input} placeholder={form.kind === "percent" ? "15" : "20,00"} />
           </label>
           <label className="grid gap-1 text-[12.5px] font-semibold text-text-2">

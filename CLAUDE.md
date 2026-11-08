@@ -168,13 +168,14 @@ React 19 + TypeScript + Vite + Tailwind v4 + lucide-react + react-router-dom.
   e-mail), `/conta` (aba em `?aba=`: pedidos, favoritos, clube, avaliar,
   cupons, trocas…), `/redefinir-senha` (link do "esqueci minha senha"),
   `/perguntas-frequentes`, `/politicas/:aba` e o painel `/admin/*` (`src/admin/`; `/gestao` redireciona
-  para lá). Checkout, conta e painel não têm a moldura da loja (faixa, header,
+  para lá). Checkout e painel não têm a moldura da loja (faixa, header,
   rodapé) — lista `SEM_MOLDURA` no `App.tsx`.
 - **API**: `src/lib/api.ts` é o único cliente HTTP — todo dado vem da API Go
   (`VITE_API_URL`), nunca de `supabase-js` (removido) nem de banco direto.
 - **Catálogo**: `src/catalogo/` (consultas, hooks, tipos) fala com a API Go.
 - **Conta**: `src/context/AuthContext.tsx` guarda o token da sessão
-  (localStorage) e fala com `/auth/*`. Página em `src/pages/Conta.tsx`.
+  (localStorage) e fala com `/auth/*`. Página em `src/pages/Conta.tsx`. Entrar e
+  criar conta é uma janela, não uma página: `abrirLogin` (`src/context/LoginContext.tsx`).
 - **Imagens** via `src/lib/images.ts`, que mapeia seeds para arquivos em
   `src/assets/images/`. Para adicionar, ponha o arquivo lá, importe e registre
   no `POOL` — não inline base64 em componente.

@@ -72,7 +72,7 @@ export default function PainelPreco({ cats, mudou }: { cats: AdminCategory[]; mu
           />
         </label>
         <p className="m-0 text-[13.5px] leading-relaxed text-[#BFE3DF]">
-          Você lucra <strong className="text-white">{formatarBRL(lucro)}</strong> por peça — {preco > 0 ? Math.round((lucro / preco) * 100) : 0}% do preço de venda
+          Você lucra <strong className="text-white">{formatarBRL(lucro)}</strong> por peça, {preco > 0 ? Math.round((lucro / preco) * 100) : 0}% do preço de venda
           fica com você (antes da taxa do Mercado Pago e da embalagem).
           {st.round_to_90 && " Preços arredondados para ,90."} O markup padrão e o arredondamento ficam em Sincronização → Regras.
         </p>

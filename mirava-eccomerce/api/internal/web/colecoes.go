@@ -209,9 +209,15 @@ func (s *Servidor) adminImportLink(w http.ResponseWriter, r *http.Request) {
 		responder(w, http.StatusBadGateway, mapa{"error": "Não consegui abrir a página da Lilly: " + err.Error()})
 		return
 	}
+	if lilly.LooksBlocked(html) {
+		s.log.Warn("lilly devolveu página de proteção na importação por link", "url", link, "bytes", len(html), "titulo", lilly.PageTitle(html))
+		responder(w, http.StatusBadGateway, mapa{"error": "A Lilly mostrou a tela \"Continuando para a loja...\" em vez da peça: o site dela passou a barrar leituras automáticas. Tente de novo mais tarde; enquanto isso, cadastre a peça à mão em Produtos → Novo produto"})
+		return
+	}
 	p := lilly.Extract(html, link, ratio)
 	if p == nil {
-		responder(w, http.StatusUnprocessableEntity, mapa{"error": "Não consegui ler esta página como uma peça. O site da Lilly pode ter barrado as leituras seguidas — espere um pouco e tente de novo, com poucos links por vez"})
+		s.log.Warn("importação por link: página sem peça reconhecível", "url", link, "bytes", len(html), "titulo", lilly.PageTitle(html))
+		responder(w, http.StatusUnprocessableEntity, mapa{"error": "Não consegui ler esta página como uma peça. O site da Lilly pode ter barrado as leituras seguidas. Espere um pouco e tente de novo, com poucos links por vez"})
 		return
 	}
 	if err := p.Validate(); err != nil {

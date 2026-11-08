@@ -33,6 +33,7 @@ const PRECOS = [
 const ORDENS = [
   { value: "", label: "Ordenar: mais recentes" },
   { value: "novos", label: "Lançamentos" },
+  { value: "vendidos", label: "Mais vendidos" },
   { value: "menor", label: "Menor preço" },
   { value: "maior", label: "Maior preço" },
 ];
@@ -56,7 +57,7 @@ export default function CategoryPage() {
   const de = Number(params.get("de")) || 0;
   const ordem = params.get("ordem") ?? "";
 
-  const { data, loading, error, retry } = useProducts({ metal, category });
+  const { data, loading, error, retry } = useProducts({ metal, category, bestSellers: ordem === "vendidos" || undefined });
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -65,9 +66,13 @@ export default function CategoryPage() {
   let products = data.filter((p) => (!ate || p.priceCents <= ate) && (!de || p.priceCents > de));
   if (ordem === "menor") products = [...products].sort((a, b) => a.priceCents - b.priceCents);
   if (ordem === "maior") products = [...products].sort((a, b) => b.priceCents - a.priceCents);
+  // Indisponível vai para o fim em qualquer ordem (decisão 40).
+  products = [...products].sort((a, b) => Number(b.available) - Number(a.available));
 
   // A API já devolve as peças mais recentes primeiro: "novos" só muda o título.
-  const titulo = category
+  const titulo = ordem === "vendidos" && !category && !metal
+    ? "Mais vendidos"
+    : category
     ? rotuloCategoria(category)
     : ordem === "novos" && !metal && !ate
       ? "Lançamentos"

@@ -34,8 +34,8 @@ const INFO: Record<AutomationStatus["key"], { titulo: string; texto: string }> =
 // Texto padrão (o mesmo do código, em notificacao.go) — aparece como prévia
 // enquanto a dona não escreve o dela.
 const PADRAO: Record<AutomationStatus["key"], { assunto: string; corpo: string }> = {
-  payment_reminder: { assunto: "Seu pedido #{pedido} está te esperando", corpo: "O pedido #{pedido} ainda está esperando o pagamento. As peças são encomendadas só depois que ele é confirmado — pelo Pix, cai na hora." },
-  abandoned_cart: { assunto: "Suas peças ainda estão na sacola ✦", corpo: "Você deixou peças lindas na sacola. Elas continuam guardadas para você — é só voltar e finalizar quando quiser." },
+  payment_reminder: { assunto: "Seu pedido #{pedido} está te esperando", corpo: "O pedido #{pedido} ainda está esperando o pagamento. As peças são encomendadas só depois que ele é confirmado. Pelo Pix, cai na hora." },
+  abandoned_cart: { assunto: "Suas peças ainda estão na sacola ✦", corpo: "Você deixou peças lindas na sacola. Elas continuam guardadas para você, é só voltar e finalizar quando quiser." },
   review_request: { assunto: "Conta pra gente: o que achou da sua peça?", corpo: "Sua peça do pedido #{pedido} já está com você há uns dias. Conta pra gente o que achou?" },
   stock_alert: { assunto: "{produto} voltou ✦", corpo: "Boa notícia: {produto} voltou a ficar disponível. Garanta a sua antes que acabe de novo." },
   return_update: { assunto: "Sua troca do pedido #{pedido} andou", corpo: "Sua solicitação de troca do pedido #{pedido} mudou de etapa." },

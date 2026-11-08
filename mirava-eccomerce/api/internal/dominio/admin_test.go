@@ -19,8 +19,8 @@ func TestTransicaoManualDoPainel(t *testing.T) {
 		{AwaitingPayment, Cancelled, true},
 		{Paid, OutOfStock, true},
 		{InBatch, OutOfStock, true},
-		{OutOfStock, Refunded, true},
-		{Paid, Refunded, true},
+		{OutOfStock, Refunded, false}, // estorno só pela rota que devolve o dinheiro
+		{Paid, Refunded, false},
 		{InBatch, Paid, true}, // tirar do lote devolve para "pago"
 
 		{AwaitingPayment, Paid, false},    // só o webhook confirma pagamento

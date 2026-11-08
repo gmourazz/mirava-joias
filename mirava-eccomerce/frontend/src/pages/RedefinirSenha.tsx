@@ -6,6 +6,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Check } from "lucide-react";
 import { ApiError } from "../lib/api";
 import { resetPassword } from "../lib/extras";
+import SenhaInput from "../components/SenhaInput";
 
 export default function RedefinirSenha() {
   const [params] = useSearchParams();
@@ -55,8 +56,8 @@ export default function RedefinirSenha() {
         ) : (
           <form onSubmit={enviar} className="grid gap-4">
             <h1 className="m-0 font-serif text-[30px] font-normal text-teal-dark">Crie uma senha nova</h1>
-            <input type="password" required minLength={8} value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Senha nova (mínimo 8 caracteres)" autoComplete="new-password" className={input} />
-            <input type="password" required minLength={8} value={confirma} onChange={(e) => setConfirma(e.target.value)} placeholder="Repita a senha" autoComplete="new-password" className={input} />
+            <SenhaInput required minLength={8} value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Senha nova (mínimo 8 caracteres)" autoComplete="new-password" className={input} />
+            <SenhaInput required minLength={8} value={confirma} onChange={(e) => setConfirma(e.target.value)} placeholder="Repita a senha" autoComplete="new-password" className={input} />
             {erro && <p className="m-0 rounded-[14px] bg-[#FDECEC] px-3.5 py-2.5 text-[13.5px] text-[#B4443C]">{erro}</p>}
             <button type="submit" disabled={enviando} className="cursor-pointer rounded-full border-none bg-teal p-4 text-[14px] font-semibold text-white hover:bg-teal-dark disabled:opacity-60">
               {enviando ? "Salvando…" : "Salvar senha nova"}

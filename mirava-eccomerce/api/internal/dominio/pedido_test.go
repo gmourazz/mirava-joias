@@ -18,6 +18,11 @@ func TestLegalTransitions(t *testing.T) {
 		{ReceivedByOwner, Shipped, true},
 		{Shipped, Delivered, true},
 		{OutOfStock, Refunded, true},
+		{InBatch, Refunded, true},
+		{PurchasedFromSupplier, Refunded, true},
+		{ReceivedByOwner, Refunded, true},
+		{Shipped, Refunded, true},   // devolução com a peça a caminho
+		{Delivered, Refunded, true}, // arrependimento depois de receber
 
 		// Os caminhos que precisam ser impossíveis:
 		{AwaitingPayment, Shipped, false},   // despachar sem receber
@@ -25,6 +30,8 @@ func TestLegalTransitions(t *testing.T) {
 		{Delivered, Shipped, false},         // voltar no tempo
 		{Cancelled, Paid, false},
 		{Refunded, Shipped, false},          // despachar depois de devolver
+		{AwaitingPayment, Refunded, false},  // sem pagamento não há o que estornar
+		{Cancelled, Refunded, false},
 		{Paid, Delivered, false},            // pular a operação inteira
 	}
 
@@ -154,6 +161,36 @@ func TestTodoStatusTemRotulo(t *testing.T) {
 		}
 		if s != Cancelled && s != Refunded && s != OutOfStock && stage == StageClosed {
 			t.Errorf("status %s caiu em 'encerrado' sem ser um estado final", s)
+		}
+	}
+}
+
+// A cliente cancela sozinha até o pedido ser despachado (decisão 43).
+func TestCustomerCanCancel(t *testing.T) {
+	sim := []Status{AwaitingPayment, Paid, InBatch, PurchasedFromSupplier, ReceivedByOwner, OutOfStock}
+	nao := []Status{Shipped, Delivered, Cancelled, Refunded}
+	for _, s := range sim {
+		if !CustomerCanCancel(s) {
+			t.Errorf("%s deveria poder ser cancelado pela cliente", s)
+		}
+	}
+	for _, s := range nao {
+		if CustomerCanCancel(s) {
+			t.Errorf("%s não pode ser cancelado pela cliente", s)
+		}
+	}
+}
+
+func TestCustomerCancelTarget(t *testing.T) {
+	if got := CustomerCancelTarget(AwaitingPayment); got != Cancelled {
+		t.Errorf("sem pagamento vira %s, quero cancelado", got)
+	}
+	for _, s := range []Status{Paid, InBatch, PurchasedFromSupplier, ReceivedByOwner, OutOfStock} {
+		if got := CustomerCancelTarget(s); got != Refunded {
+			t.Errorf("%s vira %s, quero estornado", s, got)
+		}
+		if !CanGo(s, CustomerCancelTarget(s)) {
+			t.Errorf("%s não chega no destino pela máquina de estados", s)
 		}
 	}
 }

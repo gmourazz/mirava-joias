@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { ChevronRight, Layers } from "lucide-react";
 import { imageUrl } from "../catalogo/consultas";
 import type { Product } from "../catalogo/tipos";
 import ProductCard from "../components/ProductCard";
@@ -33,32 +34,30 @@ export default function ColecaoPage() {
 
   return (
     <div className="mx-auto grid max-w-[1360px] gap-6 px-[clamp(16px,3vw,40px)] pt-7">
-      <nav className="text-[12px] tracking-[0.1em] text-[#5E7473] uppercase">
-        <Link to="/" className="text-[#5E7473] hover:text-teal">Início</Link>
-        <span className="mx-2">/</span>
-        <Link to="/colecoes" className="text-[#5E7473] hover:text-teal">Coleções</Link>
+      <nav className="flex flex-wrap items-center gap-2 text-[14px] text-text-2">
+        <Link to="/" className="text-text-2 hover:text-teal">Início</Link>
+        <ChevronRight size={14} strokeWidth={1.6} className="text-teal" />
+        <Link to="/colecoes" className="text-text-2 hover:text-teal">Coleções</Link>
         {data && (
           <>
-            <span className="mx-2">/</span>
-            <span className="font-semibold text-teal">{data.collection.name}</span>
+            <ChevronRight size={14} strokeWidth={1.6} className="text-teal" />
+            <span className="font-medium text-teal">{data.collection.name}</span>
           </>
         )}
       </nav>
 
       {data && (
-        <header className="grid overflow-hidden rounded-[32px] bg-mist md:grid-cols-[1.1fr_1fr]">
-          <div className="grid content-center gap-3 p-[clamp(24px,4vw,56px)]">
-            <span className="text-[12px] font-semibold tracking-[0.22em] text-teal-mid uppercase">Coleção</span>
-            <h1 className="m-0 font-serif text-[clamp(38px,4.6vw,64px)] leading-[1.02] font-normal text-teal-dark">{data.collection.name}</h1>
-            {data.collection.tagline && <p className="m-0 text-[17px] text-teal">{data.collection.tagline}</p>}
-            {data.collection.description && <p className="m-0 max-w-[48ch] text-[15px] leading-[1.7] text-text-2">{data.collection.description}</p>}
-            <span className="text-[13.5px] text-muted">
-              {data.products.length} {data.products.length === 1 ? "peça" : "peças"}
+        <header className="grid items-center gap-[clamp(20px,3vw,40px)] rounded-[28px] bg-teal-dark p-[clamp(16px,2vw,20px)] text-white md:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="grid content-center gap-2.5 p-[clamp(8px,2vw,24px)]">
+            <span className="flex items-center gap-2 text-[12px] font-semibold tracking-[0.2em] text-teal-pale uppercase">
+              <Layers size={15} strokeWidth={1.6} />
+              Coleção · {data.products.length} {data.products.length === 1 ? "peça" : "peças"}
             </span>
+            <h1 className="m-0 font-serif text-[clamp(34px,3.8vw,50px)] leading-[1.05] font-normal text-white">{data.collection.name}</h1>
+            {data.collection.tagline && <p className="m-0 font-serif text-[19px] text-teal-pale italic">{data.collection.tagline}</p>}
+            {data.collection.description && <p className="m-0 max-w-[58ch] text-[14.5px] leading-[1.65] text-[#D6EEEB]">{data.collection.description}</p>}
           </div>
-          <div className="relative min-h-[240px] bg-mist-3">
-            {capa && <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-          </div>
+          {capa && <img src={capa} alt="" className="h-[220px] w-full rounded-[20px] object-cover object-[50%_28%]" />}
         </header>
       )}
 

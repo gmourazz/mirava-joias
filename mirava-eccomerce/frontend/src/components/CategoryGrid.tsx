@@ -1,11 +1,10 @@
 // "Encontre a sua joia" (v5): categorias em círculos numa linha que rola na
 // horizontal.
 //
-// A foto de cada círculo vem do CATÁLOGO REAL, não de arte estática: buscamos
-// algumas peças de cada categoria e usamos a primeira que tenha imagem. A
-// vitrine mostra o que a loja realmente vende, e a arte não envelhece sozinha
-// quando o catálogo muda. Se a busca falhar, cai na arte de
-// src/assets/images/cat-*.webp quando existe; senão, círculo liso.
+// As categorias principais têm foto escolhida e fixa (FOTO_FIXA): peça nova no
+// catálogo não troca o círculo. Anéis e Colares usam fotos da dona, em
+// src/assets/images/cat-*.webp. Categoria sem foto fixa usa a peça mais nova
+// que tenha imagem; se a busca falhar, círculo liso.
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -14,11 +13,13 @@ import { listProducts, imageUrl } from "../catalogo/consultas";
 import { img } from "../lib/images";
 import SectionHeading from "./SectionHeading";
 
-const ARTE: Record<string, string> = {
+const FOTO_FIXA: Record<string, string | null> = {
   aneis: img("cat-aneis"),
+  berloques: imageUrl("/images/BER29/1.jpeg"),
+  brincos: imageUrl("/images/BR81/1.jpg"),
   colares: img("cat-colares"),
-  pulseiras: img("cat-pulseiras"),
-  berloques: img("cat-berloques"),
+  conjuntos: imageUrl("/images/CJ94/1.jpg"),
+  pulseiras: imageUrl("/images/BRA78/1.jpg"),
 };
 
 export default function CategoryGrid() {
@@ -48,7 +49,7 @@ export default function CategoryGrid() {
       <SectionHeading eyebrow="Explore" title="Encontre a sua joia" align="center" />
       <div className="grid auto-cols-[minmax(112px,1fr)] grid-flow-col gap-[18px] overflow-x-auto pb-2 [scrollbar-width:none]">
         {cats.map(({ slug: c, label }) => {
-          const foto = fotos[c] ?? ARTE[c];
+          const foto = FOTO_FIXA[c] ?? fotos[c];
           return (
             <Link key={c} to={`/categoria/colecoes/${c}`} className="group flex flex-col items-center gap-3 text-text hover:text-teal">
               <span className="block aspect-square w-full max-w-[148px] rounded-full border-[1.5px] border-line-strong p-[5px] transition-[transform,border-color,box-shadow] duration-300 group-hover:-translate-y-1.5 group-hover:border-teal group-hover:shadow-[0_14px_30px_rgba(15,110,115,0.16)]">

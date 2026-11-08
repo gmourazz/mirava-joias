@@ -263,6 +263,12 @@ func TestGuessCategory(t *testing.T) {
 		{"Brinco Argola Pequena", "brincos"},
 		{"Berloque Coração", "berloques"},
 		{"Conjunto Colar e Brinco", "conjuntos"},
+		// "Charm" é nome de linha da Lilly, não tipo de peça: argola é brinco.
+		{"Trio de Argolas Prata Cravejadas - Charm", "brincos"},
+		{"Argolas Trevo Preto - Charm", "brincos"},
+		{"Pulseira Charm - Trevos Pretos - Gravatinha", "pulseiras"},
+		{"Berloque Argola Cravejada", "berloques"},
+		{"Charm Coração", "berloques"},
 		{"Porta-Retrato Decorativo", "outros"},
 		// Relógio vem antes dos outros: "Relógio feminino ... com pulseira" não é pulseira.
 		{"Relógio Feminino Vintage Dourado Oval", "relogios"},
@@ -581,5 +587,27 @@ func TestProductURL(t *testing.T) {
 		if got, err := ProductURL(in); err == nil {
 			t.Errorf("ProductURL(%q) deveria recusar, devolveu %q", in, got)
 		}
+	}
+}
+
+// Página de proteção (captcha, "acesso negado", desafio do WAF) volta com
+// status 200 e sem produto: o importador precisa distinguir isso de uma peça
+// que só tem outro formato, para dizer à dona o que fazer.
+func TestLooksBlocked(t *testing.T) {
+	for _, h := range []string{
+		"<html><title>Just a moment...</title><body>Checking your browser</body></html>",
+		"<html><body>Access Denied - you don't have permission</body></html>",
+		"<html><body><div class=\"g-recaptcha\"></div> captcha</body></html>",
+		"<html><body>Request blocked. We can't connect to the server</body></html>",
+		"<html><head><title>Continuando para a loja...</title></head><body><script>location.reload()</script></body></html>",
+		"", "   <html></html>  ",
+	} {
+		if !LooksBlocked(h) {
+			t.Errorf("LooksBlocked(%q) deveria ser true", h)
+		}
+	}
+	pagina := "<html><head><title>Anel Prata - Nina</title></head><body>" + strings.Repeat("<p>conteúdo da peça</p>", 1200) + "</body></html>"
+	if LooksBlocked(pagina) {
+		t.Error("página normal de peça não pode parecer bloqueio")
 	}
 }

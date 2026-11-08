@@ -27,7 +27,15 @@ export function useProducts(filter: ProductFilter = {}) {
   const key = JSON.stringify(filter);
   const [attempt, setAttempt] = useState(0);
 
+  // `limit: 0` quer dizer "não buscar agora" (busca ainda sem termo, sacola
+  // fechada…): a API trataria 0 como o padrão e devolveria 48 peças à toa.
+  const parado = filter.limit === 0;
+
   useEffect(() => {
+    if (parado) {
+      setState({ data: [], loading: false, error: null });
+      return;
+    }
     let active = true;
     setState((s) => ({ ...s, loading: true, error: null }));
 
@@ -40,7 +48,7 @@ export function useProducts(filter: ProductFilter = {}) {
     // Evita gravar resposta de uma busca antiga por cima da nova quando a
     // cliente troca de categoria rápido.
     return () => { active = false; };
-  }, [key, attempt]);
+  }, [key, attempt, parado]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   return { ...state, retry };

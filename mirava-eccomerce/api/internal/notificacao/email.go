@@ -128,6 +128,10 @@ func tituloHTML(ev Evento) string {
 		return "Pedido confirmado"
 	case PagamentoFalhou:
 		return "O pagamento não foi concluído"
+	case PedidoCancelado:
+		return "Pedido cancelado"
+	case PedidoEstornado:
+		return "Pedido cancelado e valor estornado"
 	case PecaComprada:
 		return "Sua peça já foi encomendada"
 	case PedidoEnviado:

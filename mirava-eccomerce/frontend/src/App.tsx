@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { LoginProvider } from "./context/LoginContext";
 import { CartProvider } from "./context/CartContext";
 import { FavoritesProvider } from "./context/FavoritesContext";
 import AnnouncementBar from "./components/AnnouncementBar";
@@ -23,9 +24,9 @@ import SobreNos from "./pages/SobreNos";
 import AdminApp from "./admin/AdminApp";
 import Rastreio from "./pages/Rastreio";
 
-// Telas com topo próprio no v5 (checkout, conta e painel): sem faixa de avisos, menu, rodapé
+// Telas com topo próprio (checkout e painel): sem faixa de avisos, menu, rodapé
 // nem botão flutuante — nada que tire a cliente do caminho do pagamento.
-const SEM_MOLDURA = ["/checkout", "/conta", "/admin", "/redefinir-senha"];
+const SEM_MOLDURA = ["/checkout", "/admin", "/redefinir-senha"];
 
 function Loja() {
   const { pathname } = useLocation();
@@ -65,11 +66,13 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <CartProvider>
-          <FavoritesProvider>
-            <Loja />
-          </FavoritesProvider>
-        </CartProvider>
+        <LoginProvider>
+          <CartProvider>
+            <FavoritesProvider>
+              <Loja />
+            </FavoritesProvider>
+          </CartProvider>
+        </LoginProvider>
       </AuthProvider>
     </BrowserRouter>
   );

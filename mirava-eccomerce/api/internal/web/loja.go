@@ -1011,6 +1011,10 @@ func (s *Servidor) adminTestAutomation(w http.ResponseWriter, r *http.Request) {
 // próprio acesso. O resto (preço, financeiro, clientes, configurações) é da
 // dona.
 func dispatchAllowed(path string) bool {
+	// Devolver dinheiro é da dona, mesmo dentro de pedidos.
+	if strings.HasSuffix(path, "/reembolsar") {
+		return false
+	}
 	for _, p := range []string{"/admin/eu", "/admin/pedidos", "/admin/lotes"} {
 		if path == p || strings.HasPrefix(path, p+"/") {
 			return true

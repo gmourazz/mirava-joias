@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import { Mail, Search, X, Tag } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
 import { extraApi, growthApi, lojaApi, STAGE_PILL, dataCurta, type AdminCoupon, type AdminOrder, type Customer } from "./api";
+import Select from "../components/Select";
 
 export default function Clientes() {
   const [busca, setBusca] = useState("");
@@ -210,12 +211,16 @@ function ClienteDrawer({ cliente, fechar, mudou }: { cliente: Customer; fechar: 
           <section className="grid gap-2">
             <span className="text-[12px] font-bold tracking-[0.06em] text-muted uppercase">Enviar cupom</span>
             <div className="flex gap-2">
-              <select value={cupom} onChange={(e) => setCupom(e.target.value)} className="min-w-0 flex-1 rounded-full border-[1.5px] border-line bg-white px-3.5 py-2.5 text-[13.5px] outline-none">
-                <option value="">Escolha um cupom ativo</option>
-                {cupons.map((c) => (
-                  <option key={c.code} value={c.code}>{c.code} · {c.kind === "percent" ? `${c.value}%` : formatarBRL(c.value)}</option>
-                ))}
-              </select>
+              <Select
+                ariaLabel="Cupom"
+                className="flex-1 [&>button]:w-full"
+                value={cupom}
+                onChange={setCupom}
+                options={[
+                  { value: "", label: "Escolha um cupom ativo" },
+                  ...cupons.map((c) => ({ value: c.code, label: `${c.code} · ${c.kind === "percent" ? `${c.value}%` : formatarBRL(c.value)}` })),
+                ]}
+              />
               <button
                 type="button"
                 disabled={!cupom}

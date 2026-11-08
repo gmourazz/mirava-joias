@@ -4,26 +4,16 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { FAQ } from "../data/content";
-import { LOJA } from "../config/loja";
 import SectionHeading from "./SectionHeading";
 
 export default function Faq() {
   const [aberta, setAberta] = useState<number | null>(0);
 
   return (
-    <section id="duvidas" className="mx-auto grid max-w-[1360px] scroll-mt-32 grid-cols-1 gap-8 px-[clamp(16px,3vw,40px)] pt-20 lg:grid-cols-[360px_1fr] lg:gap-16">
-      <div className="grid content-start">
-        <SectionHeading eyebrow="Antes de comprar" title="Dúvidas frequentes" description="Não achou o que procurava? Fala com a gente." />
-        <a
-          href={`mailto:${LOJA.email}?subject=${encodeURIComponent("Dúvida sobre as peças")}`}
-          className="-mt-2 flex w-fit items-center gap-2.5 rounded-full bg-teal px-6 py-3.5 text-[14px] font-semibold text-white hover:bg-teal-dark hover:text-white"
-        >
-          <Mail size={15} strokeWidth={1.8} />
-          Enviar e-mail
-        </a>
-      </div>
+    <section id="duvidas" className="mx-auto grid max-w-[1360px] scroll-mt-32 gap-2 px-[clamp(16px,3vw,40px)] pt-20">
+      <SectionHeading eyebrow="Antes de comprar" title="Dúvidas frequentes" align="center" />
 
       <div className="grid content-start gap-3">
         {FAQ.slice(0, 6).map((item, i) => {

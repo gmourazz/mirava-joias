@@ -404,6 +404,11 @@ func (s *Servidor) createPayment(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.log.Error("mercado pago recusou a preferência", "erro", err, "pedido", number)
+		// Sem preferência não há como pagar este pedido: cancela para não
+		// sobrar pedido fantasma nem pontos ou cupom presos nele.
+		if cerr := s.db.CancelUnpaidOrder(context.WithoutCancel(ctx), orderID); cerr != nil {
+			s.log.Error("não consegui cancelar o pedido sem preferência", "erro", cerr, "pedido", number)
+		}
 		responder(w, http.StatusBadGateway, mapa{
 			"error": "Não foi possível iniciar o pagamento. Tente de novo."})
 		return

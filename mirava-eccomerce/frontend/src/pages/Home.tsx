@@ -4,10 +4,9 @@ import Hero from "../components/Hero";
 import Beneficios from "../components/Beneficios";
 import CategoryGrid from "../components/CategoryGrid";
 import MaisVendidos from "../components/MaisVendidos";
+import SignificadoAneis from "../components/SignificadoAneis";
 import QuizBrilho from "../components/QuizBrilho";
-import BerloquesSection from "../components/BerloquesSection";
 import CompraSegura from "../components/CompraSegura";
-import PresentesSection from "../components/PresentesSection";
 import AjudaSection from "../components/AjudaSection";
 import Faq from "../components/Faq";
 import Reveal from "../components/Reveal";
@@ -36,10 +35,9 @@ export default function Home() {
       <Beneficios />
       <CategoryGrid />
       <MaisVendidos />
+      <Reveal><SignificadoAneis /></Reveal>
       <Reveal><QuizBrilho /></Reveal>
-      <Reveal><BerloquesSection /></Reveal>
       <Reveal><CompraSegura /></Reveal>
-      <Reveal><PresentesSection /></Reveal>
       <Reveal><QuemUsaAma /></Reveal>
       <Reveal><GaleriaInstagram /></Reveal>
       <Reveal><AjudaSection /></Reveal>

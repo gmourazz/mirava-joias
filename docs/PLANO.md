@@ -856,7 +856,7 @@ Regras que o admin respeita, mesmo onde o protótipo diverge: máquina de estado
 
 - [x] Tabela de produtos paginada no servidor, com busca por nome/SKU, abas de categoria e filtros (status, banho), publicar e destaque na home direto na linha. Seleção em massa feita no fechamento do design v5.
 - [x] Editor do produto: nome, descrição e markup da peça — o preço sai de `dominio.PriceFromMarkup`, com teste, igual à conta do SQL. *(Falta: foto própria, SEO e checklist antes de publicar.)*
-- [ ] Markup por categoria e padrão global (precisa de tabela; hoje o markup é por peça).
+- [x] Markup por categoria e padrão global (feito no fechamento do design v5, decisão 21: peça > categoria > padrão).
 - [x] Alertas de preço do disjuntor: aceitar ou recusar o `suggested_price_cents` no editor. *(Falta: fila "novos na Lilly".)*
 - [x] Vitrine da loja: queridinhas, lançamentos e presentes escolhidos e ordenados no painel (tabela `showcase_items`, bloco 3). A capa continua com `featured`.
 
@@ -927,6 +927,58 @@ Fica para quando a loja estiver vendendo, porque cada item precisa de tabela e r
 ### Antes de começar a Fase B, decidir
 
 - **Desconto do Pix:** o site anuncia 5% off, mas o checkout cobra o valor cheio (`discount` é sempre zero em `api/internal/web/checkout.go`). O financeiro do admin precisa saber qual é a regra de verdade.
+
+---
+
+## 16. Plano de ação até a loja vender
+
+**Data:** 07/11/2026 · Marque cada item com `[x]` quando terminar. As etapas vão em ordem: cada uma depende da anterior. Quem faz: **Você**, **Claude** ou **Juntos**.
+
+### Etapa 1 · Arrumar a casa
+
+- [ ] Commit e push do que está pronto, conferindo antes que nenhum segredo vai junto (o repositório é público) · Juntos
+- [ ] Gerar uma chave nova do webhook no Mercado Pago e trocar `MP_WEBHOOK_SECRET` no `api/.env` (a atual apareceu num registro de conversa) · Você
+- [ ] Gerar uma chave nova no Resend e trocar `RESEND_API_KEY` no `api/.env` (a atual é recusada: "API key is invalid"). Depois, testar pelo painel em Automações → "enviar teste" · Você
+- [ ] Despublicar o "PRODUTO TESTE" (`peca-de-teste-mirava`) · Você ou Claude
+- [ ] Apagar `frontend/src/assets/images/colecao01.png`, que já virou a capa da coleção e não é usada pelo site · Você
+- [ ] Escolher o nome definitivo da coleção (hoje "Luz Própria", provisório) · Você
+- [ ] Decidir a logo do rodapé (aumentar ou usar a versão sem SEMIJOIAS) e trocar a escrita "MIRAVA" pela logo nas telas que faltam: conta, redefinir senha, painel e etiqueta · Você decide, Claude faz
+
+### Etapa 2 · O que falta no back
+
+- [ ] Sincronização incremental: ler só as páginas que mudaram (`lastmod` do sitemap) e com pausas maiores. Hoje ela relê 2.272 páginas a cada vez, o que deve ser o que faz a Lilly bloquear · Claude
+- [ ] Avisar a dona quando entra pedido pago e quando uma cliente cancela · Claude
+- [ ] Financeiro: mostrar o custo das peças compradas na Lilly e canceladas depois (hoje somem do relatório) · Claude
+- [ ] Recusar embrulho no servidor enquanto ele estiver desligado no site (decisão 41) · Claude
+- [ ] Decidir se o BEMVINDA10 pode ficar em dois pedidos ainda não pagos ao mesmo tempo (hoje pode, caso raro) · Você decide
+- [ ] Trazer os 3 relógios: por link quando a Lilly liberar, ou cadastro manual em Produtos → Novo produto · Você
+
+### Etapa 3 · Pagamento de ponta a ponta, ainda em teste
+
+- [ ] ngrok ligado e o endereço do webhook cadastrado no Mercado Pago de teste · Você
+- [ ] Compra com comprador de teste e cartão de teste, nas três formas: Pix, cartão e boleto · Juntos
+- [ ] Conferir que o pedido vira "pago", aparece no painel, entra no lote e manda o e-mail · Juntos
+- [ ] Cancelar um pedido pago pela conta da cliente e conferir o estorno no Mercado Pago · Juntos
+- [ ] Reembolsar um pedido pelo painel · Juntos
+- [ ] Pagamento recusado e aviso de pagamento repetido: o pedido não pode mudar errado · Juntos
+
+### Etapa 4 · Colocar no ar
+
+- [ ] Escolher onde a API roda: Cloud Run ou VPS da Hostinger (decisões 11 e 15) · Você decide
+- [ ] Banco de produção com `db/schema.sql` (ou `db/alter-design-v5.sql`) e backup automático · Juntos
+- [ ] Domínio `.com.br` registrado, site no Cloudflare Pages e API com HTTPS · Juntos
+- [ ] Variáveis de produção: credenciais de produção da sua conta Mercado Pago, `MP_MODO`, Resend, `SITE_URL`, `WEBHOOK_URL` e uma chave nova para o login (JWT) · Juntos
+- [ ] Pasta das fotos enviadas pelo painel (`UPLOADS_DIR`) num disco que não some a cada atualização · Juntos
+- [ ] Agendamentos: `/tarefas/sincronizar-se-devido` a cada hora, `/tarefas/automacoes` e `/tarefas/avaliar-lote` · Juntos
+
+### Etapa 5 · Antes de abrir para o público
+
+- [ ] Compra real de R$ 5,00 no seu cartão, com estorno pelo painel em seguida · Você
+- [ ] Privacidade, Termos e Trocas revisados por advogado (hoje são rascunho) · Você
+- [ ] Autorização por escrito para usar as fotos da Lilly e as fotos de terceiros do site (mão com anéis, colar com letra, capa da coleção) · Você
+- [ ] Site testado no celular, do início à compra · Juntos
+- [ ] Embalagens compradas e conta no Melhor Envio · Você
+- [ ] Alerta de pedido novo chegando no seu celular · Juntos
 
 ---
 

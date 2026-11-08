@@ -47,8 +47,10 @@ export default function ProductCard({ product }: { product: Product }) {
     setTimeout(() => setJustAdded(false), 1600);
   };
 
+  const rotuloBotao = justAdded ? "Na sacola" : needsChoice ? `Escolher ${(product.variantLabel ?? "tamanho").toLowerCase()}` : "Adicionar à sacola";
+
   return (
-    <div className="group flex h-full flex-col gap-3 rounded-3xl border border-line-soft bg-white p-2.5 pb-4 transition-[box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(11,74,77,0.10)]">
+    <div className="group @container flex h-full flex-col gap-3 rounded-3xl border border-line-soft bg-white p-2.5 pb-4 transition-[box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(11,74,77,0.10)]">
       <Link to={href} className="relative block aspect-square overflow-hidden rounded-[18px] bg-mist-3">
         {cover ? (
           <img
@@ -111,10 +113,13 @@ export default function ProductCard({ product }: { product: Product }) {
         <button
           type="button"
           onClick={onAdd}
+          aria-label={rotuloBotao}
+          title={rotuloBotao}
           className="mx-1.5 mt-auto flex cursor-pointer items-center justify-center gap-2 rounded-full border-none bg-mist-2 p-3 text-[14px] font-semibold text-teal transition-colors hover:bg-teal hover:text-white"
         >
-          {justAdded ? <Check size={15} strokeWidth={2} /> : <ShoppingBag size={15} strokeWidth={1.8} />}
-          {justAdded ? "Na sacola" : needsChoice ? `Escolher ${(product.variantLabel ?? "tamanho").toLowerCase()}` : "Adicionar à sacola"}
+          {justAdded ? <Check size={17} strokeWidth={2} /> : <ShoppingBag size={17} strokeWidth={1.8} />}
+          {/* Card estreito (coluna apertada, celular): só o ícone. */}
+          <span className="hidden whitespace-nowrap @[196px]:inline">{rotuloBotao}</span>
         </button>
       )}
       {espiando && <QuickView product={product} fechar={() => setEspiando(false)} />}

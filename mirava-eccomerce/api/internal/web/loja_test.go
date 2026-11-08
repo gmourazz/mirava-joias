@@ -57,3 +57,12 @@ func TestSlugDaColecao(t *testing.T) {
 		t.Error("nome sem letra não pode virar endereço")
 	}
 }
+
+func TestDispatchNaoReembolsa(t *testing.T) {
+	if dispatchAllowed("/admin/pedidos/abc/reembolsar") {
+		t.Error("papel de despacho não pode devolver dinheiro")
+	}
+	if !dispatchAllowed("/admin/pedidos/abc/despachar") {
+		t.Error("papel de despacho precisa continuar despachando")
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -64,12 +65,14 @@ type NewPreference struct {
 // ExcludedPaymentTypes tira do Mercado Pago as formas que a cliente não
 // escolheu. Com Pix escolhido, sobra só o Pix — senão o desconto do Pix
 // viraria desconto num pagamento com cartão. Sem escolha, só tira o boleto
-// (comportamento de antes da decisão 33).
+// (comportamento de antes da decisão 33). O saldo em conta (account_money) não
+// entra na lista: o Mercado Pago recusa a preferência inteira se ele for
+// excluído, então a cliente com saldo pode pagar com ele em qualquer escolha.
 func ExcludedPaymentTypes(choice string) []map[string]string {
 	ids := map[string][]string{
-		"pix":    {"credit_card", "debit_card", "prepaid_card", "ticket", "atm", "account_money"},
-		"card":   {"bank_transfer", "ticket", "atm", "account_money"},
-		"boleto": {"credit_card", "debit_card", "prepaid_card", "bank_transfer", "atm", "account_money"},
+		"pix":    {"credit_card", "debit_card", "prepaid_card", "ticket", "atm"},
+		"card":   {"bank_transfer", "ticket", "atm"},
+		"boleto": {"credit_card", "debit_card", "prepaid_card", "bank_transfer", "atm"},
 	}[choice]
 	if ids == nil {
 		ids = []string{"ticket"}
@@ -207,6 +210,43 @@ func (c *Client) GetPayment(ctx context.Context, id string) (*Payment, error) {
 		return nil, err
 	}
 	return &p, nil
+}
+
+// Refund é a resposta do Mercado Pago a um estorno.
+type Refund struct {
+	ID     int64   `json:"id"`
+	Status string  `json:"status"`
+	Amount float64 `json:"amount"`
+}
+
+// RefundPayment devolve o valor integral do pagamento. A chave de idempotência
+// é a trava contra estorno em dobro: repetir a chamada com a mesma chave não
+// devolve de novo. Sem resposta de sucesso, nada mudou para quem chama.
+func (c *Client) RefundPayment(ctx context.Context, paymentID, idempotencyKey string) (*Refund, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, api+"/v1/payments/"+paymentID+"/refunds", strings.NewReader("{}"))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Idempotency-Key", idempotencyKey)
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated {
+		corpo, _ := io.ReadAll(io.LimitReader(res.Body, 2<<10))
+		return nil, fmt.Errorf("mercado pago recusou o estorno (%d): %s", res.StatusCode, corpo)
+	}
+
+	var r Refund
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+		return nil, err
+	}
+	return &r, nil
 }
 
 // ---------------------------------------------------------------------------

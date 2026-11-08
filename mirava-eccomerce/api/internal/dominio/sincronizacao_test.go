@@ -52,3 +52,25 @@ func TestResultadoDaSincronizacao(t *testing.T) {
 		}
 	}
 }
+
+// Uma leitura barrada pela Lilly não "vê" peça nenhuma: sem esta trava, o fim
+// da rodada marcaria o catálogo inteiro como sumido.
+func TestSafeToMarkVanished(t *testing.T) {
+	cases := []struct {
+		name        string
+		seen, known int
+		want        bool
+	}{
+		{"catálogo vazio", 0, 0, true},
+		{"todas vistas", 2000, 2000, true},
+		{"algumas saíram de linha", 1900, 2000, true},
+		{"exatamente no limite", 1600, 2000, true},
+		{"logo abaixo do limite", 1599, 2000, false},
+		{"leitura barrada: nada visto", 0, 2000, false},
+	}
+	for _, c := range cases {
+		if got := SafeToMarkVanished(c.seen, c.known); got != c.want {
+			t.Errorf("%s: SafeToMarkVanished(%d, %d) = %v, quero %v", c.name, c.seen, c.known, got, c.want)
+		}
+	}
+}

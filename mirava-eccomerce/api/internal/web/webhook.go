@@ -142,6 +142,11 @@ func (s *Servidor) webhookMP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch {
+	// Pagou depois de cancelar (Pix aberto em outra aba, por exemplo): o pedido
+	// não volta a valer, então o dinheiro volta para a cliente.
+	case payment.Status == "approved" && order.Status == dominio.Cancelled:
+		s.estornarPagamentoTardio(ctx, order.ID, fmt.Sprintf("%d", payment.ID), order.Number)
+
 	case payment.Status == "approved":
 		changed, err := s.db.MarkPaid(ctx, order.ID)
 		if err != nil {

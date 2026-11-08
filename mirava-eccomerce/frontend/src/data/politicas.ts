@@ -34,6 +34,10 @@ export const POLITICAS: Politica[] = [
         d: "Você tem até 7 dias corridos a partir do recebimento para desistir da compra, sem precisar justificar, conforme o art. 49 do Código de Defesa do Consumidor. Na devolução por arrependimento, o frete fica por nossa conta e o reembolso é feito na mesma forma de pagamento da compra.",
       },
       {
+        t: "Cancelamento antes do envio",
+        d: "Você pode cancelar o pedido na sua conta até ele ser despachado. Se o pagamento já foi feito, o valor é estornado automaticamente pelo Mercado Pago, e o prazo para aparecer depende do seu banco ou da operadora do cartão.",
+      },
+      {
         t: "Troca",
         d: "Dentro do mesmo prazo de 7 dias, você pode pedir a troca da peça. Você recebe um vale no valor da peça para usar em um novo pedido, válido por 30 dias.",
       },
@@ -55,7 +59,7 @@ export const POLITICAS: Politica[] = [
     secoes: [
       {
         t: "Peças sob encomenda",
-        d: `Cada peça é encomendada depois que o pagamento é confirmado. Por isso o prazo de entrega é de ${prazo}, contados a partir da confirmação do pagamento — já somando a encomenda e o transporte.`,
+        d: `Cada peça é encomendada depois que o pagamento é confirmado. Por isso o prazo de entrega é de ${prazo}, contados a partir da confirmação do pagamento, já somando a encomenda e o transporte.`,
       },
       {
         t: "Formas de envio",

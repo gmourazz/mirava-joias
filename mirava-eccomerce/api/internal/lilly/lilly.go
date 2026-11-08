@@ -55,6 +55,36 @@ func NewClient() *Client {
 	return &Client{http: &http.Client{Timeout: 12 * time.Second}}
 }
 
+// LooksBlocked diz se o HTML parece uma página de proteção do site (desafio
+// do WAF, captcha, "acesso negado") e não uma página de produto. Essas vêm com
+// status 200, então Extract só vê "sem peça" — aqui a gente separa os dois casos.
+func LooksBlocked(html string) bool {
+	h := strings.ToLower(strings.TrimSpace(html))
+	if len(h) < 20000 {
+		return true // página de produto real tem centenas de KB
+	}
+	for _, sinal := range []string{"just a moment", "checking your browser", "access denied", "captcha", "request blocked", "attention required", "cf-chl", "are you a robot"} {
+		if strings.Contains(h, sinal) && !strings.Contains(h, "og:title") {
+			return true
+		}
+	}
+	return false
+}
+
+// PageTitle devolve o <title> da página (até 120 caracteres), para o log
+// dizer o que veio quando a extração falha.
+func PageTitle(html string) string {
+	m := regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`).FindStringSubmatch(html)
+	if m == nil {
+		return ""
+	}
+	t := strings.Join(strings.Fields(m[1]), " ")
+	if len(t) > 120 {
+		t = t[:120]
+	}
+	return t
+}
+
 // ProductURL normaliza o link de uma peça colado no painel: só páginas de
 // produto de uselilly.com (https, um único trecho de caminho), sem consulta
 // nem âncora. Devolve sempre "https://www.uselilly.com/<peca>/". Página de
@@ -230,7 +260,13 @@ func (c *Client) BestSellers(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mais vendidos: %w", err)
 	}
-	return extrairMaisVendidos(html), nil
+	// Lista vazia é leitura ruim (tela de proteção, layout novo), não "ninguém
+	// vende": gravar isso apagaria a lista da rodada anterior.
+	slugs := extrairMaisVendidos(html)
+	if len(slugs) == 0 {
+		return nil, fmt.Errorf("mais vendidos: nenhuma peça na página (%q)", PageTitle(html))
+	}
+	return slugs, nil
 }
 
 // extrairMaisVendidos separa a leitura do HTML da chamada de rede, para dar
@@ -627,8 +663,11 @@ var categoryKeywords = []struct {
 	{"aneis", []string{"anel"}},
 	{"colares", []string{"colar", "gargantilha", "choker"}},
 	{"pulseiras", []string{"pulseira", "bracelete"}},
-	{"berloques", []string{"berloque", "pingente avulso", "charm"}},
-	{"brincos", []string{"brinco"}},
+	{"berloques", []string{"berloque", "pingente avulso"}},
+	{"brincos", []string{"brinco", "argola"}},
+	// "Charm" também é nome de linha da Lilly ("Argolas Trevo Preto - Charm"):
+	// só decide depois das palavras que dizem o tipo da peça.
+	{"berloques", []string{"charm"}},
 }
 
 // GuessCategory infere a categoria a partir do nome da peça.

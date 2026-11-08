@@ -11,11 +11,11 @@ import { ApiError } from "../lib/api";
 import { showcase, type ShowcaseSlot } from "../lib/extras";
 import { growthApi, lojaApi, productApi, uploadImage, type AdminCategory, type AdminProduct } from "./api";
 import Toggle from "./Toggle";
+import Select from "../components/Select";
 
 const ESPACOS: { slot: ShowcaseSlot; label: string }[] = [
   { slot: "queridinhas", label: "As queridinhas" },
   { slot: "lancamentos", label: "Lançamentos" },
-  { slot: "presentes", label: "Presentes" },
 ];
 
 export default function ProdutoDrawer({ id, fechar, mudou }: { id: string; fechar: () => void; mudou: () => void }) {
@@ -322,23 +322,21 @@ export default function ProdutoDrawer({ id, fechar, mudou }: { id: string; fecha
               <label className="grid gap-1.5">
                 <span className="text-[13px] font-semibold text-text-2">Descrição</span>
                 <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={5} className={`${campo} resize-y leading-relaxed`} />
-                <span className="text-[12px] text-muted">Reescreva na voz da Mirava — copiar o texto da Lilly faz o site competir com ela no Google. Texto editado aqui não é sobrescrito pela sincronização.</span>
+                <span className="text-[12px] text-muted">Reescreva na voz da Mirava: copiar o texto da Lilly faz o site competir com ela no Google. Texto editado aqui não é sobrescrito pela sincronização.</span>
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="grid gap-1.5">
                   <span className="text-[13px] font-semibold text-text-2">Categoria</span>
-                  <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className={campo}>
-                    {cats.map((c) => (
-                      <option key={c.slug} value={c.slug}>{c.label}</option>
-                    ))}
-                  </select>
+                  <Select variant="field" value={categoria} onChange={setCategoria} options={cats.map((c) => ({ value: c.slug, label: c.label }))} />
                 </label>
                 <label className="grid gap-1.5">
                   <span className="text-[13px] font-semibold text-text-2">Banho</span>
-                  <select value={metal} onChange={(e) => setMetal(e.target.value as "prata" | "ouro")} className={campo}>
-                    <option value="prata">Banhado a prata</option>
-                    <option value="ouro">Banhado a ouro</option>
-                  </select>
+                  <Select
+                    variant="field"
+                    value={metal}
+                    onChange={(v) => setMetal(v as "prata" | "ouro")}
+                    options={[{ value: "prata", label: "Banhado a prata" }, { value: "ouro", label: "Banhado a ouro" }]}
+                  />
                 </label>
               </div>
 

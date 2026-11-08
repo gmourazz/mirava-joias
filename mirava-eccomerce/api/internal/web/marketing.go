@@ -409,7 +409,7 @@ func (s *Servidor) adminSetAutomation(w http.ResponseWriter, r *http.Request) {
 func (s *Servidor) runAutomations(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !s.notif.Ativo() {
-		responder(w, http.StatusOK, mapa{"ok": true, "nota": "e-mail não configurado — nada enviado"})
+		responder(w, http.StatusOK, mapa{"ok": true, "nota": "e-mail não configurado, nada enviado"})
 		return
 	}
 	site := s.cfg.SiteURL

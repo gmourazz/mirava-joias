@@ -3,8 +3,8 @@
 // mora na conta (tabela `favorites`), não no navegador.
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { useLogin } from "./LoginContext";
 import { addFavorite, listFavorites, removeFavorite } from "../lib/favoritos";
 
 interface FavoritesValue {
@@ -17,7 +17,7 @@ const FavoritesContext = createContext<FavoritesValue | null>(null);
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const { abrirLogin } = useLogin();
   const [ids, setIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(
     (productId: string) => {
       if (!user) {
-        navigate(`/conta?voltar=${encodeURIComponent(window.location.pathname)}`);
+        abrirLogin();
         return;
       }
       const era = ids.has(productId);
@@ -53,7 +53,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
         }),
       );
     },
-    [user, ids, navigate],
+    [user, ids, abrirLogin],
   );
 
   return (

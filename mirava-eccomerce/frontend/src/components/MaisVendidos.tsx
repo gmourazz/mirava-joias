@@ -1,9 +1,8 @@
 // "As queridinhas" (v5): abas em pill e um trilho de cards que rola na
 // horizontal com encaixe, mais setas que andam 80% da largura.
 //
-// "Mais vendidos" vem ordenado do banco (units_sold: a venda da própria
-// Mirava manda, a posição na vitrine da fornecedora só desempata). "Até R$ 79"
-// filtra essa mesma lista, porque a API ainda não tem filtro de preço.
+// "Mais vendidos" é a lista da fornecedora, na ordem dela (supplier_rank,
+// decisão 39). "Até R$ 79" filtra essa mesma lista, porque a API ainda não tem filtro de preço.
 //
 // Quando a dona monta a vitrine no painel (Vitrine → queridinhas /
 // lançamentos), essas abas mostram a escolha dela, na ordem dela.

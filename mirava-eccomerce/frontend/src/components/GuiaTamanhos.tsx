@@ -36,7 +36,7 @@ export default function GuiaTamanhos({ fechar }: { fechar: () => void }) {
           <h3 className="m-0 text-[15px] font-semibold text-text">Anéis</h3>
           <p className="m-0">
             Passe uma fita métrica (ou um barbante) em volta do dedo, na base, sem apertar. Marque onde a ponta encontra
-            e meça em milímetros. Outra forma: meça por dentro, de lado a lado, um anel que já sirva em você — esse é o
+            e meça em milímetros. Outra forma: meça por dentro, de lado a lado, um anel que já sirva em você: esse é o
             diâmetro.
           </p>
           <p className="m-0">

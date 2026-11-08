@@ -59,6 +59,7 @@ export interface AdminOrderDetail extends AdminOrder {
   }[];
   events: { from_status: string | null; to_status: string; origin: string; detail: string | null; created_at: string }[];
   actions: OrderStatus[];
+  can_refund: boolean;
   discount_cents: number;
   coupon_code: string | null;
   points_used: number;
@@ -114,6 +115,7 @@ export const adminApi = {
   order: (id: string) => api<AdminOrderDetail>(`/admin/pedidos/${id}`, auth),
   transition: (id: string, from: OrderStatus, to: OrderStatus) =>
     api<{ ok: boolean }>(`/admin/pedidos/${id}/transicao`, { ...auth, method: "POST", body: { from, to } }),
+  refund: (id: string) => api<{ ok: boolean }>(`/admin/pedidos/${id}/reembolsar`, { ...auth, method: "POST" }),
   ship: (id: string, trackingCode: string) =>
     api<{ ok: boolean }>(`/admin/pedidos/${id}/despachar`, { ...auth, method: "POST", body: { tracking_code: trackingCode } }),
   batches: () => api<Batch[]>("/admin/lotes", auth),
@@ -141,7 +143,6 @@ export const ACTION_LABEL: Partial<Record<OrderStatus, string>> = {
   received_by_owner: "Recebi da Lilly",
   delivered: "Marcar entregue",
   cancelled: "Cancelar pedido",
-  refunded: "Marcar estornado",
   out_of_stock: "Sem estoque na Lilly",
   in_batch: "Voltar para o lote",
 };

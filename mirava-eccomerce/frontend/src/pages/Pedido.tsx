@@ -19,6 +19,7 @@ import { useCart } from "../context/CartContext";
 import { getOrder, type Order } from "../lib/pedidos";
 import { ApiError } from "../lib/api";
 import AcompanhamentoPedido from "../components/AcompanhamentoPedido";
+import CancelarPedido from "../components/CancelarPedido";
 
 export default function Pedido() {
   const { id } = useParams();
@@ -126,6 +127,9 @@ export default function Pedido() {
         )}
 
         {!loading && order && <AcompanhamentoPedido order={order} />}
+        {!loading && order && (
+          <CancelarPedido order={order} onCancelado={() => void getOrder(order.id).then(setOrder).catch(() => {})} />
+        )}
 
         {recemCriado && (
           <Link to="/" className="mx-auto rounded-full border-[1.5px] border-line-strong bg-white px-7 py-3.5 text-[14px] font-semibold text-teal hover:border-teal">

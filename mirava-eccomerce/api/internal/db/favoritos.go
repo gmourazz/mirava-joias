@@ -48,6 +48,7 @@ func (d *DB) FavoriteProducts(ctx context.Context, userID string) ([]CatalogProd
 			out = append(out, *p)
 		}
 	}
+	availableFirst(out)
 	return out, nil
 }
 

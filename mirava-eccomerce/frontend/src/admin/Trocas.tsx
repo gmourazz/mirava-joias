@@ -93,7 +93,7 @@ export default function Trocas() {
                     value={notas[r.id] ?? ""}
                     onChange={(e) => setNotas((n) => ({ ...n, [r.id]: e.target.value }))}
                     maxLength={500}
-                    placeholder="Recado para a cliente (vai no e-mail) — ex.: endereço de postagem"
+                    placeholder="Recado para a cliente (vai no e-mail). Ex.: endereço de postagem"
                     className="min-w-[240px] flex-1 rounded-full border-[1.5px] border-line bg-white px-4 py-2.5 text-[13.5px] outline-none focus:border-teal"
                   />
                   {(PROXIMA[r.stage] ?? []).map((p) => (

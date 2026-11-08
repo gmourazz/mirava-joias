@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight, ChevronLeft, ChevronRight, CreditCard, Flame, Gem, Gift, Link2, Moon, Percent, ShieldCheck, Sparkles, Sun,
+  ArrowRight, ChevronLeft, ChevronRight, CreditCard, Cherry, Flame, Gem, Gift, Link2, Moon, Percent, ShieldCheck, Sparkles, Sun,
   type LucideIcon,
 } from "lucide-react";
 import { HERO_SLIDES } from "../data/content";
@@ -49,7 +49,8 @@ const ICONES_BOTAO: [RegExp, LucideIcon][] = [
   [/mais vendid|queridinha/i, Flame],
   [/ouro/i, Sun],
   [/prata/i, Moon],
-  [/berloque|montar|pulseira/i, Link2],
+  [/berloque|montar/i, Cherry],
+  [/pulseira/i, Link2],
   [/presente/i, Gift],
 ];
 const iconeDoBotao = (t: string): LucideIcon => ICONES_BOTAO.find(([re]) => re.test(t))?.[1] ?? Gem;

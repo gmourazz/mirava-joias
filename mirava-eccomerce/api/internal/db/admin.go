@@ -161,6 +161,7 @@ type AdminOrderDetail struct {
 	GiftWrapCents dominio.Cents     `json:"gift_wrap_cents"`
 	GiftMessage   *string           `json:"gift_message"`
 	Actions       []dominio.Status  `json:"actions"`
+	CanRefund     bool              `json:"can_refund"`
 }
 
 func (d *DB) AdminOrderByID(ctx context.Context, id string) (*AdminOrderDetail, error) {
@@ -185,6 +186,7 @@ func (d *DB) AdminOrderByID(ctx context.Context, id string) (*AdminOrderDetail, 
 	deadlineFor(&o.AdminOrder)
 	o.Address = json.RawMessage(addr)
 	o.Actions = dominio.ManualActions(o.Status)
+	o.CanRefund = dominio.CanRefund(o.Status)
 	if o.Actions == nil {
 		o.Actions = []dominio.Status{}
 	}
@@ -252,6 +254,14 @@ func (d *DB) AdminTransition(ctx context.Context, id string, from, to dominio.St
 		return false, nil
 	}
 	return true, tx.Commit(ctx)
+}
+
+// CancelUnpaidOrder cancela um pedido que nunca chegou a ser cobrado, como
+// quando o Mercado Pago recusa a preferência. O evento sai com origem 'system'.
+func (d *DB) CancelUnpaidOrder(ctx context.Context, id string) error {
+	_, err := d.pool.Exec(ctx, `update orders set status = $2 where id = $1 and status = $3`,
+		id, dominio.Cancelled, dominio.AwaitingPayment)
+	return err
 }
 
 // ---------------------------------------------------------------------------

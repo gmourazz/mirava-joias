@@ -103,6 +103,7 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 	var res db.SyncResult
 	seen := make([]string, 0, len(entries))
 	consecutiveFailures := 0
+	blockedInARow := 0
 
 	for _, e := range entries {
 		select {
@@ -160,9 +161,26 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 
 		p := lilly.Extract(html, e.URL, ratio)
 		if p == nil {
+			if !lilly.LooksBlocked(html) {
+				blockedInARow = 0
+				cancelItem()
+				continue // página de categoria ou institucional, não é falha
+			}
+			// Tela de proteção vem com status 200: sem esta checagem a rodada
+			// passaria por todas as páginas sem ler nada e sem registrar falha.
+			res.Failed++
+			blockedInARow++
+			s.db.RecordSyncFailure(itemCtx, syncID, e.URL, "bloqueio: "+lilly.PageTitle(html))
 			cancelItem()
-			continue // página de categoria ou institucional, não é falha
+			if blockedInARow >= dominio.MaxBlockedInARow {
+				res.Status, res.Error = dominio.SyncError, "a Lilly está mostrando uma tela de proteção em vez das peças. Nada foi alterado no catálogo"
+				s.log.Error("sincronização encerrada: leituras barradas pela Lilly", "seguidas", blockedInARow, "url", e.URL)
+				s.finishSync(ctx, syncID, res)
+				return
+			}
+			continue
 		}
+		blockedInARow = 0
 		if err := p.Validate(); err != nil {
 			res.Failed++
 			s.db.RecordSyncFailure(itemCtx, syncID, e.URL, "validação: "+err.Error())
@@ -246,8 +264,14 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 		}
 	}
 
-	if vanished, err := s.db.MarkVanished(ctx, supplierID, seen); err == nil {
-		res.Vanished = int(vanished)
+	known, err := s.db.CountKnownMirror(ctx, supplierID)
+	safe := err == nil && dominio.SafeToMarkVanished(len(seen), known)
+	if safe {
+		if vanished, err := s.db.MarkVanished(ctx, supplierID, seen); err == nil {
+			res.Vanished = int(vanished)
+		}
+	} else {
+		s.log.Error("peças sumidas não marcadas: a leitura viu poucas peças", "vistas", len(seen), "conhecidas", known, "erro", err)
 	}
 
 	// Mais vendidos, no fim e sem poder derrubar nada: é enfeite de vitrine,
@@ -258,6 +282,9 @@ func (s *Servidor) runSync(ctx context.Context, supplierID, sitemapURL string, r
 	// Taxa de sucesso baixa = o layout da Lilly mudou. Você quer saber por
 	// aqui, não pela cliente reclamando que o site está com preço errado.
 	res.Status, res.Error = dominio.SyncOutcome(res.Processed, res.Failed, false)
+	if !safe && res.Status == dominio.SyncSuccess {
+		res.Status, res.Error = dominio.SyncPartial, "a leitura viu poucas peças, nenhuma foi marcada como sumida"
+	}
 	if res.Status == dominio.SyncPartial {
 		s.log.Error("sincronização degradada", "falhas", res.Failed, "total", res.Processed)
 	}

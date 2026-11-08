@@ -37,6 +37,10 @@ const (
 	// PedidoEnviado leva o código de rastreio dos Correios.
 	PedidoEnviado Evento = "pedido_enviado"
 
+	// Cancelamento e reembolso (decisão 43).
+	PedidoCancelado Evento = "pedido_cancelado" // cancelado sem ter sido pago
+	PedidoEstornado Evento = "pedido_estornado" // cancelado com o valor devolvido
+
 	// Automações (decisão 31), disparadas pela tarefa /tarefas/automacoes.
 	PagamentoPendente  Evento = "pagamento_pendente"  // 24h sem pagar
 	CarrinhoAbandonado Evento = "carrinho_abandonado" // sacola parada há 1h
@@ -176,6 +180,10 @@ func Assunto(e Evento, p Pedido) string {
 		return fmt.Sprintf("Pedido #%d confirmado · Mirava", p.Numero)
 	case PagamentoFalhou:
 		return fmt.Sprintf("Não conseguimos confirmar o pagamento do pedido #%d", p.Numero)
+	case PedidoCancelado:
+		return fmt.Sprintf("Pedido #%d cancelado", p.Numero)
+	case PedidoEstornado:
+		return fmt.Sprintf("Pedido #%d cancelado e valor estornado", p.Numero)
 	case PecaComprada:
 		return fmt.Sprintf("Sua peça do pedido #%d já foi encomendada", p.Numero)
 	case PedidoEnviado:
@@ -205,7 +213,7 @@ func corpoTexto(e Evento, p Pedido) string {
 	switch e {
 	case RecuperarSenha:
 		miolo = "Recebemos um pedido para criar uma senha nova na sua conta Mirava. " +
-			"O link vale por 1 hora. Se não foi você, é só ignorar este e-mail — sua senha continua a mesma."
+			"O link vale por 1 hora. Se não foi você, é só ignorar este e-mail: sua senha continua a mesma."
 	case CupomEnviado:
 		miolo = fmt.Sprintf("Separamos um cupom especial pra você: %s.\n\nÉ só usar na finalização da compra.", p.Cupom)
 	case BoasVindas:
@@ -224,13 +232,20 @@ func corpoTexto(e Evento, p Pedido) string {
 	case PagamentoFalhou:
 		miolo = fmt.Sprintf(
 			"O pagamento do pedido #%d não foi concluído, então nada foi cobrado.\n\n"+
-				"Se ainda quiser a peça, é só refazer o pedido — dá pra tentar "+
+				"Se ainda quiser a peça, é só refazer o pedido. Dá pra tentar "+
 				"com Pix, que costuma cair na hora.",
 			p.Numero)
+	case PedidoCancelado:
+		miolo = fmt.Sprintf("Seu pedido #%d foi cancelado. Nada foi cobrado.", p.Numero)
+	case PedidoEstornado:
+		miolo = fmt.Sprintf(
+			"Seu pedido #%d foi cancelado e estornamos %s pelo Mercado Pago.\n\n"+
+				"O prazo para o valor aparecer depende do seu banco ou da operadora do cartão.",
+			p.Numero, p.Total.String())
 	case PecaComprada:
 		miolo = fmt.Sprintf(
 			"Boa notícia: a peça do seu pedido #%d já foi encomendada na fornecedora.\n\n"+
-				"Assim que ela chegar até nós, conferimos, embalamos e despachamos — "+
+				"Assim que ela chegar até nós, conferimos, embalamos e despachamos, "+
 				"e você recebe o código de rastreio por aqui.",
 			p.Numero)
 	case PedidoEnviado:
@@ -245,11 +260,11 @@ func corpoTexto(e Evento, p Pedido) string {
 	case PagamentoPendente:
 		miolo = fmt.Sprintf(
 			"O pedido #%d ainda está esperando o pagamento. As peças são encomendadas "+
-				"só depois que ele é confirmado — pelo Pix, cai na hora.\n\n"+
+				"só depois que ele é confirmado. Pelo Pix, cai na hora.\n\n"+
 				"Se mudou de ideia, tudo bem: sem pagamento, nada é cobrado.",
 			p.Numero)
 	case CarrinhoAbandonado:
-		miolo = "Você deixou peças lindas na sacola. Elas continuam guardadas para você — " +
+		miolo = "Você deixou peças lindas na sacola. Elas continuam guardadas para você, " +
 			"é só voltar e finalizar quando quiser."
 	case PedirAvaliacao:
 		miolo = fmt.Sprintf("Sua peça do pedido #%d já está com você há uns dias. "+

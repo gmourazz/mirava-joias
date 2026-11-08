@@ -9,7 +9,7 @@ const ITENS = [
     ? { Icon: Percent, title: `${LOJA.descontoPixPct}% de desconto`, desc: "no Pix" }
     : { Icon: QrCode, title: "Pix", desc: "aprovação na hora" },
   { Icon: CreditCard, title: "Parcelamento", desc: `${LOJA.parcelasSemJuros}x sem juros` },
-  { Icon: ShieldCheck, title: "Entrega rastreada", desc: "código por e-mail" },
+  { Icon: ShieldCheck, title: "Entrega rastreada", desc: "atualizações no e-mail" },
   { Icon: Truck, title: "Frete grátis", desc: "acima de R$ 300" },
   { Icon: Mail, title: "Atendimento", desc: "por e-mail" },
 ];
