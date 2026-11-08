@@ -32,11 +32,10 @@ import (
 const (
 	Base       = "https://www.uselilly.com"
 	SitemapURL = Base + "/sitemap.xml"
-	// A wBuy (ou um WAF na frente dela) barra com 403 qualquer User-Agent que
-	// se identifique como bot, mesmo o robots.txt permitindo Allow: /. Por
-	// isso nos identificamos como um navegador comum — não é engano malicioso,
-	// é a única forma de ler uma página pública que o robots.txt já autoriza.
-	UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+	// A leitura se identifica como Mirava, com contato, como pede a seção 12
+	// da arquitetura. Se a Lilly barrar esse acesso, a resposta é pedir
+	// autorização a ela, não se passar por navegador.
+	UserAgent = "MiravaBot/1.0 (+https://www.instagram.com/miravajoias/; miravajoias@gmail.com)"
 	// Pausa entre páginas. Com a leitura incremental a rodada lê no máximo
 	// dominio.MaxPagesPerSync páginas, então dá para ser mais lenta.
 	PageDelay = 3 * time.Second

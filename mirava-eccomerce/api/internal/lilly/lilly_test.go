@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"golang.org/x/text/encoding/charmap"
+
+	"github.com/mirava/api/internal/storage"
 )
 
 // HTML imitando a estrutura real de uma página da wBuy, incluindo a seção
@@ -609,5 +611,15 @@ func TestLooksBlocked(t *testing.T) {
 	pagina := "<html><head><title>Anel Prata - Nina</title></head><body>" + strings.Repeat("<p>conteúdo da peça</p>", 1200) + "</body></html>"
 	if LooksBlocked(pagina) {
 		t.Error("página normal de peça não pode parecer bloqueio")
+	}
+}
+
+// A leitura não se passa por navegador (decisão 45).
+func TestUserAgentIdentificaAMirava(t *testing.T) {
+	if !strings.Contains(UserAgent, "Mirava") || strings.Contains(UserAgent, "Mozilla") {
+		t.Errorf("User-Agent precisa identificar a Mirava: %q", UserAgent)
+	}
+	if storage.UserAgent != UserAgent {
+		t.Errorf("fotos e páginas com identificações diferentes: %q x %q", storage.UserAgent, UserAgent)
 	}
 }

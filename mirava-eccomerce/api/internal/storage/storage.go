@@ -23,6 +23,10 @@ import (
 	"time"
 )
 
+// UserAgent identifica a Mirava ao baixar fotos da fornecedora. Igual ao
+// lilly.UserAgent (o pacote storage não importa lilly).
+const UserAgent = "MiravaBot/1.0 (+https://www.instagram.com/miravajoias/; miravajoias@gmail.com)"
+
 type Store struct {
 	dir string
 }
@@ -68,7 +72,8 @@ func (s *Store) SaveFromURL(ctx context.Context, client *http.Client, sourceURL,
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+	// Mesma identificação da leitura do catálogo (lilly.UserAgent, decisão 45).
+	req.Header.Set("User-Agent", UserAgent)
 
 	res, err := client.Do(req)
 	if err != nil {

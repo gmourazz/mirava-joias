@@ -910,7 +910,7 @@ Feito sem regra nova de negócio:
 - [x] `db/alter-design-v5.sql` aplicado no banco local `mirava` (04/11/2026, com backup antes). Falta no banco de produção, quando existir.
 - [ ] Ligar o Resend; trocar o job de sincronização para `/tarefas/sincronizar-se-devido` (a cada hora) e criar o de `/tarefas/automacoes` (ver `api/README.md`).
 - [ ] Se for para o Cloud Run: volume para `UPLOADS_DIR` (fotos enviadas pelo painel).
-- [x] **Coleções** (menu "Coleções", painel "Coleções") e categoria **Relógios** (decisão 37). Primeira coleção criada com nome provisório "Luz Própria", 7 peças. Faltam 17 peças da coleção da Lilly que ainda não estão na base: importar pelo painel (Coleções → "Trazer peças da Lilly por link") com poucos links por vez.
+- [x] **Coleções** (menu "Coleções", painel "Coleções") e categoria **Relógios** (decisão 37). Primeira coleção: "Dona de Si" (nome provisório era "Luz Própria"), 7 peças. Faltam 17 peças da coleção da Lilly que ainda não estão na base: importar pelo painel (Coleções → "Trazer peças da Lilly por link") com poucos links por vez.
 
 Ficou de fora de propósito (decisões registradas): formulário de cartão e cartão salvo (decisão 25 — pagamento no Mercado Pago), "Continuar com Google" (precisa da credencial OAuth), WhatsApp como canal (decisão 30 — atendimento por e-mail), avaliações/fotos/números inventados do protótipo (decisão 28) e a tela de QR do Pix no nosso site (o Checkout Pro mostra). O custo de cada embrulho é informado em Configurações e sai do lucro no Financeiro.
 
@@ -941,7 +941,7 @@ Fica para quando a loja estiver vendendo, porque cada item precisa de tabela e r
 - [ ] Gerar uma chave nova no Resend e trocar `RESEND_API_KEY` no `api/.env` (a atual é recusada: "API key is invalid"). Depois, testar pelo painel em Automações → "enviar teste" · Você
 - [ ] Despublicar o "PRODUTO TESTE" (`peca-de-teste-mirava`) · Você ou Claude
 - [ ] Apagar `frontend/src/assets/images/colecao01.png`, que já virou a capa da coleção e não é usada pelo site · Você
-- [ ] Escolher o nome definitivo da coleção (hoje "Luz Própria", provisório) · Você
+- [x] Escolher o nome definitivo da coleção: **Dona de Si** (`/colecoes/dona-de-si`) · Você
 - [ ] Decidir a logo do rodapé (aumentar ou usar a versão sem SEMIJOIAS) e trocar a escrita "MIRAVA" pela logo nas telas que faltam: conta, redefinir senha, painel e etiqueta · Você decide, Claude faz
 
 ### Etapa 2 · O que falta no back
@@ -950,7 +950,8 @@ Fica para quando a loja estiver vendendo, porque cada item precisa de tabela e r
 - [x] Avisar a dona quando entra pedido pago e quando uma cliente cancela · Claude
 - [x] Financeiro: mostrar o custo das peças compradas na Lilly e canceladas depois (hoje somem do relatório) · Claude
 - [x] Recusar embrulho no servidor enquanto ele estiver desligado no site (decisão 41) · Claude
-- [ ] Decidir se o BEMVINDA10 pode ficar em dois pedidos ainda não pagos ao mesmo tempo (hoje pode, caso raro) · Você decide
+- [x] BEMVINDA10 vale em um pedido só: a tentativa nova cancela o pedido antigo que ficou esperando pagamento com o cupom · Você decidiu
+- [x] Sincronização se identifica como Mirava (`MiravaBot`, com contato), sem se passar por navegador · Você decidiu
 - [ ] Trazer os 3 relógios: por link quando a Lilly liberar, ou cadastro manual em Produtos → Novo produto · Você
 
 ### Etapa 3 · Pagamento de ponta a ponta, ainda em teste

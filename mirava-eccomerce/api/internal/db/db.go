@@ -617,6 +617,16 @@ func (d *DB) CreateOrder(ctx context.Context, o NewOrder) (id string, number int
 		if (o.CouponFirstOrderOnly && prior > 0) || (o.CouponOncePerCustomer && used) {
 			return "", 0, ErrCouponNotForYou
 		}
+		// Um pedido só com o cupom: a tentativa nova substitui a que ficou
+		// esperando pagamento (a cliente desistiu no Mercado Pago e voltou).
+		// Se aquela ainda for paga, o webhook estorna sozinho (pedido
+		// cancelado), então o cupom nunca vale em dois pedidos pagos.
+		if _, err := tx.Exec(ctx, `
+			update orders set status = 'cancelled'
+			where user_id = $1 and coupon_code = $2 and status = 'awaiting_payment'`,
+			o.UserID, o.CouponCode); err != nil {
+			return "", 0, err
+		}
 	}
 	if o.PointsUsed > 0 {
 		var balance int
