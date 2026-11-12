@@ -153,6 +153,20 @@ create table public.admins (
 comment on table public.admins is
   'Papel de admin por tabela própria, nunca em campo editável pelo usuário.';
 
+-- Usuários do painel (decisão 46): login próprio, por nome de usuário e senha,
+-- separado das contas da loja. O papel continua aqui, nunca num campo que o
+-- usuário edita. A tabela admins (acesso pela conta da loja) deixou de ser usada.
+create table if not exists public.admin_users (
+  id             uuid primary key default gen_random_uuid(),
+  username       text not null unique check (username ~ '^[a-z0-9._-]{3,40}$'),
+  name           text not null,
+  password_hash  text not null,
+  role           text not null default 'master' check (role in ('master', 'dispatch')),
+  active         boolean not null default true,
+  created_at     timestamptz not null default now(),
+  last_login_at  timestamptz
+);
+
 -- ---------------------------------------------------------------------------
 -- 03 · Catálogo
 --

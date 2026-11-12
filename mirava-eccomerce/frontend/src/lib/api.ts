@@ -29,6 +29,22 @@ export function currentToken(): string | null {
   return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
 }
 
+// Sessão do painel (decisão 46): login próprio, guardado à parte. Entrar ou
+// sair da loja não mexe nela, e ela não vale na loja.
+const PAINEL_KEY = "mirava.painel.token";
+
+export function savePainelToken(token: string) {
+  localStorage.setItem(PAINEL_KEY, token);
+}
+
+export function clearPainelToken() {
+  localStorage.removeItem(PAINEL_KEY);
+}
+
+export function currentPainelToken(): string | null {
+  return localStorage.getItem(PAINEL_KEY);
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -40,7 +56,8 @@ export class ApiError extends Error {
 interface Options {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
-  authenticated?: boolean;
+  /** true = sessão da loja; "painel" = sessão do painel. */
+  authenticated?: boolean | "painel";
 }
 
 /** Chamada genérica. Lança ApiError com a mensagem que o servidor já
@@ -49,8 +66,9 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (options.authenticated) {
-    const token = currentToken();
-    if (!token) throw new ApiError("Faça login para continuar", 401);
+    const painel = options.authenticated === "painel";
+    const token = painel ? currentPainelToken() : currentToken();
+    if (!token) throw new ApiError(painel ? "Entre no painel para continuar" : "Faça login para continuar", 401);
     headers["Authorization"] = `Bearer ${token}`;
   }
 

@@ -11,8 +11,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Activity, Bell, Box, ExternalLink, LayoutGrid, Lock, LogOut, Menu, RefreshCw, Repeat, Search, Settings, ShoppingBag, Ticket, Users, Wallet, X, Sparkles, Zap, Megaphone, Image, type LucideIcon, Layers } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
-import { ApiError } from "../lib/api";
+import { ApiError, clearPainelToken, currentPainelToken } from "../lib/api";
 import { adminApi, type Summary } from "./api";
 import VisaoGeral from "./VisaoGeral";
 import Pedidos from "./Pedidos";
@@ -29,6 +28,7 @@ import Colecoes from "./Colecoes";
 import Trocas from "./Trocas";
 import Vitrine from "./Vitrine";
 import Automacoes from "./Automacoes";
+import logoBranco from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-branco.svg";
 
 // Ordem do design v5. "despacho" = o que o papel de despacho vê (decisão 27).
 const NAV: { to: string; label: string; Icon: LucideIcon; despacho?: boolean }[] = [
@@ -52,28 +52,37 @@ const NAV: { to: string; label: string; Icon: LucideIcon; despacho?: boolean }[]
 type Papel = "master" | "dispatch";
 
 export default function AdminApp() {
-  const { user, loading } = useAuth();
-  const [acesso, setAcesso] = useState<"verificando" | "ok" | "negado" | "erro">("verificando");
-  const [papel, setPapel] = useState<Papel>("master");
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [acesso, setAcesso] = useState<"verificando" | "ok" | "erro">("verificando");
+  const [eu, setEu] = useState<{ name: string; role: Papel }>({ name: "", role: "master" });
+  const temSessao = Boolean(currentPainelToken());
 
   useEffect(() => {
-    if (!user) return;
+    if (!temSessao) return;
     adminApi
       .me()
       .then((r) => {
-        setPapel(r.role ?? "master");
+        setEu({ name: r.name, role: r.role ?? "master" });
         setAcesso("ok");
       })
-      .catch((e) => setAcesso(e instanceof ApiError && e.status === 403 ? "negado" : "erro"));
-  }, [user]);
+      .catch((e) => {
+        // Sessão vencida ou acesso encerrado: volta para a tela de entrar.
+        if (e instanceof ApiError && e.status === 401) {
+          clearPainelToken();
+          navigate(`/admin/entrar?voltar=${encodeURIComponent(pathname)}`, { replace: true });
+        } else setAcesso("erro");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- confere a sessão uma vez ao abrir
+  }, [temSessao]);
 
-  if (loading) return null;
-  if (!user) return <Navigate to="/conta?voltar=/admin" replace />;
+  if (!temSessao) return <Navigate to={`/admin/entrar?voltar=${encodeURIComponent(pathname)}`} replace />;
   if (acesso === "verificando") return <div className="min-h-screen bg-fog" />;
-  if (acesso !== "ok") return <SemAcesso erro={acesso === "erro"} />;
+  if (acesso === "erro") return <SemAcesso />;
+  const papel = eu.role;
 
   return (
-    <Moldura papel={papel}>
+    <Moldura papel={papel} nome={eu.name}>
       {papel === "dispatch" ? (
         <Routes>
           <Route path="pedidos" element={<Pedidos />} />
@@ -104,8 +113,12 @@ export default function AdminApp() {
   );
 }
 
-function Moldura({ children, papel }: { children: ReactNode; papel: Papel }) {
-  const { user, logout } = useAuth();
+function Moldura({ children, papel, nome }: { children: ReactNode; papel: Papel; nome: string }) {
+  const navigate = useNavigate();
+  const logout = () => {
+    clearPainelToken();
+    navigate("/admin/entrar", { replace: true });
+  };
   const { pathname } = useLocation();
   const [menuAberto, setMenuAberto] = useState(false);
   const nav = papel === "dispatch" ? NAV.filter((n) => n.despacho) : NAV;
@@ -116,7 +129,7 @@ function Moldura({ children, papel }: { children: ReactNode; papel: Papel }) {
   const sidebar = (
     <aside className="flex h-full flex-col gap-[22px] bg-teal-dark px-3.5 py-[22px] text-[#D9ECEA]">
       <div className="grid gap-2 px-2">
-        <span className="font-logo text-[24px] leading-none tracking-[0.28em] text-white">MIRAVA</span>
+        <img src={logoBranco} alt="Mirava" className="h-10 w-auto self-start" />
         <span className="w-fit rounded-full bg-teal px-2.5 py-1 text-[10px] font-bold tracking-[0.18em] text-teal-pale">{papel === "dispatch" ? "DESPACHO" : "ADMIN MASTER"}</span>
       </div>
       <nav className="grid gap-1">
@@ -185,11 +198,11 @@ function Moldura({ children, papel }: { children: ReactNode; papel: Papel }) {
             <BuscaTopo />
             <Sino />
             <span className="grid h-10 w-10 place-items-center rounded-full bg-teal font-logo text-[14px] text-white">
-              {(user?.name ?? "A").slice(0, 2).toUpperCase()}
+              {(nome || "A").slice(0, 2).toUpperCase()}
             </span>
             <span className="hidden text-[13px] leading-tight sm:grid">
-              <strong className="text-text">{user?.name}</strong>
-              <span className="text-muted">Master</span>
+              <strong className="text-text">{nome}</strong>
+              <span className="text-muted">{papel === "dispatch" ? "Despacho" : "Master"}</span>
             </span>
           </div>
         </header>
@@ -286,32 +299,17 @@ function Sino() {
   );
 }
 
-function SemAcesso({ erro }: { erro: boolean }) {
-  const { logout } = useAuth();
+function SemAcesso() {
   return (
     <div className="grid min-h-screen place-items-center bg-fog px-6">
       <div className="grid max-w-md justify-items-center gap-4 rounded-3xl border border-line bg-white p-10 text-center">
         <span className="grid h-14 w-14 place-items-center rounded-full bg-mist text-teal">
           <Lock size={24} strokeWidth={1.7} />
         </span>
-        <h1 className="m-0 font-serif text-[28px] font-normal text-teal-dark">
-          {erro ? "Não consegui abrir o painel" : "Acesso restrito"}
-        </h1>
+        <h1 className="m-0 font-serif text-[28px] font-normal text-teal-dark">Não consegui abrir o painel</h1>
         <p className="m-0 text-[14.5px] leading-relaxed text-text-2">
-          {erro
-            ? "O servidor não respondeu. Confira se a API está no ar e tente de novo."
-            : "Esta área é só da administração da loja. Entre com a conta de administradora."}
+          O servidor não respondeu. Confira se a API está no ar e tente de novo.
         </p>
-        <div className="flex gap-3">
-          <Link to="/" className="rounded-full border-[1.5px] border-line-strong px-5 py-3 text-[14px] font-semibold text-teal">
-            Voltar para a loja
-          </Link>
-          {!erro && (
-            <button type="button" onClick={logout} className="cursor-pointer rounded-full border-none bg-teal px-5 py-3 text-[14px] font-semibold text-white">
-              Trocar de conta
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );

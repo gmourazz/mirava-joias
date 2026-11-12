@@ -4,7 +4,7 @@
 // Nada de regra de negócio aqui: prazo, etapa e ações possíveis vêm prontos
 // da API (calculados em api/internal/dominio/admin.go).
 
-import { api, BASE_URL, currentToken } from "../lib/api";
+import { api, BASE_URL, currentPainelToken } from "../lib/api";
 import type { ReturnRequest } from "../lib/extras";
 
 export type OrderStatus =
@@ -105,10 +105,15 @@ export interface Summary {
   next_sync_at: string | null;
 }
 
-const auth = { authenticated: true } as const;
+const auth = { authenticated: "painel" } as const;
 
 export const adminApi = {
-  me: () => api<{ ok: boolean; role: "master" | "dispatch" }>("/admin/eu", auth),
+  me: () => api<{ ok: boolean; role: "master" | "dispatch"; name: string; username: string }>("/admin/eu", auth),
+  login: (username: string, password: string) =>
+    api<{ token: string; name: string; username: string; role: "master" | "dispatch" }>("/admin/auth/entrar", {
+      method: "POST",
+      body: { username, password },
+    }),
   notices: (id: string) => api<{ kind: string; channel: string; sent_at: string }[]>(`/admin/pedidos/${id}/avisos`, auth),
   summary: () => api<Summary>("/admin/resumo", auth),
   orders: () => api<AdminOrder[]>("/admin/pedidos", auth),
@@ -551,10 +556,11 @@ export interface AdminCart {
 }
 
 export interface TeamMember {
-  user_id: string;
+  id: string;
+  username: string;
   name: string;
-  email: string;
   role: "master" | "dispatch";
+  last_login_at: string | null;
 }
 
 export interface AdminCollection {
@@ -638,13 +644,14 @@ export const lojaApi = {
   testAutomation: (key: string) => api<{ ok: boolean; to: string }>(`/admin/automacoes/${key}/teste`, { ...auth, method: "POST" }),
 
   team: () => api<TeamMember[]>("/admin/equipe", auth),
-  addTeam: (email: string) => api<{ ok: boolean }>("/admin/equipe", { ...auth, method: "POST", body: { email } }),
+  addTeam: (username: string, name: string, password: string) =>
+    api<{ ok: boolean }>("/admin/equipe", { ...auth, method: "POST", body: { username, name, password } }),
   removeTeam: (id: string) => api<{ ok: boolean }>(`/admin/equipe/${id}`, { ...auth, method: "DELETE" }),
 };
 
 /** Envia uma foto (decisão 35). Devolve o caminho público (/images/uploads/...). */
 export async function uploadImage(file: File, pasta: "produtos" | "banners" | "galeria"): Promise<string> {
-  const token = currentToken();
+  const token = currentPainelToken();
   const form = new FormData();
   form.append("arquivo", file);
   const res = await fetch(`${BASE_URL}/admin/upload?pasta=${pasta}`, {

@@ -939,10 +939,11 @@ Fica para quando a loja estiver vendendo, porque cada item precisa de tabela e r
 - [ ] Commit e push do que está pronto, conferindo antes que nenhum segredo vai junto (o repositório é público) · Juntos
 - [ ] Gerar uma chave nova do webhook no Mercado Pago e trocar `MP_WEBHOOK_SECRET` no `api/.env` (a atual apareceu num registro de conversa) · Você
 - [ ] Gerar uma chave nova no Resend e trocar `RESEND_API_KEY` no `api/.env` (a atual é recusada: "API key is invalid"). Depois, testar pelo painel em Automações → "enviar teste" · Você
-- [ ] Despublicar o "PRODUTO TESTE" (`peca-de-teste-mirava`) · Você ou Claude
+- [x] Despublicar o "PRODUTO TESTE" (`peca-de-teste-mirava`) · Você ou Claude
 - [ ] Apagar `frontend/src/assets/images/colecao01.png`, que já virou a capa da coleção e não é usada pelo site · Você
 - [x] Escolher o nome definitivo da coleção: **Dona de Si** (`/colecoes/dona-de-si`) · Você
-- [ ] Decidir a logo do rodapé (aumentar ou usar a versão sem SEMIJOIAS) e trocar a escrita "MIRAVA" pela logo nas telas que faltam: conta, redefinir senha, painel e etiqueta · Você decide, Claude faz
+- [x] Trocar a escrita "MIRAVA" pela logo nas telas que faltavam: redefinir senha, painel e etiqueta · Claude
+- [x] Logo do rodapé: versão sem SEMIJOIAS · Você decidiu
 
 ### Etapa 2 · O que falta no back
 

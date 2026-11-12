@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,40 +24,36 @@ import (
 
 func (s *Servidor) requireAdmin(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, err := s.auth.DoRequest(r)
+		// Sessão do painel, nunca a da loja (decisão 46).
+		id, err := s.auth.AdminRequest(r)
 		if err != nil {
-			responder(w, http.StatusUnauthorized, mapa{"error": "não autenticado"})
+			responder(w, http.StatusUnauthorized, mapa{"error": "Entre no painel para continuar"})
 			return
 		}
-		role, err := s.db.AdminRole(r.Context(), user.ID)
+		u, err := s.db.AdminUserByID(r.Context(), id)
 		if err != nil {
 			s.log.Error("falha ao conferir admin", "erro", err)
 			responder(w, http.StatusInternalServerError, mapa{"error": "Erro ao conferir acesso"})
 			return
 		}
-		if role == "" {
-			responder(w, http.StatusForbidden, mapa{"error": "Acesso restrito à administração da loja"})
+		if u == nil || !u.Active {
+			responder(w, http.StatusUnauthorized, mapa{"error": "Acesso ao painel encerrado"})
 			return
 		}
 		// Papel de despacho (decisão 27): só pedidos e lote.
-		if role == "dispatch" && !dispatchAllowed(r.URL.Path) {
+		if u.Role == "dispatch" && !dispatchAllowed(r.URL.Path) {
 			responder(w, http.StatusForbidden, mapa{"error": "Seu acesso é só de despacho (pedidos e lote)"})
 			return
 		}
-		h(w, r)
+		h(w, r.WithContext(context.WithValue(r.Context(), chaveAdmin{}, u)))
 	}
 }
 
 // adminMe: o front usa para saber se mostra o painel ou a tela de acesso
 // restrito.
 func (s *Servidor) adminMe(w http.ResponseWriter, r *http.Request) {
-	role := "master"
-	if u, err := s.auth.DoRequest(r); err == nil {
-		if r2, err := s.db.AdminRole(r.Context(), u.ID); err == nil && r2 != "" {
-			role = r2
-		}
-	}
-	responder(w, http.StatusOK, mapa{"ok": true, "role": role})
+	u := adminAtual(r.Context())
+	responder(w, http.StatusOK, mapa{"ok": true, "role": u.Role, "name": u.Name, "username": u.Username})
 }
 
 func (s *Servidor) adminSummary(w http.ResponseWriter, r *http.Request) {

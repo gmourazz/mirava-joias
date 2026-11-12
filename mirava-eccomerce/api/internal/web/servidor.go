@@ -111,6 +111,7 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("POST /tarefas/sincronizar-se-devido", s.protegidoPorCron(s.syncIfDue))
 
 	// Painel de gestão (ver admin.go): login da loja + tabela `admins`.
+	mux.HandleFunc("POST /admin/auth/entrar", s.adminLogin)
 	mux.HandleFunc("GET /admin/eu", s.requireAdmin(s.adminMe))
 	mux.HandleFunc("GET /admin/resumo", s.requireAdmin(s.adminSummary))
 	mux.HandleFunc("GET /admin/pedidos", s.requireAdmin(s.adminOrders))
@@ -186,7 +187,7 @@ func (s *Servidor) Rotas() http.Handler {
 	mux.HandleFunc("PUT /admin/automacoes/{key}/texto", s.requireAdmin(s.adminSetAutomationText))
 	mux.HandleFunc("POST /admin/automacoes/{key}/teste", s.requireAdmin(s.adminTestAutomation))
 	mux.HandleFunc("GET /admin/equipe", s.requireAdmin(s.adminTeam))
-	mux.HandleFunc("POST /admin/equipe", s.requireAdmin(s.adminAddTeam))
+	mux.HandleFunc("POST /admin/equipe", s.requireAdmin(s.adminTeamCreate))
 	mux.HandleFunc("DELETE /admin/equipe/{id}", s.requireAdmin(s.adminRemoveTeam))
 	mux.HandleFunc("GET /admin/pedidos/{id}/avisos", s.requireAdmin(s.adminOrderNotices))
 	mux.HandleFunc("GET /admin/colecoes", s.requireAdmin(s.adminCollections))

@@ -216,25 +216,26 @@ function CalcularFrete() {
 
 function Equipe() {
   const [lista, setLista] = useState<TeamMember[]>([]);
-  const [email, setEmail] = useState("");
+  const [novo, setNovo] = useState({ username: "", name: "", password: "" });
   const [msg, setMsg] = useState<string | null>(null);
   const carregar = () => lojaApi.team().then(setLista).catch((e: Error) => setMsg(e.message));
   useEffect(() => {
     void carregar();
   }, []);
+
   return (
     <Bloco titulo="Equipe do painel">
       {lista.map((m) => (
-        <div key={m.user_id} className="flex items-center gap-3 border-t border-[#EEF3F2] py-2 text-[13.5px] first-of-type:border-t-0">
+        <div key={m.id} className="flex items-center gap-3 border-t border-[#EEF3F2] py-2 text-[13.5px] first-of-type:border-t-0">
           <span className="flex-1">
-            <strong className="text-text">{m.name || m.email}</strong>
-            <span className="block text-[12px] text-muted">{m.email}</span>
+            <strong className="text-text">{m.name}</strong>
+            <span className="block text-[12px] text-muted">usuário {m.username}</span>
           </span>
           <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-bold ${m.role === "master" ? "bg-teal-dark text-white" : "bg-mist text-teal"}`}>
             {m.role === "master" ? "MASTER" : "DESPACHO"}
           </span>
           {m.role === "dispatch" && (
-            <button type="button" aria-label="Tirar acesso" onClick={() => void lojaApi.removeTeam(m.user_id).then(carregar)} className="cursor-pointer border-none bg-transparent p-1 text-muted hover:text-[#B4443C]">
+            <button type="button" aria-label="Tirar acesso" onClick={() => void lojaApi.removeTeam(m.id).then(carregar)} className="cursor-pointer border-none bg-transparent p-1 text-muted hover:text-[#B4443C]">
               <Trash2 size={14} />
             </button>
           )}
@@ -244,12 +245,21 @@ function Equipe() {
         onSubmit={(e) => {
           e.preventDefault();
           setMsg(null);
-          void lojaApi.addTeam(email.trim()).then(() => { setEmail(""); void carregar(); setMsg("Acesso de despacho liberado."); }).catch((err: Error) => setMsg(err.message));
+          void lojaApi
+            .addTeam(novo.username.trim(), novo.name.trim(), novo.password)
+            .then(() => {
+              setNovo({ username: "", name: "", password: "" });
+              void carregar();
+              setMsg("Acesso de despacho criado. Passe o usuário e a senha para a pessoa.");
+            })
+            .catch((err: Error) => setMsg(err.message));
         }}
-        className="mt-2 flex gap-2"
+        className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
       >
-        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail da conta na loja" className={`${campo} flex-1`} />
-        <button type="submit" className="cursor-pointer rounded-full border-none bg-teal px-4 text-[13px] font-semibold text-white">Dar acesso</button>
+        <input required value={novo.name} onChange={(e) => setNovo({ ...novo, name: e.target.value })} placeholder="Nome" className={campo} />
+        <input required value={novo.username} onChange={(e) => setNovo({ ...novo, username: e.target.value.toLowerCase() })} placeholder="Usuário" autoCapitalize="none" className={campo} />
+        <input required minLength={8} type="password" value={novo.password} onChange={(e) => setNovo({ ...novo, password: e.target.value })} placeholder="Senha (8+)" autoComplete="new-password" className={campo} />
+        <button type="submit" className="cursor-pointer rounded-full border-none bg-teal px-4 py-2.5 text-[13px] font-semibold text-white">Criar acesso</button>
       </form>
       {msg && <span className="text-[13px] text-text-2">{msg}</span>}
       <span className="text-[12px] text-muted">Despacho vê só pedidos e lote (etiqueta, despachar, lista de compras). Preço, financeiro e clientes ficam só com a master.</span>

@@ -7,6 +7,7 @@ import { Check } from "lucide-react";
 import { ApiError } from "../lib/api";
 import { resetPassword } from "../lib/extras";
 import SenhaInput from "../components/SenhaInput";
+import logoTurquesa from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-turquesa.svg";
 
 export default function RedefinirSenha() {
   const [params] = useSearchParams();
@@ -39,7 +40,9 @@ export default function RedefinirSenha() {
   return (
     <div className="grid min-h-screen place-items-center bg-snow p-6">
       <div className="grid w-full max-w-[420px] gap-5 rounded-3xl border border-line bg-white p-8">
-        <Link to="/" className="font-logo text-[24px] tracking-[0.28em] text-teal-dark">MIRAVA</Link>
+        <Link to="/" aria-label="Mirava Semijoias, início" className="w-fit">
+          <img src={logoTurquesa} alt="Mirava" className="h-11 w-auto" />
+        </Link>
         {pronto ? (
           <>
             <h1 className="m-0 flex items-center gap-2 font-serif text-[30px] font-normal text-teal-dark">

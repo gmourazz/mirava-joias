@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { AtSign, Clock, Heart, HelpCircle, Lock, Mail, Moon, Package, RefreshCw, Sparkles, Sun, Truck, Cherry, Flame, type LucideIcon } from "lucide-react";
 import { LOJA } from "../config/loja";
-import logoBranco from "../assets/logos/1 - Logo completo (com SEMIJOIAS)/mirava-logo-completo-branco.svg";
+import logoBranco from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-branco.svg";
 
 // Rodapé do design v5: bloco teal-escuro com o topo arredondado, coluna da
 // marca e três colunas de links com ícone.
@@ -57,7 +57,7 @@ export default function Footer() {
       <div className="mx-auto grid max-w-[1360px] grid-cols-1 gap-8 px-[clamp(16px,3vw,40px)] pt-[60px] pb-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,minmax(0,1fr))]">
         <div className="grid content-start gap-5">
           <div className="grid gap-2">
-            <img src={logoBranco} alt="Mirava Semijoias" className="h-[92px] w-auto self-start" />
+            <img src={logoBranco} alt="Mirava Semijoias" className="h-14 w-auto self-start" />
           </div>
           <p className="m-0 max-w-[34ch] text-[14px] leading-[1.7]">
             Semijoias banhadas a prata e ouro 18k, delicadas e feitas pra durar.

@@ -40,14 +40,20 @@ Já está preenchido em `mirava-eccomerce/api/.env`:
 DATABASE_URL=postgresql://mirava:mirava_dev_local@localhost:5432/mirava
 ```
 
-## Criar a primeira admin (você)
+## Criar um usuário do painel
 
-Depois de cadastrar sua conta pelo `/auth/cadastrar` da API, pegue o `id`
-dela e rode:
+O painel tem login próprio, por nome de usuário e senha, separado das contas da
+loja (decisão 46). Para criar um acesso, rode na pasta `api/` com o banco no ar.
+A senha vai pela entrada padrão, para não ficar em arquivo:
 
-```sql
-insert into public.admins (user_id) values ('<uuid da sua conta>');
+```bash
+cd mirava-eccomerce/api
+read -s SENHA && printf '%s' "$SENHA" | go run ./cmd/criar-admin -usuario fulana -nome "Fulana" -papel master
 ```
+
+`-papel dispatch` cria acesso só de pedidos e lote. Depois de ter uma master,
+os acessos de despacho também podem ser criados pelo painel, em Configurações →
+Equipe. O painel abre em `/admin/entrar`.
 
 ## Depois, na VPS da Hostinger
 

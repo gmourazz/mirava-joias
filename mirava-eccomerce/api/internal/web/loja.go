@@ -976,9 +976,10 @@ func (s *Servidor) adminSetAutomationText(w http.ResponseWriter, r *http.Request
 // adminTestAutomation manda a automação, com dados de exemplo, para o e-mail
 // de quem está no painel.
 func (s *Servidor) adminTestAutomation(w http.ResponseWriter, r *http.Request) {
-	user, err := s.auth.DoRequest(r)
-	if err != nil {
-		responder(w, http.StatusUnauthorized, mapa{"error": "não autenticado"})
+	// O usuário do painel não tem e-mail: o teste vai para o e-mail da loja.
+	cfg, err := s.db.Settings(r.Context())
+	if err != nil || cfg.StoreEmail == "" {
+		responder(w, http.StatusBadRequest, mapa{"error": "Informe o e-mail da loja em Configurações"})
 		return
 	}
 	if !s.notif.Ativo() {
@@ -996,11 +997,11 @@ func (s *Servidor) adminTestAutomation(w http.ResponseWriter, r *http.Request) {
 		responder(w, http.StatusNotFound, mapa{"error": "Automação não encontrada"})
 		return
 	}
-	p := notificacao.Pedido{Numero: 1042, Nome: "Marina Alves", Email: user.Email, Produto: "Anel Solitário Aura",
+	p := notificacao.Pedido{Numero: 1042, Nome: "Marina Alves", Email: cfg.StoreEmail, Produto: "Anel Solitário Aura",
 		Total: 12990, Etapa: "Aguardando envio", Cupom: WelcomeCoupon, URLAcao: s.cfg.SiteURL, TextoAcao: "Ver na loja"}
 	s.aplicarTexto(r.Context(), key, &p)
 	s.notif.Avisar(r.Context(), ev, p)
-	responder(w, http.StatusOK, mapa{"ok": true, "to": user.Email})
+	responder(w, http.StatusOK, mapa{"ok": true, "to": cfg.StoreEmail})
 }
 
 // ---------------------------------------------------------------------------
@@ -1024,7 +1025,7 @@ func dispatchAllowed(path string) bool {
 }
 
 func (s *Servidor) adminTeam(w http.ResponseWriter, r *http.Request) {
-	list, err := s.db.Team(r.Context())
+	list, err := s.db.AdminUsers(r.Context())
 	if err != nil {
 		s.falha(w, err, "carregar a equipe")
 		return
@@ -1032,26 +1033,8 @@ func (s *Servidor) adminTeam(w http.ResponseWriter, r *http.Request) {
 	responder(w, http.StatusOK, list)
 }
 
-func (s *Servidor) adminAddTeam(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email string `json:"email"`
-	}
-	if !decode(w, r, &req) {
-		return
-	}
-	err := s.db.AddTeamMember(r.Context(), strings.TrimSpace(req.Email))
-	switch {
-	case errors.Is(err, db.ErrNotAllowed):
-		responder(w, http.StatusBadRequest, mapa{"error": "Essa pessoa precisa criar uma conta na loja antes (ou já tem acesso)"})
-	case err != nil:
-		s.falha(w, err, "dar acesso")
-	default:
-		responder(w, http.StatusOK, mapa{"ok": true})
-	}
-}
-
 func (s *Servidor) adminRemoveTeam(w http.ResponseWriter, r *http.Request) {
-	ok, err := s.db.RemoveTeamMember(r.Context(), r.PathValue("id"))
+	ok, err := s.db.DeactivateAdminUser(r.Context(), r.PathValue("id"))
 	s.okOuNaoAchou(w, ok, err, "tirar o acesso", "Só dá para tirar o acesso de quem é do despacho")
 }
 

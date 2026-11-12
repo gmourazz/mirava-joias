@@ -22,6 +22,7 @@ import PerguntasFrequentes from "./pages/PerguntasFrequentes";
 import Politicas from "./pages/Politicas";
 import SobreNos from "./pages/SobreNos";
 import AdminApp from "./admin/AdminApp";
+import AdminEntrar from "./admin/Entrar";
 import Rastreio from "./pages/Rastreio";
 
 // Telas com topo próprio (checkout e painel): sem faixa de avisos, menu, rodapé
@@ -49,6 +50,7 @@ function Loja() {
         <Route path="/rastreio" element={<Rastreio />} />
         <Route path="/redefinir-senha" element={<RedefinirSenha />} />
         <Route path="/gestao" element={<Navigate to="/admin/pedidos" replace />} />
+        <Route path="/admin/entrar" element={<AdminEntrar />} />
         <Route path="/admin/*" element={<AdminApp />} />
         <Route path="/perguntas-frequentes" element={<PerguntasFrequentes />} />
         <Route path="/sobre-nos" element={<SobreNos />} />

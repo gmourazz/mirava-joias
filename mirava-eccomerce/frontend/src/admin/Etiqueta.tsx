@@ -9,6 +9,7 @@ import { Printer, X } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
 import { useEffect, useState } from "react";
 import { SHIP_LABEL, lojaApi, type AdminOrderDetail, type StoreSettings } from "./api";
+import logoPreto from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-preto.svg";
 
 export default function Etiqueta({ pedido, fechar }: { pedido: AdminOrderDetail; fechar: () => void }) {
   const a = pedido.address ?? {};
@@ -32,7 +33,7 @@ export default function Etiqueta({ pedido, fechar }: { pedido: AdminOrderDetail;
 
         <div className="grid gap-4 rounded-xl border-2 border-text p-5 font-mono text-[13px] text-text">
           <div className="flex items-center justify-between">
-            <span className="font-logo text-[22px] tracking-[0.28em]">MIRAVA</span>
+            <img src={logoPreto} alt="Mirava" className="h-9 w-auto" />
             <span className="rounded border-2 border-text px-2 py-1 font-bold">
               {pedido.shipping_method ? SHIP_LABEL[pedido.shipping_method] : "CORREIOS"}
             </span>
