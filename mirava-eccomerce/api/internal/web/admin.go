@@ -465,10 +465,6 @@ func (s *Servidor) adminConfig(w http.ResponseWriter, r *http.Request) {
 		"new_product_days":          dominio.NewProductDays,
 		"installments_no_interest":  s.cfg.InstallmentsNoInterest,
 		"packaging_cents":           s.cfg.PackagingCents,
-		"site_url":                  s.cfg.SiteURL,
-		"payment_ready":             s.cfg.PaymentReady,
-		"payment_test_mode":         s.cfg.TestMode,
-		"email_ready":               s.notif.Ativo(),
 	})
 }
 

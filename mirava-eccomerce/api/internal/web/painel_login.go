@@ -122,6 +122,28 @@ func (s *Servidor) adminLogin(w http.ResponseWriter, r *http.Request) {
 	responder(w, http.StatusOK, mapa{"token": token, "name": u.Name, "username": u.Username, "role": u.Role})
 }
 
+// requireDev: área técnica do painel, só do papel dev (decisão 47).
+func (s *Servidor) requireDev(h http.HandlerFunc) http.HandlerFunc {
+	return s.requireAdmin(func(w http.ResponseWriter, r *http.Request) {
+		if u := adminAtual(r.Context()); u == nil || u.Role != "dev" {
+			responder(w, http.StatusForbidden, mapa{"error": "Área técnica, só para o papel de dev"})
+			return
+		}
+		h(w, r)
+	})
+}
+
+// adminTech: o estado das integrações, para a dev.
+func (s *Servidor) adminTech(w http.ResponseWriter, r *http.Request) {
+	responder(w, http.StatusOK, mapa{
+		"site_url":          s.cfg.SiteURL,
+		"webhook_url":       s.cfg.WebhookURL,
+		"payment_ready":     s.cfg.PaymentReady,
+		"payment_test_mode": s.cfg.TestMode,
+		"email_ready":       s.notif.Ativo(),
+	})
+}
+
 type chaveAdmin struct{}
 
 // adminAtual é quem está no painel nesta requisição (posto por requireAdmin).
@@ -135,6 +157,7 @@ func (s *Servidor) adminTeamCreate(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Name     string `json:"name"`
 		Password string `json:"password"`
+		Role     string `json:"role"`
 	}
 	if !decode(w, r, &req) {
 		return
@@ -144,6 +167,10 @@ func (s *Servidor) adminTeamCreate(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case !reUsuarioPainel.MatchString(usuario):
 		responder(w, http.StatusBadRequest, mapa{"error": "Usuário com 3 a 40 letras minúsculas, números, ponto, hífen ou sublinhado"})
+		return
+	case req.Role != "master" && req.Role != "dispatch":
+		// Dev só pelo comando criar-admin.
+		responder(w, http.StatusBadRequest, mapa{"error": "Escolha master ou despacho"})
 		return
 	case nome == "":
 		responder(w, http.StatusBadRequest, mapa{"error": "Informe o nome"})
@@ -157,7 +184,7 @@ func (s *Servidor) adminTeamCreate(w http.ResponseWriter, r *http.Request) {
 		s.falha(w, err, "criar o acesso")
 		return
 	}
-	_, err = s.db.CreateAdminUser(r.Context(), usuario, nome, hash, "dispatch")
+	_, err = s.db.CreateAdminUser(r.Context(), usuario, nome, hash, req.Role)
 	switch {
 	case errors.Is(err, db.ErrDuplicate):
 		responder(w, http.StatusConflict, mapa{"error": "Esse usuário já existe"})

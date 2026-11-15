@@ -108,9 +108,9 @@ export interface Summary {
 const auth = { authenticated: "painel" } as const;
 
 export const adminApi = {
-  me: () => api<{ ok: boolean; role: "master" | "dispatch"; name: string; username: string }>("/admin/eu", auth),
+  me: () => api<{ ok: boolean; role: "master" | "dispatch" | "dev"; name: string; username: string }>("/admin/eu", auth),
   login: (username: string, password: string) =>
-    api<{ token: string; name: string; username: string; role: "master" | "dispatch" }>("/admin/auth/entrar", {
+    api<{ token: string; name: string; username: string; role: "master" | "dispatch" | "dev" }>("/admin/auth/entrar", {
       method: "POST",
       body: { username, password },
     }),
@@ -324,11 +324,19 @@ export interface StoreConfig {
   new_product_days: number;
   installments_no_interest: number;
   packaging_cents: number;
+}
+
+export interface TechStatus {
   site_url: string;
+  webhook_url: string;
   payment_ready: boolean;
   payment_test_mode: boolean;
   email_ready: boolean;
 }
+
+export const techApi = {
+  status: () => api<TechStatus>("/admin/tecnico", auth),
+};
 
 export const extraApi = {
   customers: (busca: string) => api<Customer[]>(`/admin/clientes?busca=${encodeURIComponent(busca)}`, auth),
@@ -559,7 +567,7 @@ export interface TeamMember {
   id: string;
   username: string;
   name: string;
-  role: "master" | "dispatch";
+  role: "master" | "dispatch" | "dev";
   last_login_at: string | null;
 }
 
@@ -644,8 +652,8 @@ export const lojaApi = {
   testAutomation: (key: string) => api<{ ok: boolean; to: string }>(`/admin/automacoes/${key}/teste`, { ...auth, method: "POST" }),
 
   team: () => api<TeamMember[]>("/admin/equipe", auth),
-  addTeam: (username: string, name: string, password: string) =>
-    api<{ ok: boolean }>("/admin/equipe", { ...auth, method: "POST", body: { username, name, password } }),
+  addTeam: (username: string, name: string, password: string, role: "master" | "dispatch") =>
+    api<{ ok: boolean }>("/admin/equipe", { ...auth, method: "POST", body: { username, name, password, role } }),
   removeTeam: (id: string) => api<{ ok: boolean }>(`/admin/equipe/${id}`, { ...auth, method: "DELETE" }),
 };
 

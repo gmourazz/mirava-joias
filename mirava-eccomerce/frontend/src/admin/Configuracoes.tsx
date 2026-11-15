@@ -5,12 +5,13 @@
 // markup padrão e a sincronização ficam na tela de Sincronização.
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { CheckCircle2, Trash2, Truck, XCircle } from "lucide-react";
+import { Truck } from "lucide-react";
 import { formatarBRL } from "../lib/dinheiro";
 import { LOJA } from "../config/loja";
 import { quoteShipping, shippingPrazo, type ShippingOption } from "../lib/frete";
 import { lookupZip, onlyDigits } from "../lib/enderecos";
-import { extraApi, lojaApi, type StoreConfig, type StoreSettings, type TeamMember } from "./api";
+import { extraApi, lojaApi, type StoreConfig, type StoreSettings } from "./api";
+import { Bloco, Linha, campo } from "./blocos";
 
 export default function Configuracoes() {
   const [c, setC] = useState<StoreConfig | null>(null);
@@ -26,10 +27,7 @@ export default function Configuracoes() {
   return (
     <>
       <DadosDaLoja />
-      <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-2">
-        <CalcularFrete />
-        <Equipe />
-      </div>
+      <CalcularFrete />
 
       <p className="m-0 rounded-2xl bg-mist px-5 py-4 text-[13.5px] leading-relaxed text-text-2">
         As regras abaixo ficam no código, com teste, e não num formulário: são elas que decidem preço e prazo. Para mudar uma, peça a alteração no
@@ -37,13 +35,6 @@ export default function Configuracoes() {
       </p>
 
       <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-2">
-        <Bloco titulo="Integrações">
-          <Status ok={c.payment_ready} rotulo="Mercado Pago" detalhe={c.payment_ready ? (c.payment_test_mode ? "credenciais de TESTE" : "produção") : "sem credenciais: o checkout recusa"} />
-          <Status ok={c.email_ready} rotulo="E-mails às clientes" detalhe={c.email_ready ? "ativos" : "RESEND_API_KEY não configurada: pedidos saem sem aviso"} />
-          <Linha rotulo="Endereço do site" valor={c.site_url || "—"} />
-          <Linha rotulo="Atendimento" valor={LOJA.email} />
-        </Bloco>
-
         <Bloco titulo="Vendas e frete">
           <Linha rotulo="Frete grátis (PAC) acima de" valor={formatarBRL(c.free_shipping_above_cents)} onde="api/internal/dominio/frete.go" />
           <Linha rotulo="Parcelas sem juros" valor={`${c.installments_no_interest}x`} onde="PARCELAS_SEM_JUROS no .env" />
@@ -71,38 +62,6 @@ export default function Configuracoes() {
   );
 }
 
-function Bloco({ titulo, children }: { titulo: string; children: ReactNode }) {
-  return (
-    <section className="grid content-start gap-1 rounded-[20px] border border-line bg-white p-[22px]">
-      <strong className="mb-2 text-[16px] text-text">{titulo}</strong>
-      {children}
-    </section>
-  );
-}
-
-function Linha({ rotulo, valor, onde }: { rotulo: string; valor: string; onde?: string }) {
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-t border-[#EEF3F2] py-2.5 text-[13.5px] first-of-type:border-t-0">
-      <span className="grid">
-        <span className="text-text-2">{rotulo}</span>
-        {onde && <span className="font-mono text-[11px] text-faint">{onde}</span>}
-      </span>
-      <strong className="text-text">{valor}</strong>
-    </div>
-  );
-}
-
-function Status({ ok, rotulo, detalhe }: { ok: boolean; rotulo: string; detalhe: string }) {
-  return (
-    <div className="flex items-center gap-3 border-t border-[#EEF3F2] py-2.5 text-[13.5px] first-of-type:border-t-0">
-      {ok ? <CheckCircle2 size={18} className="text-success" /> : <XCircle size={18} className="text-[#B4443C]" />}
-      <span className="flex-1 text-text-2">{rotulo}</span>
-      <span className={ok ? "font-semibold text-success" : "font-semibold text-[#B4443C]"}>{detalhe}</span>
-    </div>
-  );
-}
-
-const campo = "w-full min-w-0 rounded-[12px] border-[1.5px] border-line bg-white px-3 py-2.5 text-[13.5px] outline-none focus:border-teal";
 
 function DadosDaLoja() {
   const [st, setSt] = useState<StoreSettings | null>(null);
@@ -214,55 +173,3 @@ function CalcularFrete() {
   );
 }
 
-function Equipe() {
-  const [lista, setLista] = useState<TeamMember[]>([]);
-  const [novo, setNovo] = useState({ username: "", name: "", password: "" });
-  const [msg, setMsg] = useState<string | null>(null);
-  const carregar = () => lojaApi.team().then(setLista).catch((e: Error) => setMsg(e.message));
-  useEffect(() => {
-    void carregar();
-  }, []);
-
-  return (
-    <Bloco titulo="Equipe do painel">
-      {lista.map((m) => (
-        <div key={m.id} className="flex items-center gap-3 border-t border-[#EEF3F2] py-2 text-[13.5px] first-of-type:border-t-0">
-          <span className="flex-1">
-            <strong className="text-text">{m.name}</strong>
-            <span className="block text-[12px] text-muted">usuário {m.username}</span>
-          </span>
-          <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-bold ${m.role === "master" ? "bg-teal-dark text-white" : "bg-mist text-teal"}`}>
-            {m.role === "master" ? "MASTER" : "DESPACHO"}
-          </span>
-          {m.role === "dispatch" && (
-            <button type="button" aria-label="Tirar acesso" onClick={() => void lojaApi.removeTeam(m.id).then(carregar)} className="cursor-pointer border-none bg-transparent p-1 text-muted hover:text-[#B4443C]">
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
-      ))}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setMsg(null);
-          void lojaApi
-            .addTeam(novo.username.trim(), novo.name.trim(), novo.password)
-            .then(() => {
-              setNovo({ username: "", name: "", password: "" });
-              void carregar();
-              setMsg("Acesso de despacho criado. Passe o usuário e a senha para a pessoa.");
-            })
-            .catch((err: Error) => setMsg(err.message));
-        }}
-        className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
-      >
-        <input required value={novo.name} onChange={(e) => setNovo({ ...novo, name: e.target.value })} placeholder="Nome" className={campo} />
-        <input required value={novo.username} onChange={(e) => setNovo({ ...novo, username: e.target.value.toLowerCase() })} placeholder="Usuário" autoCapitalize="none" className={campo} />
-        <input required minLength={8} type="password" value={novo.password} onChange={(e) => setNovo({ ...novo, password: e.target.value })} placeholder="Senha (8+)" autoComplete="new-password" className={campo} />
-        <button type="submit" className="cursor-pointer rounded-full border-none bg-teal px-4 py-2.5 text-[13px] font-semibold text-white">Criar acesso</button>
-      </form>
-      {msg && <span className="text-[13px] text-text-2">{msg}</span>}
-      <span className="text-[12px] text-muted">Despacho vê só pedidos e lote (etiqueta, despachar, lista de compras). Preço, financeiro e clientes ficam só com a master.</span>
-    </Bloco>
-  );
-}

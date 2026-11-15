@@ -1034,8 +1034,8 @@ func (s *Servidor) adminTeam(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Servidor) adminRemoveTeam(w http.ResponseWriter, r *http.Request) {
-	ok, err := s.db.DeactivateAdminUser(r.Context(), r.PathValue("id"))
-	s.okOuNaoAchou(w, ok, err, "tirar o acesso", "Só dá para tirar o acesso de quem é do despacho")
+	ok, err := s.db.DeactivateAdminUser(r.Context(), r.PathValue("id"), adminAtual(r.Context()).ID)
+	s.okOuNaoAchou(w, ok, err, "tirar o acesso", "Esse acesso não pode ser tirado (o seu, de dev ou da última master)")
 }
 
 func (s *Servidor) adminOrderNotices(w http.ResponseWriter, r *http.Request) {

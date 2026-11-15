@@ -10,7 +10,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { Activity, Bell, Box, ExternalLink, LayoutGrid, Lock, LogOut, Menu, RefreshCw, Repeat, Search, Settings, ShoppingBag, Ticket, Users, Wallet, X, Sparkles, Zap, Megaphone, Image, type LucideIcon, Layers } from "lucide-react";
+import { Activity, Bell, Box, ExternalLink, LayoutGrid, Lock, LogOut, Menu, RefreshCw, Repeat, Search, Settings, ShoppingBag, Ticket, Users, Wallet, X, Sparkles, Zap, Megaphone, Image, type LucideIcon, Layers, Wrench } from "lucide-react";
 import { ApiError, clearPainelToken, currentPainelToken } from "../lib/api";
 import { adminApi, type Summary } from "./api";
 import VisaoGeral from "./VisaoGeral";
@@ -21,6 +21,7 @@ import Sincronizacao from "./Sincronizacao";
 import Clientes from "./Clientes";
 import Atividades from "./Atividades";
 import Configuracoes from "./Configuracoes";
+import Tecnico from "./Tecnico";
 import Cupons from "./Cupons";
 import Marketing from "./Marketing";
 import Conteudo from "./Conteudo";
@@ -31,7 +32,7 @@ import Automacoes from "./Automacoes";
 import logoBranco from "../assets/logos/2 - Logo sem SEMIJOIAS/mirava-logo-branco.svg";
 
 // Ordem do design v5. "despacho" = o que o papel de despacho vê (decisão 27).
-const NAV: { to: string; label: string; Icon: LucideIcon; despacho?: boolean }[] = [
+const NAV: { to: string; label: string; Icon: LucideIcon; despacho?: boolean; dev?: boolean }[] = [
   { to: "/admin", label: "Visão geral", Icon: LayoutGrid },
   { to: "/admin/produtos", label: "Produtos", Icon: Box },
   { to: "/admin/vitrine", label: "Vitrine da loja", Icon: Sparkles },
@@ -47,9 +48,10 @@ const NAV: { to: string; label: string; Icon: LucideIcon; despacho?: boolean }[]
   { to: "/admin/conteudo", label: "Banners e avisos", Icon: Image },
   { to: "/admin/configuracoes", label: "Configurações", Icon: Settings },
   { to: "/admin/atividades", label: "Atividades", Icon: Activity },
+  { to: "/admin/tecnico", label: "Técnico", Icon: Wrench, dev: true },
 ];
 
-type Papel = "master" | "dispatch";
+type Papel = "master" | "dispatch" | "dev";
 
 export default function AdminApp() {
   const navigate = useNavigate();
@@ -106,6 +108,7 @@ export default function AdminApp() {
         <Route path="automacoes" element={<Automacoes />} />
         <Route path="atividades" element={<Atividades />} />
         <Route path="configuracoes" element={<Configuracoes />} />
+        {papel === "dev" && <Route path="tecnico" element={<Tecnico />} />}
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
       )}
@@ -121,7 +124,7 @@ function Moldura({ children, papel, nome }: { children: ReactNode; papel: Papel;
   };
   const { pathname } = useLocation();
   const [menuAberto, setMenuAberto] = useState(false);
-  const nav = papel === "dispatch" ? NAV.filter((n) => n.despacho) : NAV;
+  const nav = papel === "dispatch" ? NAV.filter((n) => n.despacho) : papel === "dev" ? NAV : NAV.filter((n) => !n.dev);
   const atual = nav.find((n) => (n.to === "/admin" ? pathname === "/admin" : pathname.startsWith(n.to))) ?? nav[0];
 
   useEffect(() => setMenuAberto(false), [pathname]);
@@ -130,7 +133,7 @@ function Moldura({ children, papel, nome }: { children: ReactNode; papel: Papel;
     <aside className="flex h-full flex-col gap-[22px] bg-teal-dark px-3.5 py-[22px] text-[#D9ECEA]">
       <div className="grid gap-2 px-2">
         <img src={logoBranco} alt="Mirava" className="h-10 w-auto self-start" />
-        <span className="w-fit rounded-full bg-teal px-2.5 py-1 text-[10px] font-bold tracking-[0.18em] text-teal-pale">{papel === "dispatch" ? "DESPACHO" : "ADMIN MASTER"}</span>
+        <span className="w-fit rounded-full bg-teal px-2.5 py-1 text-[10px] font-bold tracking-[0.18em] text-teal-pale">{papel === "dispatch" ? "DESPACHO" : papel === "dev" ? "DEV" : "ADMIN MASTER"}</span>
       </div>
       <nav className="grid gap-1">
         {nav.map(({ to, label, Icon }) => (
@@ -202,7 +205,7 @@ function Moldura({ children, papel, nome }: { children: ReactNode; papel: Papel;
             </span>
             <span className="hidden text-[13px] leading-tight sm:grid">
               <strong className="text-text">{nome}</strong>
-              <span className="text-muted">{papel === "dispatch" ? "Despacho" : "Master"}</span>
+              <span className="text-muted">{papel === "dispatch" ? "Despacho" : papel === "dev" ? "Dev" : "Master"}</span>
             </span>
           </div>
         </header>

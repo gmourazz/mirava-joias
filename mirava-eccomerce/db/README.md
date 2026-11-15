@@ -51,9 +51,10 @@ cd mirava-eccomerce/api
 read -s SENHA && printf '%s' "$SENHA" | go run ./cmd/criar-admin -usuario fulana -nome "Fulana" -papel master
 ```
 
-`-papel dispatch` cria acesso só de pedidos e lote. Depois de ter uma master,
-os acessos de despacho também podem ser criados pelo painel, em Configurações →
-Equipe. O painel abre em `/admin/entrar`.
+Papéis (decisão 47): `master` é a admin da loja, `dispatch` vê só pedidos e
+lote, e `dev` vê tudo da master mais a área Técnico, onde cria e tira acessos
+de master e despacho. Dev só se cria por este comando. O painel abre em
+`/admin/entrar`.
 
 ## Depois, na VPS da Hostinger
 

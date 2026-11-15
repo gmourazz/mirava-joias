@@ -20,11 +20,11 @@ import (
 func main() {
 	usuario := flag.String("usuario", "", "nome de usuário (minúsculas)")
 	nome := flag.String("nome", "", "nome de quem usa o painel")
-	papel := flag.String("papel", "master", "master ou dispatch")
+	papel := flag.String("papel", "master", "master, dispatch ou dev")
 	flag.Parse()
 
-	if *usuario == "" || *nome == "" || (*papel != "master" && *papel != "dispatch") {
-		fmt.Fprintln(os.Stderr, "uso: (senha pela entrada padrão) | criar-admin -usuario fulana -nome \"Fulana\" [-papel master|dispatch]")
+	if *usuario == "" || *nome == "" || (*papel != "master" && *papel != "dispatch" && *papel != "dev") {
+		fmt.Fprintln(os.Stderr, "uso: (senha pela entrada padrão) | criar-admin -usuario fulana -nome \"Fulana\" [-papel master|dispatch|dev]")
 		os.Exit(2)
 	}
 	senha, _ := bufio.NewReader(os.Stdin).ReadString('\n')

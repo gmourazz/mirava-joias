@@ -56,7 +56,8 @@ func (d *DB) CreateAdminUser(ctx context.Context, username, name, hash, role str
 }
 
 func (d *DB) AdminUsers(ctx context.Context) ([]AdminUser, error) {
-	rows, err := d.pool.Query(ctx, `select `+adminUserCols+` from admin_users where active order by role desc, name`)
+	rows, err := d.pool.Query(ctx, `select `+adminUserCols+` from admin_users where active
+		order by case role when 'dev' then 0 when 'master' then 1 else 2 end, name`)
 	if err != nil {
 		return nil, err
 	}
@@ -72,10 +73,15 @@ func (d *DB) AdminUsers(ctx context.Context) ([]AdminUser, error) {
 	return out, rows.Err()
 }
 
-// DeactivateAdminUser tira o acesso de quem é do despacho. Master não sai por
-// aqui, para a loja nunca ficar sem quem administre.
-func (d *DB) DeactivateAdminUser(ctx context.Context, id string) (bool, error) {
-	tag, err := d.pool.Exec(ctx, `update admin_users set active = false where id::text = $1 and role = 'dispatch'`, id)
+// DeactivateAdminUser tira o acesso de alguém da equipe. Não tira o próprio
+// acesso, não tira dev (só pelo banco) e não tira a última master, para a
+// loja nunca ficar sem quem administre.
+func (d *DB) DeactivateAdminUser(ctx context.Context, id, quemPede string) (bool, error) {
+	tag, err := d.pool.Exec(ctx, `
+		update admin_users set active = false
+		where id::text = $1 and id::text <> $2 and role <> 'dev'
+		  and (role <> 'master' or (select count(*) from admin_users where role = 'master' and active) > 1)`,
+		id, quemPede)
 	return tag.RowsAffected() > 0, err
 }
 

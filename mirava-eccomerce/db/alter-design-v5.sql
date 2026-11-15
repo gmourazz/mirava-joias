@@ -566,8 +566,12 @@ create table if not exists public.admin_users (
   username       text not null unique check (username ~ '^[a-z0-9._-]{3,40}$'),
   name           text not null,
   password_hash  text not null,
-  role           text not null default 'master' check (role in ('master', 'dispatch')),
+  role           text not null default 'master' check (role in ('master', 'dispatch', 'dev')),
   active         boolean not null default true,
   created_at     timestamptz not null default now(),
   last_login_at  timestamptz
 );
+
+-- Papel de dev (decisão 47): tudo da master e a área técnica.
+alter table public.admin_users drop constraint if exists admin_users_role_check;
+alter table public.admin_users add constraint admin_users_role_check check (role in ('master', 'dispatch', 'dev'));
